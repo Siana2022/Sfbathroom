@@ -47,7 +47,11 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
 - [x] Exportación de cualquier vista a Excel: helper `lib/csv.ts` + componente
       `DescargarExcel` en Facturación, Clientes, Margen, Alertas, Pedidos, Stock,
       Concentración, Crédito-Cobro, Calidad, Canal y Marca y Actividad comercial.
-- [ ] Drill-down hasta el documento origen (factura, línea, pedido).
+- [x] Drill-down hasta el documento origen (factura, línea, pedido) — `app/documentos`,
+      `lib/datos/documentos.ts` (commit `0daedbd`): listado paginado y filtrable de
+      facturas/abonos/notas de cargo y detalle con líneas (artículo, familia, marca),
+      pedido de origen, albarán y abonos cruzados. La parte <i>documental</i> (enlaces al
+      ERP) seguirá dependiendo del conector A3ERP.
 - [ ] Consolidada de holding (SF + DOT + Fuxsabany en un mismo número).
 - [x] Vistas semanal (ISO) y diaria; 12 meses rodantes y proyección de cierre (Q26) — página
       de facturación (`lib/datos/vistas.ts`, `app/facturacion`).
