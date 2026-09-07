@@ -11,6 +11,21 @@ export default async function MargenPage() {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
   const d = await getMargen(empresa, ANIO);
 
+  if (d.sinAcceso) {
+    return (
+      <div>
+        <p className="breadcrumb">Cuadro de mando · Bloque 3</p>
+        <h1>Margen y rentabilidad</h1>
+        <div className="card">
+          <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
+            El bloque de margen y costes está restringido a dirección y al responsable financiero.
+            Consulta al administrador si necesitas acceso.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <p className="breadcrumb">Cuadro de mando · Bloque 3</p>

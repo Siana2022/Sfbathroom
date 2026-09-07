@@ -30,9 +30,15 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
 - [ ] Drill-down hasta el documento origen (factura, línea, pedido).
 - [ ] Consolidada de holding (SF + DOT + Fuxsabany en un mismo número).
 - [ ] Vistas semanal (ISO) y diaria; 12 meses rodantes y proyección de cierre.
-- [ ] Cerrar reglas de negocio 0.2 pendientes con dirección (portes a parte de la neta,
-      regla exacta de cliente perdido, tipo de cambio aplicado al coste).
-- [ ] Verificar que los márgenes no sean visibles para roles no dirección/financiero.
+- [x] Cerrar reglas de negocio 0.2 con dirección (portes a parte, cliente activo 12M, perdido
+      12M sin facturar tras 12M con, tipo de cambio del pedido) — ver
+      `docs/cuestionario-cliente.md` Q1–Q4, Q7 y Q8–Q19 (umbrales confirmados).
+- [x] Definir umbrales de alertas iniciales (confirmados Q8–Q19); pendiente hacerlos
+      configurables desde interfaz + apartado de configuración de dirección (percibir Q6).
+- [~] Márgenes visibles solo para dirección/financiero: migración `0005` (vista margen con
+      `security_invoker` + RLS) y gating por rol en `app/margen`. Queda aplicar `0005`.
+- [ ] Aviso de clientes no activos (Q2) + definiciones 12M aplicadas a B5.
+- [ ] Coste de transporte anual como métrica propia, fuera de la neta (Q1).
 
 ### Bloques
 - B1: [x] métricas base + mensual vs previo + presupuesto. [ ] análisis de variación en

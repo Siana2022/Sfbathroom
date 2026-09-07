@@ -1,9 +1,11 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
+import { getRol, puedeVerMargenes } from '@/lib/datos/role';
 
 export type MargenData = {
   empresa: { id: string; codigo: string; nombre: string };
   anio: number;
+  sinAcceso: boolean;
   importeVendido: number;
   costeVenta: number;
   margen: number;
@@ -20,6 +22,22 @@ type FilaFamilia = { id: string; nombre: string };
 export async function getMargen(codigoEmpresa: string, anio: number): Promise<MargenData> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
+
+  const rol = await getRol();
+  if (!puedeVerMargenes(rol)) {
+    return {
+      empresa,
+      anio,
+      sinAcceso: true,
+      importeVendido: 0,
+      costeVenta: 0,
+      margen: 0,
+      margenPct: 0,
+      porFamilia: [],
+      porArticulo: [],
+      ultimosLotes: [],
+    };
+  }
 
   const { data: facturasIds } = await supabase
     .from('facturas')
@@ -102,6 +120,7 @@ export async function getMargen(codigoEmpresa: string, anio: number): Promise<Ma
   return {
     empresa,
     anio,
+    sinAcceso: false,
     importeVendido,
     costeVenta,
     margen,

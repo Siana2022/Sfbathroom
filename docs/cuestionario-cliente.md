@@ -1,111 +1,67 @@
-# Cuestionario para el responsable de sfbathroom
+# Decisiones del responsable — cuestionario resuelto (29/09/2026)
 
-Rellena junto a cada pregunta la opción elegida (o escribe tu respuesta). Las opciones marcadas
-como **[RECOMENDADO]** son las que proponemos por defecto para que las confirmes o cambies.
+Reglas cerradas con dirección para desbloquear el cuadro de mando. Cada decisión cita la
+pregunta (Q#) y el estado de implementación.
 
----
+## 1. Reglas de negocio
 
-## 1. Reglas de negocio (bloquean los cálculos)
+- **Q1. Portes**: la facturación neta NO incluye portes como venta. Si el porte supera un cierto
+  importe se refleja, pero no se imputa al cliente. Se quiere el **coste de transporte anual**
+  como métrica propia, extraído de la línea de proveedores (flete/aduana/seguro/transporte de
+  `compras`). [PENDIENTE de implementación]
+- **Q2. Cliente activo** = ≥ 1 pedido en los últimos 12 meses. **+ aviso de clientes no activos**
+  (listado y aviso en el semáforo de fuga).  [PENDIENTE: ajustar B5/alertas a definición 12M]
+- **Q3. Cliente perdido** = lleva 12 meses sin facturar habiendo facturado en los 12 meses
+  anteriores.  [PENDIENTE: ajustar B5]
+- **Q4. Tipo de cambio**: el del pedido de compra (ya modelado en `compras.tipo_cambio`).
+- **Q5. Márgenes/costes**: solo dirección y responsable financiero.  [PENDIENTE: cierre RLS +
+  puerta en la app para /margen y señal "margen bajo" de /alertas]
+- **Q6. Saturación comercial** = >1,5 M€ trimestrales gestionados y/o >60 clientes activos.
+  **+ el responsable de dirección debe poder modificar estos umbrales desde un apartado de
+  configuración** (mecanismo `alertas_config`, con interfaz de administración).  [PENDIENTE]
+- **Q7. Tarifa**: se usará tarifa de A3ERP al conectar; mientras tanto, precio medio del año
+  anterior como referencia de erosión de precio.
 
-**Q1. Portes de la facturación neta.**
-- a) Los portes van aparte, no como venta [RECOMENDADO]
-- b) Los portes se incluyen en la facturación neta
+## 2. Umbrales de alertas (valores iniciales, configurables luego desde la interfaz)
 
-**Q2. Definición de "cliente activo".**
-- a) Al menos un pedido en los últimos 12 meses [RECOMENDADO]
-- b) Al menos una factura en los últimos 12 meses
-- c) Otra (específica)
+| Alerta | Umbral |
+|---|---|
+| Cliente en riesgo de fuga | 2,5× su frecuencia habitual de pedido |
+| Caída de cliente relevante | −20% en 12M rodantes |
+| Rotura de stock inminente | cobertura < 60 días |
+| Pedido bajo margen objetivo | margen < 30% |
+| Erosión de precio | desvío > 10% sobre tarifa |
+| Cliente alargando pagos | DSO > 1,5× su media histórica |
+| Vencido relevante | > 2.000 € a más de 60 días |
+| Límite de crédito superado | riesgo vivo > 90% del límite |
+| Concentración creciendo | +5 p.p. del % top 10 frente al trimestre anterior |
+| Familia dependiente de un cliente | 1 cliente ≥ 70% de una familia relevante (≥8% del total) |
+| Retraso de proveedor | plazo real > 75 días frente a los 60 pactados |
+| Desviación de presupuesto | −15% mes o −10% acumulado |
 
-**Q3. Definición de "cliente perdido".**
-- a) Facturó en los 12 meses anteriores y lleva más de 90 días sin pedir [RECOMENDADO]
-- b) Estado marcado a mano en el CRM
-- c) Otra (específica)
+## 3. Datos e integración
 
-**Q4. Tipo de cambio aplicado al coste de compras en dólares.**
-- a) El del pedido de compra [RECOMENDADO]
-- b) El del pago
-- c) El medio del periodo
+- **Q20. A3ERP**: pendiente. Versión de escritorio sobre servidor físico propio.
+  → **Plantear sistema de exportación de datos** (ver `docs/exportacion-a3erp.md`).
+- **Q21. Holding**: se trabaja solo SF Bathroom ahora, pero el esquema debe estar preparado para
+  las 3 entidades (ya lo está; la vista consolidada queda para cuando haya datos de DOT/FUX).
+- **Q22. Marketing y Financiero**: se deja para el final (el Excel está disponible, no se sube
+  ahora).
+- **Q23. Seguro de crédito**: pendiente de respuesta del departamento financiero.
+- **Q24. Efectos/impagados**: proceso manual con Excel de consolidación bancaria. Se soportará
+  como marcado manual en `cobros` y/o import del Excel; sin automatización.
 
-**Q5. ¿Quién debe ver márgenes y costes?**
-- a) Solo dirección y financiero [RECOMENDADO]
-- b) También los comerciales (solo los suyos)
+## 4. Alcance de la app
 
-**Q6. Umbral de saturación de un comercial** (¿cuándo se considera "saturado"?).
-- a) > 1,5 M€ trimestrales gestionados y/o > 60 clientes activos [RECOMENDADO]
-- b) Otros (específica importe y nº de clientes)
+- **Q25. Prioridad**: el orden lo decide Siana. Secuencia: Ciclo de crédito (B8+B2) →
+  Rentabilidad (B3+B9) → Servicio y stock (B4) → Fuga y crecimiento (B5+B6) → Riesgo (B7) →
+  Calidad (B10) → Transversal (filtros, export, drill-down al final).
+- **Q26. Vistas temporales**: se construyen ya (diaria, semanal ISO, 12M rodantes, proyección de
+  cierre).
+- **Q27. Drill-down**: se espera al ERP.
+- **Q28. Alertas por correo**: no por ahora, se empieza con buzón dentro de la app.
 
-**Q7. Tarifa para medir erosión de precio.**
-- a) Usar lista de tarifa de A3ERP cuando se conecte; mientras tanto, precio medio del año anterior [RECOMENDADO]
-- b) No medir erosión por ahora
+## 5. Esquema
 
----
-
-## 2. Umbrales de alertas (valores iniciales, luego configurables en la app)
-
-Proponemos estos valores de arranque. Confirmar o corregir cada uno:
-
-| Q# | Alerta | Umbral propuesto |
-|----|--------|------------------|
-| Q8 | Cliente en riesgo de fuga | 2,5× su frecuencia habitual de pedido |
-| Q9 | Caída de cliente relevante | −20% en 12M rodantes |
-| Q10 | Rotura de stock inminente | cobertura < 60 días (plazo reposición) |
-| Q11 | Pedido bajo margen objetivo | margen < 30% |
-| Q12 | Erosión de precio | desvío > 10% sobre tarifa |
-| Q13 | Cliente alargando pagos | DSO > 1,5× su media histórica |
-| Q14 | Vencido relevante | > 2.000 € a más de 60 días |
-| Q15 | Límite de crédito superado | riesgo vivo > 90% del límite |
-| Q16 | Concentración creciendo | +5 p.p. del % top 10 frente al trimestre anterior |
-| Q17 | Familia dependiente de un cliente | 1 cliente ≥ 70% de una familia relevante (≥8% del total) |
-| Q18 | Retraso de proveedor | plazo real > 75 días frente a los 60 pactados |
-| Q19 | Desviación de presupuesto | −15% mes o −10% acumulado |
-
-> ¿Alguno se cambia? Indica solo los que quieras ajustar.
-
----
-
-## 3. Datos e integración (lo que necesitamos del cliente)
-
-**Q20. Conector A3ERP.** ¿Nos puedes facilitar ya servidor, nombre de BD y credenciales de
-lectura del SQL Server, y confirmar acceso de red (VPN/firewall)? *(Fecha prevista: ____)*
-
-**Q21. Holding.** ¿Trabajamos solo SF Bathroom en esta fase, o preparamos también DOT Surfaces
-y Fuxsabany?
-
-**Q22. Marketing y Financiero.** ¿Conseguimos el Excel histórico (>10 años) y las cuentas?
-¿Import manual con tu equipo o esperamos al workflow n8n?
-
-**Q23. Seguro de crédito.** ¿Existe póliza? Si sí, ¿de dónde sacamos el saldo cubierto por
-cliente (manual/Excel)?
-
-**Q24. Efectos/impagados.** ¿El ERP registra efectos e impagos confirmados? Si no, ¿marcamos
-los impagados a mano en `cobros`?
-
----
-
-## 4. Alcance y funcionamiento de la app
-
-**Q25. Prioridad de construcción.** Ordénalos del 1 (primero) al 6:
-- ___ Ciclo de crédito: cobros/DSO completo (B8) + ticket, plazos y cumplimiento de fecha (B2)
-- ___ Rentabilidad: margen por pedido/comercial/canal + ranking (B3) + margen y presupuesto por comercial (B9)
-- ___ Servicio y stock: rotación, fill rate, stock muerto, venta perdida (B4)
-- ___ Fuga y crecimiento: evolución individual, cohortes (B5) + canal/marca completo (B6)
-- ___ Riesgo: top 20, evolución concentración, riesgo de proveedor (B7)
-- ___ Calidad: devoluciones por referencia/familia, coste con margen (B10)
-- ___ Transversal: filtros por dimensión, export a Excel, drill-down (al final, toca todas las páginas)
-
-**Q26. Vistas temporales.** ¿Se construyen ya diaria/semanal/12M rodante/proyección de cierre,
-o se añaden cuando el ERP real las alimente (mientras tanto seguimos con mensual + acumulado)?
-
-**Q27. Drill-down.** ¿Basta con abrir la factura/pedido origen dentro de la app ahora, o se
-espera al ERP?
-
-**Q28. Alertas por correo.** ¿Dirección(es) de destino y frecuencia (diario al amanecer tras la
-carga)? ¿O empezamos con un buzón dentro de la app?
-
----
-
-## 5. Confirmación de esquema (cambio técnico, 1 min)
-
-**Q29.** ¿Añadimos a `incidencias` el lote/compra de origen y la fecha de cierre, para poder
-medir devoluciones por lote y plazo de resolución?
-- a) Sí [RECOMENDADO] b) No
+- **Q29. Incidencias**: SÍ añadir `compra_id` (devoluciones por lote) y `fecha_cierre` (plazo de
+  resolución). → migración `0005`. [PENDIENTE de aplicar por el cliente]
