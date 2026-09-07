@@ -51,9 +51,10 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
       cliente, matriz margen×rotación, ranking por margen, erosión de tarifa, evolución
       mensual. [ ] evolución 12M rodante con alerta ya cubierta en B11 (señal de margen por
       debajo de objetivo); añadir filtros cruzados cuando estén (transversal).
-- B4: [x] valor, en tránsito, cobertura media, roturas, bajo punto. [ ] rotación, fill rate,
-      venta perdida, stock muerto/baja rotación, cobertura por estacionalidad, propuesta de
-      aprovisionamiento, cruce cobertura×cartera, evolución mensual del inmovilizado.
+- B4: [x] valor, en tránsito, cobertura media, roturas, bajo punto. [x] rotación, fill rate,
+      venta perdida, stock muerto/baja rotación, propuesta de aprovisionamiento, cruce
+      cobertura×cartera. [ ] cobertura por estacionalidad y evolución mensual del inmovilizado
+      (necesitan histórico de fotos de stock desde A3ERP, ver `docs/exportacion-a3erp.md`).
 - B5: [ ] matriz cliente×familia, semáforo de fuga, frecuencia/último pedido, evolución
       individual ordenada por delta, cohortes.
 - B6: [ ] margen y unidades por segmento, crecimiento YoY, peso 12M en rodante, diferencial
