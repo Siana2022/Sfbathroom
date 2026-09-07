@@ -22,11 +22,103 @@ export default async function ClientesPage() {
 
       <ul className="grid-kpis">
         <Kpi etiqueta={`Clientes activos ${d.anio}`} valor={numero(d.activos)} nota={`en ${ANIO - 1}: ${d.activosPrevio}`} />
+        <Kpi etiqueta="Clientes activos 12M" valor={numero(d.activos12m)} nota="con al menos un pedido en los últimos 12 meses" />
         <Kpi etiqueta="Tasa de retención" valor={d.retencion === null ? '—' : `${decimal(d.retencion)} %`} nota="siguen facturando año a año" />
         <Kpi etiqueta="Nuevos clientes" valor={numero(d.nuevos)} nota="no facturaron el año previo" />
         <Kpi etiqueta="Recuperados" valor={numero(d.recuperados)} nota="facturaron previo, no el actual" />
         <Kpi etiqueta="Clientes perdidos / inactivos" valor={numero(d.perdidos)} nota="estado marcado en el CRM" />
       </ul>
+
+      <div className="card">
+        <h2>Clientes sin actividad en 12 meses</h2>
+        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
+          Aviso Q2: clientes con estado activo pero sin facturar desde hace más de 365 días.
+          Candidatos a reactivación (o a su clasificación como perdidos).
+        </p>
+        {d.noActivos.length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>Todos los clientes activos han facturado en los últimos 12 meses.</p>
+        ) : (
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th className="td-num">Días sin facturar</th>
+                <th>Última factura</th>
+              </tr>
+            </thead>
+            <tbody>
+              {d.noActivos.map((c) => (
+                <tr key={c.nombre}>
+                  <td>{c.nombre}</td>
+                  <td className={`td-num ${c.diasSin > 365 ? 'td-pos' : ''}`}>{numero(c.diasSin)}</td>
+                  <td>{c.ultimaFactura}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="card">
+        <h2>Evolución por cliente: últimos 12M frente a los 12M previos</h2>
+        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
+          Top de variación (ganadores y zonas de caída) para priorizar el plan de visita.
+        </p>
+        <table className="tabla">
+          <thead>
+            <tr>
+              <th>Cliente</th>
+              <th className="td-num">Neta 12M</th>
+              <th className="td-num">Neta 12M previos</th>
+              <th className="td-num">Delta</th>
+              <th className="td-num">Delta %</th>
+            </tr>
+          </thead>
+          <tbody>
+            {d.movimiento.map((c) => (
+              <tr key={c.nombre}>
+                <td>{c.nombre}</td>
+                <td className="td-num">{eur(c.netaActual)}</td>
+                <td className="td-num">{eur(c.netaPrevia)}</td>
+                <td className={`td-num ${c.delta < 0 ? 'td-pos' : ''}`}>{c.delta > 0 ? '+' : ''}{eur(c.delta)}</td>
+                <td className={`td-num ${c.delta < 0 ? 'td-pos' : ''}`}>{c.deltaPct === null ? '—' : `${c.deltaPct > 0 ? '+' : ''}${decimal(c.deltaPct)} %`}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="card">
+        <h2>Cohortes mensuales de nuevos clientes</h2>
+        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
+          Clientes que empezaron a facturar en cada mes de {ANIO - 1} y cuántos siguen comprando
+          a día de hoy.
+        </p>
+        {d.cohortes.length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>Sin cohortes del ejercicio previo.</p>
+        ) : (
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Mes de inicio</th>
+                <th className="td-num">Nuevos</th>
+                <th className="td-num">Activos hoy</th>
+                <th className="td-num">Retención</th>
+              </tr>
+            </thead>
+            <tbody>
+              {d.cohortes.map((c) => (
+                <tr key={c.mes}>
+                  <td>{c.mes}</td>
+                  <td className="td-num">{numero(c.nuevos)}</td>
+                  <td className="td-num">{numero(c.activos12m)}</td>
+                  <td className="td-num">{c.retencion === null ? '—' : `${decimal(c.retencion)} %`}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
 
       <div className="card">
         <h2>Clientes por facturación {d.anio}</h2>

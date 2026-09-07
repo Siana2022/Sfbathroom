@@ -37,7 +37,8 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
       configurables desde interfaz + apartado de configuración de dirección (percibir Q6).
 - [~] Márgenes visibles solo para dirección/financiero: migración `0005` (vista margen con
       `security_invoker` + RLS) y gating por rol en `app/margen`. Queda aplicar `0005`.
-- [ ] Aviso de clientes no activos (Q2) + definiciones 12M aplicadas a B5.
+- [ ] Aviso de clientes no activos (Q2) visible en la página de clientes ([x]) y como señal
+      en `lib/datos/alertas.ts` ([ ]).
 - [ ] Coste de transporte anual como métrica propia, fuera de la neta (Q1).
 
 ### Bloques
@@ -55,8 +56,9 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
       venta perdida, stock muerto/baja rotación, propuesta de aprovisionamiento, cruce
       cobertura×cartera. [ ] cobertura por estacionalidad y evolución mensual del inmovilizado
       (necesitan histórico de fotos de stock desde A3ERP, ver `docs/exportacion-a3erp.md`).
-- B5: [ ] matriz cliente×familia, semáforo de fuga, frecuencia/último pedido, evolución
-      individual ordenada por delta, cohortes.
+- B5: [x] matriz cliente×familia, semáforo de fuga, definiciones Q2/Q3 aplicadas (activo por
+      pedido 12M, aviso de clientes sin actividad, perdido 12M), evolución individual por
+      delta (12M vs 12M previos), cohortes mensuales con retención.
 - B6: [ ] margen y unidades por segmento, crecimiento YoY, peso 12M en rodante, diferencial
       de margen SB vs MB, marca blanca por cliente-fabricante.
 - B7: [ ] top 20, concentración de producto (3 familias / 20 refs / nº refs que dan el 80%),
