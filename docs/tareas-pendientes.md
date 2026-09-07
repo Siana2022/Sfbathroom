@@ -44,8 +44,9 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
 - B1: [x] métricas base + mensual vs previo + presupuesto. [ ] análisis de variación en
       página (capa de datos hecha en `getVariacion`), semanal/diaria/12M/proyección,
       desvío presupuesto por comercial/cliente/familia.
-- B2: [ ] ticket medio de pedido, cartera por fecha solicitada, motivo de anulación,
-      modificaciones, plazo pedido→entrega, cumplimiento de fecha prometida.
+- B2: [x] ticket medio de pedido, cartera por fecha solicitada, motivo de anulación,
+      modificaciones, plazo pedido→entrega, cumplimiento de fecha prometida (commit del
+      paquete Ciclo de crédito).
 - B3: [ ] margen por unidad, por pedido/factura, por comercial, por marca/canal/país y
       cliente, matriz margen×rotación, ranking por margen, erosión de tarifa, evolución
       12M con alerta.
@@ -59,8 +60,9 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
 - B7: [ ] top 20, concentración de producto (3 familias / 20 refs / nº refs que dan el 80%),
       concentración geográfica por país, matriz cliente×familia de riesgo, riesgo de
       proveedor (chino, sin alternativas, plazos vs 90 días).
-- B8: [ ] desvío DSO vs 30 días, DSO por cliente y su evolución, impagos/devoluciones de
-      efectos, riesgo vivo vs límite de crédito, cobertura de seguro.
+- B8: [x] desvío DSO vs 30 días, DSO por cliente y su evolución, riesgo vivo vs límite de
+      crédito (commit del paquete Ciclo de crédito); cobertura de seguro de crédito a la
+      espera de Q23. [ ] impagos/devoluciones de efectos (manual vía Excel, Q24).
 - B9: [x] facturación, clientes, descuento medio, pedidos por persona. [ ] carga SF+DOT
       consolidada, margen aportado, cumplimiento presupuesto, nuevos/perdidos, saturación.
 - B10: [ ] devoluciones por referencia/familia/lote y en unidades, coste cruzado con margen,
@@ -68,7 +70,8 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
 - B11: [x] señales calculadas + alertas_generadas. [ ] umbrales configurables desde interfaz,
       envío por correo, disparadores restantes (fuga top-10, erosión de precio, DSO al alza,
       saturación, retraso de proveedor, familia dependiente de un cliente).
-- B12: [ ] cuadros de mando por perfil y cadencia (operativa/comercial/estratégica/holding).
+- B12: [x] cuadros de mando por perfil y cadencia (operativa/comercial/estratégica/holding)
+      + consolidada de holding por estado (commit `7c8db83`).
 
 ## 1. Autenticación y perfiles
 - [x] Activar Supabase Auth (email/password basta, es un único usuario por ahora).
