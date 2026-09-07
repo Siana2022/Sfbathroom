@@ -1,0 +1,82 @@
+:root {
+  --bg: #0f1115;
+  --panel: #171a21;
+  --border: #262b36;
+  --text: #e8e9ec;
+  --muted: #9aa1ad;
+  --accent: #4f8cff;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+a { color: inherit; text-decoration: none; }
+
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+nav.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  padding: 24px 16px;
+}
+
+nav.sidebar h1 {
+  font-size: 15px;
+  margin: 0 0 24px 8px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+nav.sidebar a {
+  display: block;
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+nav.sidebar a:hover {
+  background: rgba(79, 140, 255, 0.12);
+  color: var(--accent);
+}
+
+main.content {
+  flex: 1;
+  padding: 32px 40px;
+  max-width: 960px;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+
+.card h2 { margin-top: 0; font-size: 18px; }
+
+.badge {
+  display: inline-block;
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  margin-bottom: 10px;
+}
+
+.badge.pendiente { background: rgba(255, 180, 60, 0.15); color: #ffb43c; }
+.badge.listo { background: rgba(60, 200, 120, 0.15); color: #3cc878; }
+
+ul.tablas { color: var(--muted); font-size: 13px; margin: 8px 0 0; padding-left: 18px; }

@@ -1,0 +1,54 @@
+# Backlog
+
+Orden sugerido, no estricto — reordena si el cliente marca otra prioridad.
+
+## 1. Autenticación (bloqueante para casi todo lo demás)
+- [ ] Activar Supabase Auth (email/password basta, es un único usuario por ahora).
+- [ ] Página de login en Next.js + middleware que proteja todas las rutas salvo `/login`.
+- [ ] Dar de alta al responsable de sfbathroom con rol `admin` en `profiles`.
+- [ ] (Más adelante, no ahora) pantalla simple de administración de usuarios para que el
+      cliente pueda dar de alta a financiero/comercial/fabricación sin depender de Siana.
+
+## 2. Conector A3ERP → Supabase
+- [ ] Conseguir del cliente: servidor, nombre de base de datos y credenciales SQL Server
+      (mirar el `.pbix` actual como atajo — ver `arquitectura.md`).
+- [ ] Confirmar accesibilidad de red (VPN / regla de firewall para la IP de n8n).
+- [ ] Identificar qué cubos de BI existen en su instalación de A3ERP además del de Ventas
+      (¿hay uno de stock/almacén? si no, escribir la consulta SQL directamente contra las
+      tablas del ERP).
+- [ ] Workflow n8n nocturno: extrae ventas/stock, transforma y hace upsert en `facturas`,
+      `factura_lineas`, `clientes`, `comerciales`, `articulos`, `stock_actual`,
+      `stock_movimientos` vía Supabase REST (`service_role key`).
+- [ ] Manejar abonos/devoluciones (el cliente confirmó que existen y deben restarse).
+
+## 3. Margen por producto
+- [ ] Cargar `articulos.coste_unitario` real desde A3ERP (mismo conector que ventas).
+- [ ] Validar si hace falta descontar costes indirectos (transporte, comisión comercial) del
+      margen — el cliente dijo "se verá cuando conectemos", no está cerrado.
+- [ ] Construir vistas/páginas de margen agregado por pedido, cliente y comercial (hoy solo
+      existe por artículo vía `v_margen_por_articulo`).
+
+## 4. Stock
+- [ ] Definir alertas de rotura de stock (prioridad del cliente sobre solo visibilidad).
+- [ ] Decidir mecanismo: ¿tabla + cron diario que compara contra un umbral mínimo por
+      artículo, notificación por email/Slack?
+
+## 5. Marketing Mix Modeling
+- [ ] Conseguir el Excel histórico (>10 años) del departamento financiero.
+- [ ] Diseñar el import (manual vs. automatizado) a `marketing_inversion` /
+      `ventas_semanales`.
+- [ ] Fase posterior (no en el alcance inmediato): modelo MMM real (p. ej. PyMC-Marketing,
+      como en el proyecto SianaHub/SianaPredict) una vez haya datos cargados.
+
+## 6. Financiero
+- [ ] Definir con el cliente los KPIs concretos a mostrar (liquidez, EBITDA, DSO, ratio de
+      endeudamiento — no calculan ninguno hoy, hay que proponerlos y validarlos).
+- [ ] Diseñar el proceso de import desde Excel/PDF de la gestoría (sin API disponible).
+- [ ] Cargar 3-5 ejercicios históricos de `financiero_cuentas_anuales`.
+
+## 7. General
+- [ ] Vincular este repo a un repositorio Git remoto (GitHub) para habilitar despliegue
+      automático en cada push (hoy el deploy de Vercel es manual, sin Git).
+- [ ] Evaluar si en algún momento compensa activar "Link API | a3ERP" (tiempo real, de pago)
+      en vez del workflow n8n nocturno — no es necesario mientras la actualización diaria
+      sea suficiente para el cliente.
