@@ -3,9 +3,10 @@
 Orden sugerido, no estricto — reordena si el cliente marca otra prioridad.
 
 ## 1. Autenticación (bloqueante para casi todo lo demás)
-- [ ] Activar Supabase Auth (email/password basta, es un único usuario por ahora).
-- [ ] Página de login en Next.js + middleware que proteja todas las rutas salvo `/login`.
+- [x] Activar Supabase Auth (email/password basta, es un único usuario por ahora).
+- [x] Página de login en Next.js + middleware que proteja todas las rutas salvo `/login`.
 - [ ] Dar de alta al responsable de sfbathroom con rol `admin` en `profiles`.
+      (crear el usuario en Supabase Auth + fijar `profiles.role = 'admin'`).
 - [ ] (Más adelante, no ahora) pantalla simple de administración de usuarios para que el
       cliente pueda dar de alta a financiero/comercial/fabricación sin depender de Siana.
 

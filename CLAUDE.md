@@ -82,7 +82,8 @@ Módulos:
 
 ## Qué falta (ver `docs/tareas-pendientes.md` para el detalle)
 
-1. Auth real con Supabase Auth (hoy no hay login montado, solo el esqueleto de páginas).
+1. Crear el usuario real en Supabase Auth y fijarle `profiles.role = 'admin'` (el login ya
+   está montado: página en `/login`, middleware que protege todas las rutas).
 2. Conector A3ERP → Supabase (workflow n8n, pendiente de credenciales de la base de datos SQL
    Server del cliente).
 3. Carga de costes reales de artículo para que el margen deje de ser cero.

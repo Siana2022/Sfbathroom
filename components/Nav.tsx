@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 
 const items = [
   { href: '/', label: 'Resumen' },
@@ -11,8 +12,17 @@ const items = [
   { href: '/financiero', label: 'Financiero' }
 ];
 
-export default function Nav() {
+export default function Nav({ userEmail }: { userEmail?: string }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const supabase = createClient();
+
+  async function cerrarSesion() {
+    await supabase.auth.signOut();
+    router.push('/login');
+    router.refresh();
+  }
+
   return (
     <nav className="sidebar">
       <h1>sfbathroom</h1>
@@ -21,6 +31,14 @@ export default function Nav() {
           {item.label}
         </Link>
       ))}
+      {userEmail && (
+        <div className="sidebar-usuario">
+          <span>{userEmail}</span>
+          <button className="logout" onClick={cerrarSesion}>
+            Cerrar sesión
+          </button>
+        </div>
+      )}
     </nav>
   );
 }

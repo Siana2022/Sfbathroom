@@ -17,13 +17,13 @@ npm run dev
 ## Variables de entorno
 
 Ver `.env.example`. La URL y la publishable key de Supabase están también hardcodeadas como
-fallback en `lib/supabaseClient.ts` porque no son secretas (RLS las protege), pero usa el
+fallback en `lib/supabase/` porque no son secretas (RLS las protege), pero usa el
 `.env.local` para desarrollo.
 
 ## Estructura
 
 - `app/` — páginas (App Router). Una carpeta por módulo: comercial, margen, stock, marketing, financiero.
 - `components/` — componentes compartidos (nav, tarjetas de módulo).
-- `lib/` — cliente de Supabase.
+- `lib/supabase/` — clientes de Supabase (servidor, navegador y middleware de sesión).
 - `supabase/migrations/` — SQL exactamente igual al aplicado en el proyecto real de Supabase.
 - `docs/` — requisitos del cliente, decisiones de arquitectura y backlog de tareas.

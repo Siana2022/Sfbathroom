@@ -52,6 +52,39 @@ nav.sidebar a:hover {
   color: var(--accent);
 }
 
+nav.sidebar .sidebar-usuario {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+nav.sidebar .sidebar-usuario span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 8px;
+}
+
+nav.sidebar .logout {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+nav.sidebar .logout:hover {
+  background: rgba(255, 90, 90, 0.1);
+  color: #ff5a5a;
+  border-color: rgba(255, 90, 90, 0.4);
+}
+
 main.content {
   flex: 1;
   padding: 32px 40px;
@@ -80,3 +113,78 @@ main.content {
 .badge.listo { background: rgba(60, 200, 120, 0.15); color: #3cc878; }
 
 ul.tablas { color: var(--muted); font-size: 13px; margin: 8px 0 0; padding-left: 18px; }
+
+.login-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 32px 28px;
+}
+
+.login-card h1 {
+  margin: 0 0 4px;
+  font-size: 20px;
+}
+
+.login-sub {
+  margin: 0 0 24px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.login-form label {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+
+.login-form input {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.login-form input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.login-form button {
+  width: 100%;
+  margin-top: 8px;
+  padding: 11px 12px;
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.login-form button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.login-error {
+  color: #ff5a5a;
+  font-size: 13px;
+  margin: 0 0 12px;
+}
