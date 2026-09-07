@@ -35,6 +35,9 @@ export default function Nav({ userEmail }: { userEmail?: string }) {
       <Link key="/cuadros" href="/cuadros" style={{ color: activo('/cuadros') }}>
         Vistas por perfil y cadencia
       </Link>
+      <Link key="/configuracion" href="/configuracion" style={{ color: activo('/configuracion') }}>
+        Configuración de umbrales
+      </Link>
 
       <p className="nav-group">Otros módulos</p>
       {otrosModulos.map((m) => (

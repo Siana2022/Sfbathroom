@@ -26,19 +26,24 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
 - [x] Dimensiones en esquema: tiempo, cliente, geografía, comercial, producto, marca/canal,
       documento.
 - [ ] Filtros cruzados por dimensión en cada bloque.
-- [ ] Exportación de cualquier vista a Excel.
+- [~] Exportación de cualquier vista a Excel: helper `lib/csv.ts` + componente
+      `DescargarExcel` ya en Facturación, Clientes, Margen y Alertas. Falta añadir a las
+      vistas restantes cuando lo pida el cliente.
 - [ ] Drill-down hasta el documento origen (factura, línea, pedido).
 - [ ] Consolidada de holding (SF + DOT + Fuxsabany en un mismo número).
-- [ ] Vistas semanal (ISO) y diaria; 12 meses rodantes y proyección de cierre.
+- [x] Vistas semanal (ISO) y diaria; 12 meses rodantes y proyección de cierre (Q26) — página
+      de facturación (`lib/datos/vistas.ts`, `app/facturacion`).
 - [x] Cerrar reglas de negocio 0.2 con dirección (portes a parte, cliente activo 12M, perdido
       12M sin facturar tras 12M con, tipo de cambio del pedido) — ver
       `docs/cuestionario-cliente.md` Q1–Q4, Q7 y Q8–Q19 (umbrales confirmados).
-- [x] Definir umbrales de alertas iniciales (confirmados Q8–Q19); pendiente hacerlos
-      configurables desde interfaz + apartado de configuración de dirección (percibir Q6).
+- [x] Definir umbrales de alertas iniciales (confirmados Q8–Q19) y hacerlos configurables
+      desde interfaz: migración `0006` siembra `alertas_config`; `app/configuracion` con
+      editor (solo admin/direccion por RLS); `lib/datos/alertas.ts` usa los umbrales
+      configurados. Queda aplicar `0006`.
 - [~] Márgenes visibles solo para dirección/financiero: migración `0005` (vista margen con
-      `security_invoker` + RLS) y gating por rol en `app/margen`. Queda aplicar `0005`.
-- [ ] Aviso de clientes no activos (Q2) visible en la página de clientes ([x]) y como señal
-      en `lib/datos/alertas.ts` ([ ]).
+      `security_invoker` + RLS) y gating por rol en `app/margen`. Aplicada por el cliente.
+- [x] Aviso de clientes no activos (Q2) visible en la página de clientes y como señal en
+      `lib/datos/alertas.ts` (señal "Clientes activos sin pedidos en 12 meses").
 - [ ] Coste de transporte anual como métrica propia, fuera de la neta (Q1).
 
 ### Bloques
@@ -73,9 +78,10 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
       motivo/cliente/estado. [ ] plazo de resolución (funciona en la página, pero los datos
       demo no traen `fecha_cierre`; con A3ERP ya se puede nutrir, Q29). [ ] devoluciones por
       lote (requiere que A3ERP mariage lote en línea de factura).
-- B11: [x] señales calculadas + alertas_generadas. [ ] umbrales configurables desde interfaz,
-      envío por correo, disparadores restantes (fuga top-10, erosión de precio, DSO al alza,
-      saturación, retraso de proveedor, familia dependiente de un cliente).
+- B11: [x] señales calculadas + alertas_generadas. [x] umbrales configurables desde interfaz
+      (`app/configuracion` + migración `0006`); [ ] envío por correo y disparadores restantes
+      (fuga top-10, erosión de precio, DSO al alza, saturación, retraso de proveedor, familia
+      dependiente de un cliente).
 - B12: [x] cuadros de mando por perfil y cadencia (operativa/comercial/estratégica/holding)
       + consolidada de holding por estado (commit `7c8db83`).
 

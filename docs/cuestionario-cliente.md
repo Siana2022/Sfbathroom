@@ -18,7 +18,8 @@ pregunta (Q#) y el estado de implementación.
   puerta en la app para /margen y señal "margen bajo" de /alertas]
 - **Q6. Saturación comercial** = >1,5 M€ trimestrales gestionados y/o >60 clientes activos.
   **+ el responsable de dirección debe poder modificar estos umbrales desde un apartado de
-  configuración** (mecanismo `alertas_config`, con interfaz de administración).  [PENDIENTE]
+  configuración** (mecanismo `alertas_config`, con interfaz de administración).  [HECHO:
+  migración `0006` + `app/configuracion`]
 - **Q7. Tarifa**: se usará tarifa de A3ERP al conectar; mientras tanto, precio medio del año
   anterior como referencia de erosión de precio.
 
@@ -57,7 +58,7 @@ pregunta (Q#) y el estado de implementación.
   Rentabilidad (B3+B9) → Servicio y stock (B4) → Fuga y crecimiento (B5+B6) → Riesgo (B7) →
   Calidad (B10) → Transversal (filtros, export, drill-down al final).
 - **Q26. Vistas temporales**: se construyen ya (diaria, semanal ISO, 12M rodantes, proyección de
-  cierre).
+  cierre).  [HECHO: `lib/datos/vistas.ts` + página de facturación]
 - **Q27. Drill-down**: se espera al ERP.
 - **Q28. Alertas por correo**: no por ahora, se empieza con buzón dentro de la app.
 

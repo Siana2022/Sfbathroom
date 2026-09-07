@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { getMargen } from '@/lib/datos/margen';
 import { decimal, eur, eur2 } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
+import DescargarExcel from '@/components/DescargarExcel';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,6 +66,13 @@ export default async function MargenPage() {
             ))}
           </tbody>
         </table>
+        <div style={{ marginTop: 12 }}>
+          <DescargarExcel
+            nombre="margen-por-familia"
+            columnas={['Familia', 'Importe', 'Coste', 'Margen', 'Margen %']}
+            registros={d.porFamilia.map((f) => [f.familia, f.importe, f.coste, f.margen, f.margenPct])}
+          />
+        </div>
       </div>
 
       <div className="card">

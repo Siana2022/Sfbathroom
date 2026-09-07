@@ -1,8 +1,10 @@
 import { cookies } from 'next/headers';
 import { getFacturacion, getVariacion } from '@/lib/datos/facturacion';
+import { getVistasTemporales } from '@/lib/datos/vistas';
 import { decimal, eur, numero, pct } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import GraficoBarras, { type Barra } from '@/components/GraficoBarras';
+import DescargarExcel from '@/components/DescargarExcel';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +15,7 @@ const NOMBRE_MES = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 
 export default async function FacturacionPage() {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
   const d = await getFacturacion(empresa, ANIO);
+  const t = await getVistasTemporales(empresa, ANIO);
   const previo = d.anioPrevio;
   const delta = d.netaPrevioTotal > 0 ? pct(((d.neta - d.netaPrevioTotal) / d.netaPrevioTotal) * 100) : '—';
 
@@ -45,6 +48,92 @@ export default async function FacturacionPage() {
       <div className="card">
         <h2>Evolución mensual · {d.anio} frente a {previo}</h2>
         <GraficoBarras series={barras} formato={eur} leyenda={{ a: String(d.anio), b: String(previo) }} />
+        <div style={{ marginTop: 12 }}>
+          <DescargarExcel
+            nombre="facturacion-mensual"
+            columnas={['Mes', 'Neta', 'Unidades', 'Facturas', 'Presupuesto', 'Neta previo']}
+            registros={d.series.map((s) => [s.mes, s.neta, s.unidades, s.facturas, s.presupuesto ?? '', s.netaPrevio ?? ''])}
+            etiqueta="Exportar evolución mensual"
+          />
+        </div>
+      </div>
+
+      <ul className="grid-kpis">
+        <Kpi etiqueta={`Facturación acumulada ${t.proyeccion.anio} (YTD)`} valor={eur(t.proyeccion.ytd)} nota={`ritmo diario ${eur(t.proyeccion.ritmoDiario)}`} />
+        <Kpi etiqueta="Proyección de cierre de año" valor={eur(t.proyeccion.proyectado)} nota={`${t.proyeccion.diasRestantes} días por delante`} />
+        <Kpi etiqueta="Cumplimiento presupuesto proyectado" valor={t.proyeccion.cumplimientoProyectado === null ? '—' : `${decimal(t.proyeccion.cumplimientoProyectado)} %`} nota={`presupuesto ${eur(t.proyeccion.presupuesto)}`} />
+      </ul>
+
+      <div className="card">
+        <h2>Últimos 12 meses rodantes</h2>
+        <table className="tabla">
+          <thead>
+            <tr>
+              <th>Mes</th>
+              <th className="td-num">Facturación neta</th>
+            </tr>
+          </thead>
+          <tbody>
+            {t.rodante12m.map((r) => (
+              <tr key={r.mes}>
+                <td>{r.mes}</td>
+                <td className="td-num">{eur(r.neta)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="card">
+        <h2>Últimas 12 semanas (ISO)</h2>
+        <table className="tabla">
+          <thead>
+            <tr>
+              <th>Semana</th>
+              <th className="td-num">Facturación neta</th>
+              <th className="td-num">Facturas</th>
+            </tr>
+          </thead>
+          <tbody>
+            {t.semanal.map((s) => (
+              <tr key={s.semana}>
+                <td>{s.semana}</td>
+                <td className="td-num">{eur(s.neta)}</td>
+                <td className="td-num">{numero(s.facturas)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="card">
+        <h2>Últimos 30 días</h2>
+        <table className="tabla">
+          <thead>
+            <tr>
+              <th>Día</th>
+              <th className="td-num">Facturación neta</th>
+              <th className="td-num">Facturas</th>
+            </tr>
+          </thead>
+          <tbody>
+            {t.diaria.map((dd) => (
+              <tr key={dd.fecha}>
+                <td>{dd.fecha}</td>
+                <td className="td-num">{eur(dd.neta)}</td>
+                <td className="td-num">{numero(dd.facturas)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div style={{ marginTop: 12 }}>
+          <DescargarExcel
+            nombre="facturacion-30-dias"
+            columnas={['Día', 'Neta', 'Facturas']}
+            registros={t.diaria.map((dd) => [dd.fecha, dd.neta, dd.facturas])}
+            etiqueta="Exportar últimas vistas temporales"
+          />
+        </div>
       </div>
 
       <div className="card">

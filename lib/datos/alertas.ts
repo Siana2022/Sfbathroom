@@ -34,24 +34,59 @@ export type AlertasData = {
   senales: Senal[];
 };
 
+type ConfigRow = Alerta & { config: Record<string, number | string> };
+
+const DEFAULT_UMBRALES: Record<string, number> = {
+  'stock.rotura': 5,
+  'stock.bajo_punto_pedido': 8,
+  'cobros.vencido_total': 30000,
+  'clientes.fuga': 3,
+  'clientes.no_activos': 3,
+  'presupuesto.desviacion_mes': -15,
+};
+
+function umbralDe(map: Map<string, ConfigRow>, clave: string): number {
+  const row = map.get(clave);
+  return row?.umbral ?? DEFAULT_UMBRALES[clave] ?? 0;
+}
+
+function avisoDe(map: Map<string, ConfigRow>, clave: string): number | null {
+  const v = map.get(clave)?.config?.aviso;
+  return typeof v === 'number' ? v : null;
+}
+
+function severidad(valor: number, critico: number, aviso: number | null): Senal['severidad'] {
+  if (valor <= critico) return 'ok';
+  if (aviso === null || valor <= aviso) return 'aviso';
+  return 'critico';
+}
+
 export async function getAlertas(codigoEmpresa: string, anio: number): Promise<AlertasData> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
 
-  const [stock, cobros, configRaw, generadasRaw, facturasRes, clientesRes] = await Promise.all([
+  const hoy = new Date();
+  const iso = (dias: number) => new Date(Date.now() - dias * 86400000).toISOString().slice(0, 10);
+
+  const [stock, cobros, configRaw, generadasRaw, facturasRes, clientesRes, pedidosRes] = await Promise.all([
     getStock(codigoEmpresa),
     getCobros(codigoEmpresa, anio),
-    supabase.from('alertas_config').select('id, modulo, nombre, activo, umbral, unidad').eq('activo', true).order('modulo'),
+    supabase.from('alertas_config').select('id, modulo, nombre, activo, umbral, unidad, config').order('modulo'),
     supabase.from('alertas_generadas').select('id, referencia, importe, mensaje, leida, fecha').eq('empresa_id', empresa.id).order('fecha', { ascending: false }).limit(15),
-    supabase.from('facturas').select('cliente_id').eq('empresa_id', empresa.id).eq('tipo_documento', 'factura').gte('fecha', `${anio}-01-01`).lte('fecha', `${anio}-12-31`),
+    supabase
+      .from('facturas')
+      .select('cliente_id')
+      .eq('empresa_id', empresa.id)
+      .eq('tipo_documento', 'factura')
+      .gte('fecha', `${anio}-01-01`)
+      .lte('fecha', `${anio}-12-31`),
     supabase.from('clientes').select('id, estado').eq('empresa_id', empresa.id).eq('estado', 'activo'),
+    supabase.from('pedidos').select('cliente_id').eq('empresa_id', empresa.id).gte('fecha_entrada', iso(365)),
   ]);
 
-  const config = ((configRaw.data ?? []) as Alerta[]);
-  const generadas = ((generadasRaw.data ?? []) as AlertaGenerada[]).map((g) => ({
-    ...g,
-    fecha: (g as { fecha: string }).fecha,
-  }));
+  const config = (configRaw.data ?? []) as ConfigRow[];
+  const configMap = new Map(config.map((c) => [`${c.modulo}.${c.nombre}`, c]));
+  const generadas = (generadasRaw.data ?? []) as AlertaGenerada[];
 
   const activosAnio = new Set<string>();
   for (const f of facturasRes.data ?? []) {
@@ -60,6 +95,13 @@ export async function getAlertas(codigoEmpresa: string, anio: number): Promise<A
   }
   const totalActivos = (clientesRes.data ?? []).length;
   const fuga = ((clientesRes.data ?? []) as { id: string }[]).filter((c) => !activosAnio.has(c.id)).length;
+
+  const activos12m = new Set<string>();
+  for (const p of pedidosRes.data ?? []) {
+    const id = (p as { cliente_id: string | null }).cliente_id;
+    if (id) activos12m.add(id);
+  }
+  const noActivos = ((clientesRes.data ?? []) as { id: string }[]).filter((c) => !activos12m.has(c.id)).length;
 
   const stockRoturas = stock.roturas;
   const vencido = cobros.vencido;
@@ -83,14 +125,34 @@ export async function getAlertas(codigoEmpresa: string, anio: number): Promise<A
   }
   const cumplimiento = presupuesto > 0 ? (neta / presupuesto) * 100 : null;
 
-  // desviación de presupuesto (signal) se calcula aparte para no acoplar getFacturacion
   const senales: Senal[] = [
-    { etiqueta: 'Roturas de stock', valor: String(stockRoturas), severidad: stockRoturas > 5 ? 'critico' : stockRoturas > 0 ? 'aviso' : 'ok' },
-    { etiqueta: 'Referencias bajo punto de pedido', valor: String(stock.bajoPuntoPedido), severidad: stock.bajoPuntoPedido > 8 ? 'critico' : stock.bajoPuntoPedido > 0 ? 'aviso' : 'ok' },
-    { etiqueta: 'Vencido total', valor: `${Math.round(vencido)} €`, severidad: vencido > 30000 ? 'critico' : vencido > 5000 ? 'aviso' : 'ok' },
-    { etiqueta: 'Clientes activos sin ventas este año (fuga)', valor: String(fuga), severidad: fuga > 3 ? 'critico' : fuga > 0 ? 'aviso' : 'ok' },
+    {
+      etiqueta: 'Roturas de stock',
+      valor: String(stockRoturas),
+      severidad: severidad(stockRoturas, umbralDe(configMap, 'stock.rotura'), avisoDe(configMap, 'stock.rotura')),
+    },
+    {
+      etiqueta: 'Referencias bajo punto de pedido',
+      valor: String(stock.bajoPuntoPedido),
+      severidad: severidad(stock.bajoPuntoPedido, umbralDe(configMap, 'stock.bajo_punto_pedido'), avisoDe(configMap, 'stock.bajo_punto_pedido')),
+    },
+    {
+      etiqueta: 'Vencido total',
+      valor: `${Math.round(vencido)} €`,
+      severidad: severidad(vencido, umbralDe(configMap, 'cobros.vencido_total'), avisoDe(configMap, 'cobros.vencido_total')),
+    },
+    {
+      etiqueta: 'Clientes activos sin ventas este año (fuga)',
+      valor: String(fuga),
+      severidad: severidad(fuga, umbralDe(configMap, 'clientes.fuga'), avisoDe(configMap, 'clientes.fuga')),
+    },
+    {
+      etiqueta: 'Clientes activos sin pedidos en 12 meses (Q2)',
+      valor: String(noActivos),
+      severidad: severidad(noActivos, umbralDe(configMap, 'clientes.no_activos'), avisoDe(configMap, 'clientes.no_activos')),
+    },
     { etiqueta: 'Cumplimiento de presupuesto', valor: cumplimiento === null ? '—' : `${cumplimiento.toFixed(1)} %`, severidad: 'ok' },
   ];
 
-  return { empresa, config, generadas, senales };
+  return { empresa, config: config.filter((c) => c.activo), generadas, senales };
 }

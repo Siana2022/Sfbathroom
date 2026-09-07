@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { getAlertas } from '@/lib/datos/alertas';
 import { eur, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
+import DescargarExcel from '@/components/DescargarExcel';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,6 +57,13 @@ export default async function AlertasPage() {
             ))}
           </tbody>
         </table>
+        <div style={{ marginTop: 12 }}>
+          <DescargarExcel
+            nombre="alertas-senales"
+            columnas={['Señal', 'Valor', 'Severidad']}
+            registros={d.senales.map((s) => [s.etiqueta, s.valor, s.severidad])}
+          />
+        </div>
       </div>
 
       <div className="card">

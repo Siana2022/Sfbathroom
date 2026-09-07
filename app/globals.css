@@ -207,6 +207,29 @@ ul.tablas { color: var(--muted); font-size: 13px; margin: 8px 0 0; padding-left:
   gap: 10px;
 }
 
+.boton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--fg);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.boton:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.boton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .kpi {
   border: 1px solid var(--border);
   border-radius: 8px;

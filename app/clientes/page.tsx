@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { getClientes } from '@/lib/datos/clientes';
 import { decimal, eur, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
+import DescargarExcel from '@/components/DescargarExcel';
 
 export const dynamic = 'force-dynamic';
 
@@ -86,6 +87,13 @@ export default async function ClientesPage() {
             ))}
           </tbody>
         </table>
+        <div style={{ marginTop: 12 }}>
+          <DescargarExcel
+            nombre="clientes-movimiento"
+            columnas={['Cliente', 'Neta 12M', 'Neta 12M previos', 'Delta', 'Delta %']}
+            registros={d.movimiento.map((c) => [c.nombre, c.netaActual, c.netaPrevia, c.delta, c.deltaPct])}
+          />
+        </div>
       </div>
 
       <div className="card">
