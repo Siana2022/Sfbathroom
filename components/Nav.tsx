@@ -16,7 +16,8 @@ export default function Nav({ userEmail }: { userEmail?: string }) {
   }
 
   function activo(href: string) {
-    return pathname === href ? 'activo' : '';
+    if (href === '/') return pathname === '/' ? 'activo' : '';
+    return pathname === href || pathname.startsWith(`${href}/`) ? 'activo' : '';
   }
 
   return (
@@ -47,6 +48,9 @@ export default function Nav({ userEmail }: { userEmail?: string }) {
       </Link>
       <Link key="/configuracion" href="/configuracion" className={activo('/configuracion')}>
         Configuración de umbrales
+      </Link>
+      <Link key="/documentos" href="/documentos" className={activo('/documentos')}>
+        Documentos origen (drill-down)
       </Link>
 
       <p className="nav-group">Otros módulos</p>

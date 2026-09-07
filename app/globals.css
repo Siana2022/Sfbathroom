@@ -640,6 +640,49 @@ table.tabla .td-pos {
   color: var(--verde);
 }
 
+.doc-enlace {
+  color: var(--accent-suave);
+  font-weight: 600;
+}
+
+.doc-enlace:hover {
+  text-decoration: underline;
+}
+
+.doc-volver {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.doc-volver:hover {
+  color: var(--accent-suave);
+}
+
+.grid-resumen-doc {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+  margin-top: 6px;
+}
+
+.grid-resumen-doc > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.grid-resumen-doc > div strong {
+  font-size: 14px;
+}
+
 /* ---------------- Chips ---------------- */
 
 .chips {

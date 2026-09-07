@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import Link from 'next/link';
 import { getFacturacion, getVariacion } from '@/lib/datos/facturacion';
 import { getVistasTemporales } from '@/lib/datos/vistas';
 import { getCosteTransporte } from '@/lib/datos/transporte';
@@ -71,7 +72,10 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
       <h1>Facturación</h1>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
         Facturación neta de {d.empresa.nombre} ({d.empresa.codigo}). Neta = facturas + notas de
-        cargo − abonos, imputando cada documento en su fecha.
+        cargo − abonos, imputando cada documento en su fecha.{' '}
+        <Link className="doc-enlace" href="/documentos">
+          Drill-down: ver los documentos origen →
+        </Link>
       </p>
 
       <Filtros opciones={opciones} />
