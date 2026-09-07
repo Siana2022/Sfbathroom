@@ -61,7 +61,7 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
       delta (12M vs 12M previos), cohortes mensuales con retención.
 - B6: [ ] margen y unidades por segmento, crecimiento YoY, peso 12M en rodante, diferencial
       de margen SB vs MB, marca blanca por cliente-fabricante.
-- B7: [ ] top 20, concentración de producto (3 familias / 20 refs / nº refs que dan el 80%),
+- B7: [x] top 20, concentración de producto (3 familias / 20 refs / nº refs que dan el 80%),
       concentración geográfica por país, matriz cliente×familia de riesgo, riesgo de
       proveedor (chino, sin alternativas, plazos reales y pactados vs 75 días).
 - B8: [x] desvío DSO vs 30 días, DSO por cliente y su evolución, riesgo vivo vs límite de
@@ -69,8 +69,10 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
       espera de Q23. [ ] impagos/devoluciones de efectos (manual vía Excel, Q24).
 - B9: [x] facturación, clientes, descuento medio, pedidos por persona. [ ] carga SF+DOT
       consolidada, margen aportado, cumplimiento presupuesto, nuevos/perdidos, saturación.
-- B10: [ ] devoluciones por referencia/familia/lote y en unidades, coste cruzado con margen,
-      plazo de resolución de reclamaciones.
+- B10: [x] devoluciones por referencia y familia en unidades, margen perdido, incidencias por
+      motivo/cliente/estado. [ ] plazo de resolución (funciona en la página, pero los datos
+      demo no traen `fecha_cierre`; con A3ERP ya se puede nutrir, Q29). [ ] devoluciones por
+      lote (requiere que A3ERP mariage lote en línea de factura).
 - B11: [x] señales calculadas + alertas_generadas. [ ] umbrales configurables desde interfaz,
       envío por correo, disparadores restantes (fuga top-10, erosión de precio, DSO al alza,
       saturación, retraso de proveedor, familia dependiente de un cliente).
