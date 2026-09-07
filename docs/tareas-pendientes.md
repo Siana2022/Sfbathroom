@@ -47,9 +47,10 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
 - B2: [x] ticket medio de pedido, cartera por fecha solicitada, motivo de anulación,
       modificaciones, plazo pedido→entrega, cumplimiento de fecha prometida (commit del
       paquete Ciclo de crédito).
-- B3: [ ] margen por unidad, por pedido/factura, por comercial, por marca/canal/país y
+- B3: [x] margen por unidad, por factura (tramos), por comercial, por marca/canal/país y
       cliente, matriz margen×rotación, ranking por margen, erosión de tarifa, evolución
-      12M con alerta.
+      mensual. [ ] evolución 12M rodante con alerta ya cubierta en B11 (señal de margen por
+      debajo de objetivo); añadir filtros cruzados cuando estén (transversal).
 - B4: [x] valor, en tránsito, cobertura media, roturas, bajo punto. [ ] rotación, fill rate,
       venta perdida, stock muerto/baja rotación, cobertura por estacionalidad, propuesta de
       aprovisionamiento, cruce cobertura×cartera, evolución mensual del inmovilizado.

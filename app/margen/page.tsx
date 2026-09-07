@@ -76,6 +76,7 @@ export default async function MargenPage() {
               <th className="td-num">Unidades</th>
               <th className="td-num">Importe</th>
               <th className="td-num">Margen</th>
+              <th className="td-num">Margen / unidad</th>
               <th className="td-num">Margen %</th>
             </tr>
           </thead>
@@ -86,7 +87,182 @@ export default async function MargenPage() {
                 <td className="td-num">{Math.round(a.unidades)}</td>
                 <td className="td-num">{eur(a.importe)}</td>
                 <td className="td-num">{eur(a.margen)}</td>
+                <td className="td-num">{eur2(a.margenUnidad)}</td>
                 <td className={`td-num ${a.margenPct >= 0 ? 'td-pos' : ''}`}>{decimal(a.margenPct)} %</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="card">
+        <h2>Margen por comercial, marca y canal</h2>
+        <table className="tabla">
+          <thead>
+            <tr>
+              <th>Comercial</th>
+              <th className="td-num">Importe</th>
+              <th className="td-num">Margen %</th>
+              <th>Marca</th>
+              <th className="td-num">Importe</th>
+              <th className="td-num">Margen %</th>
+              <th>Canal</th>
+              <th className="td-num">Importe</th>
+              <th className="td-num">Margen %</th>
+            </tr>
+          </thead>
+          <tbody>
+            {d.porComercial.map((c, i) => (
+              <tr key={c.nombre}>
+                <td>{c.nombre}</td>
+                <td className="td-num">{eur(c.importe)}</td>
+                <td className={`td-num ${c.margenPct >= 0 ? 'td-pos' : ''}`}>{decimal(c.margenPct)} %</td>
+                <td>{d.porMarca[i]?.nombre ?? ''}</td>
+                <td className="td-num">{d.porMarca[i] ? eur(d.porMarca[i].importe) : ''}</td>
+                <td className="td-num">{d.porMarca[i] ? `${decimal(d.porMarca[i].margenPct)} %` : ''}</td>
+                <td>{d.porCanal[i]?.nombre ?? ''}</td>
+                <td className="td-num">{d.porCanal[i] ? eur(d.porCanal[i].importe) : ''}</td>
+                <td className="td-num">{d.porCanal[i] ? `${decimal(d.porCanal[i].margenPct)} %` : ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p style={{ color: 'var(--muted)', fontSize: '0.85rem', marginTop: 8 }}>
+          Marcas con etiqueta “MB”: marca blanca (fabricada para un cliente concreto).
+        </p>
+      </div>
+
+      <div className="card">
+        <h2>Margen por cliente y país</h2>
+        <table className="tabla">
+          <thead>
+            <tr>
+              <th>Cliente</th>
+              <th className="td-num">Importe</th>
+              <th className="td-num">Margen %</th>
+              <th>País</th>
+              <th className="td-num">Importe</th>
+              <th className="td-num">Margen %</th>
+            </tr>
+          </thead>
+          <tbody>
+            {d.porCliente.map((c, i) => (
+              <tr key={c.nombre}>
+                <td>{c.nombre}</td>
+                <td className="td-num">{eur(c.importe)}</td>
+                <td className={`td-num ${c.margenPct >= 0 ? 'td-pos' : ''}`}>{decimal(c.margenPct)} %</td>
+                <td>{d.porPais[i]?.nombre ?? ''}</td>
+                <td className="td-num">{d.porPais[i] ? eur(d.porPais[i].importe) : ''}</td>
+                <td className="td-num">{d.porPais[i] ? `${decimal(d.porPais[i].margenPct)} %` : ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="card">
+        <h2>Distribución de márgenes por factura</h2>
+        <table className="tabla">
+          <thead>
+            <tr>
+              <th>Tramo de margen</th>
+              <th className="td-num">Facturas</th>
+              <th className="td-num">Importe</th>
+            </tr>
+          </thead>
+          <tbody>
+            {d.facturasPorTramo.map((t) => (
+              <tr key={t.tramo}>
+                <td>{t.tramo}</td>
+                <td className="td-num">{t.facturas}</td>
+                <td className="td-num">{eur(t.importe)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="card">
+        <h2>Matriz margen × rotación</h2>
+        <p style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>
+          Número de artículos por tramo de margen y tercil de unidades vendidas (rotación).
+        </p>
+        <table className="tabla">
+          <thead>
+            <tr>
+              <th>Margen</th>
+              <th className="td-num">Rotación baja</th>
+              <th className="td-num">Rotación media</th>
+              <th className="td-num">Rotación alta</th>
+            </tr>
+          </thead>
+          <tbody>
+            {d.matrizMargenRotacion.map((m) => (
+              <tr key={m.tramoMargen}>
+                <td>{m.tramoMargen}</td>
+                <td className="td-num">{m.baja}</td>
+                <td className="td-num">{m.media}</td>
+                <td className="td-num">{m.alta}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="card">
+        <h2>Erosión de tarifa</h2>
+        {d.erosionTarifa.length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>
+            Sin descuentos sobre tarifa detectados ({d.erosionMedia === null ? '—' : `erosión media ponderada ${decimal(d.erosionMedia)} %`}).
+          </p>
+        ) : (
+          <>
+            <p style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>
+              Precio medio de venta frente a tarifa; erosión media ponderada por importe:{' '}
+              <strong>{decimal(d.erosionMedia ?? 0)} %</strong>.
+            </p>
+            <table className="tabla">
+              <thead>
+                <tr>
+                  <th>Artículo</th>
+                  <th className="td-num">Unidades</th>
+                  <th className="td-num">PVD</th>
+                  <th className="td-num">Tarifa</th>
+                  <th className="td-num">Erosión</th>
+                </tr>
+              </thead>
+              <tbody>
+                {d.erosionTarifa.map((e) => (
+                  <tr key={e.articulo}>
+                    <td>{e.articulo}</td>
+                    <td className="td-num">{Math.round(e.unidades)}</td>
+                    <td className="td-num">{eur2(e.pvd)}</td>
+                    <td className="td-num">{eur2(e.tarifa)}</td>
+                    <td className={`td-num ${e.erosionPct > 0 ? 'td-pos' : ''}`}>{decimal(e.erosionPct)} %</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+      </div>
+
+      <div className="card">
+        <h2>Evolución mensual del margen</h2>
+        <table className="tabla">
+          <thead>
+            <tr>
+              <th>Mes</th>
+              <th className="td-num">Importe</th>
+              <th className="td-num">Margen %</th>
+            </tr>
+          </thead>
+          <tbody>
+            {d.mensual.map((m) => (
+              <tr key={m.mes}>
+                <td>{m.mes}</td>
+                <td className="td-num">{eur(m.importe)}</td>
+                <td className={`td-num ${m.margenPct < 30 ? 'td-pos' : ''}`}>{decimal(m.margenPct)} %</td>
               </tr>
             ))}
           </tbody>
