@@ -3,11 +3,16 @@
 Orden sugerido, no estricto — reordena si el cliente marca otra prioridad.
 
 ## 0. Migración del cuadro de mando (0003)
-- [ ] Aplicar `supabase/migrations/0003_esquema_cuadro_mando.sql` en el SQL editor de Supabase
-      (multiempresa, pedidos, compras/coste por lote, stock avanzado, cobros, incidencias,
-      presupuesto, alertas, roles ampliados a 7). El repo la versiona ya; falta ejecutarla.
-- [ ] Validar en Supabase que no salta ningún advisor de seguridad (las vistas nuevas van con
-      `security_invoker = true`) y que `auth_role()`/`auth_comercial_id()` siguen OK.
+- [x] Aplicar `0003` en Supabase (hecho por el cliente).
+- [x] Aplicar `0004` (fix recursión RLS + escalada de rol) y crear superusuarios.
+- [x] Shell de navegación con los 11 bloques y selector de empresa.
+
+## 0b. Datos de demostración
+- [ ] Cargar `docs/datos-demo.sql` en el SQL editor (escenario ficticio generado por
+      `scripts/datos-demo.mjs`: 3 comerciales, 16 clientes, 7 familias, 36 artículos,
+      655 facturas, pedidos, compras a China, stock, cobros, incidencias, presupuesto).
+      Es reejecutable (`on conflict do nothing`) y no toca `profiles`/auth.
+- [ ] Construir las páginas de datos: Resumen + Facturación (B1) primero, luego el resto.
 
 ## 1. Autenticación y perfiles
 - [x] Activar Supabase Auth (email/password basta, es un único usuario por ahora).
