@@ -2,6 +2,13 @@
 
 Orden sugerido, no estricto — reordena si el cliente marca otra prioridad.
 
+## 0. Migración del cuadro de mando (0003)
+- [ ] Aplicar `supabase/migrations/0003_esquema_cuadro_mando.sql` en el SQL editor de Supabase
+      (multiempresa, pedidos, compras/coste por lote, stock avanzado, cobros, incidencias,
+      presupuesto, alertas, roles ampliados a 7). El repo la versiona ya; falta ejecutarla.
+- [ ] Validar en Supabase que no salta ningún advisor de seguridad (las vistas nuevas van con
+      `security_invoker = true`) y que `auth_role()`/`auth_comercial_id()` siguen OK.
+
 ## 1. Autenticación (bloqueante para casi todo lo demás)
 - [x] Activar Supabase Auth (email/password basta, es un único usuario por ahora).
 - [x] Página de login en Next.js + middleware que proteja todas las rutas salvo `/login`.
@@ -19,11 +26,16 @@ Orden sugerido, no estricto — reordena si el cliente marca otra prioridad.
       tablas del ERP).
 - [ ] Workflow n8n nocturno: extrae ventas/stock, transforma y hace upsert en `facturas`,
       `factura_lineas`, `clientes`, `comerciales`, `articulos`, `stock_actual`,
-      `stock_movimientos` vía Supabase REST (`service_role key`).
+      `stock_movimientos`, y (tras la 0003) `pedidos`, `pedido_lineas`, `compras`,
+      `compra_lineas`, `stock_en_transito`, `cobros` vía Supabase REST (`service_role key`).
 - [ ] Manejar abonos/devoluciones (el cliente confirmó que existen y deben restarse).
 
 ## 3. Margen por producto
-- [ ] Cargar `articulos.coste_unitario` real desde A3ERP (mismo conector que ventas).
+- [ ] Cargar compras desde A3ERP en `compras`/`compra_lineas` (coste real por lote — la vista
+      `v_coste_completo_por_lote` reparte flete/aduana/seguro/transporte y roturas; es la base
+      del margen a partir de la 0003).
+- [ ] Si no hay compras importables todavía, alimentar `articulos.coste_unitario` como coste
+      de referencia provisional (mismo conector que ventas).
 - [ ] Validar si hace falta descontar costes indirectos (transporte, comisión comercial) del
       margen — el cliente dijo "se verá cuando conectemos", no está cerrado.
 - [ ] Construir vistas/páginas de margen agregado por pedido, cliente y comercial (hoy solo

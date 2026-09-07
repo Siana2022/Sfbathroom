@@ -27,8 +27,8 @@ Módulos:
 ## Estado real de la infraestructura (fuera de este repo)
 
 - **Supabase**: org "Sfbathroom" (`emvloponqtbpuuzmkxkb`), proyecto `dgbxualxhrbbqglvxtxq`,
-  región `eu-central-1`. El esquema completo ya está aplicado en producción — ver
-  `supabase/migrations/` en este repo, que refleja exactamente lo que hay desplegado.
+  región `eu-central-1`. `0001` y `0002` aplicadas en producción; la `0003` (cuadro de mando)
+  está versionada pero **pendiente de aplicar** — ver `supabase/migrations/`.
   URL: `https://dgbxualxhrbbqglvxtxq.supabase.co`.
 - **Vercel**: proyecto `sfbathroom-bi` bajo la cuenta personal conectada (sin team todavía).
   Hay un deployment preview ya generado con el esqueleto de páginas de este repo.
@@ -57,9 +57,9 @@ Módulos:
   departamento financiero — buena base para el MMM, pero la fuente es Excel, no una API de
   Ads.
 - **Usuarios**: de momento un único usuario (el responsable de sfbathroom), con contraseña.
-  El resto de roles (financiero, comercial, fabricación) se activan más adelante. El modelo
-  de 5 roles ya está implementado en RLS: `admin`, `direccion`, `comercial` (solo ve lo
-  suyo), `financiero`, `lectura`.
+  El resto de roles se activan más adelante. El modelo de 7 roles ya está implementado en RLS:
+  `admin`, `direccion`, `comercial` (solo ve lo suyo), `financiero`, `lectura`,
+  `administracion` (cobros y cartera), `almacen` (stock y servicio).
 - **Acceso**: escritorio primero; PWA para móvil en una fase posterior, no ahora.
 - **Mantenimiento**: Siana Digital construye el proyecto; la gestión de altas/bajas de
   usuario la lleva el cliente (a día de hoy no hay panel de administración de usuarios — es
@@ -82,10 +82,15 @@ Módulos:
 
 ## Qué falta (ver `docs/tareas-pendientes.md` para el detalle)
 
-1. Crear el usuario real en Supabase Auth y fijarle `profiles.role = 'admin'` (el login ya
+1. **Aplicar la migración `0003_esquema_cuadro_mando.sql`** en el SQL editor de Supabase
+   (pendiente de ejecución manual por el cliente/Siana — el repo ya la versiona). Incluye
+   multiempresa, pedidos, compras/coste por lote, stock avanzado, cobros, incidencias,
+   presupuesto, alertas y los roles ampliados a 7.
+2. Crear el usuario real en Supabase Auth y fijarle `profiles.role = 'admin'` (el login ya
    está montado: página en `/login`, middleware que protege todas las rutas).
-2. Conector A3ERP → Supabase (workflow n8n, pendiente de credenciales de la base de datos SQL
+3. Conector A3ERP → Supabase (workflow n8n, pendiente de credenciales de la base de datos SQL
    Server del cliente).
-3. Carga de costes reales de artículo para que el margen deje de ser cero.
-4. Definir y cargar los KPIs financieros concretos.
-5. Cargar histórico de inversión en marketing (Excel) para arrancar el MMM.
+4. Carga de costes reales de artículo (vía `compras`/`compra_lineas`) para que el margen deje
+   de ser cero.
+5. Definir y cargar los KPIs financieros concretos.
+6. Cargar histórico de inversión en marketing (Excel) para arrancar el MMM.

@@ -12,31 +12,56 @@
 
 ## Esquema de base de datos
 
-Ver `supabase/migrations/0001_schema_inicial_sfbathroom.sql`. Resumen por módulo:
+Ver `supabase/migrations/0001_schema_inicial_sfbathroom.sql` (esquema base) y
+`0003_esquema_cuadro_mando.sql` (alineación con la especificación del cuadro de mando
+comercial). Resumen por módulo:
 
+- **Multiempresa**: tabla `empresas` (`SF`, `DOT`, `FUX`) y columna `empresa_id` en todas las
+  tablas operativas (datos históricos backfilleados a `SF`).
 - **Comercial**: `facturas`, `factura_lineas` (con `importe` como columna generada),
-  `clientes`, `comerciales`, `articulos`, `familias_articulo`.
-- **Margen**: vista `v_margen_por_articulo` (agrega `factura_lineas` + `articulos`, calcula
-  coste total y margen %).
-- **Stock**: `stock_actual` (snapshot por artículo/almacén), `stock_movimientos` (histórico),
-  `almacenes`.
+  `clientes`, `comerciales`, `articulos`, `familias_articulo`. Ampliado con `tipo_documento`
+  (factura/abono/nota_cargo), `factura_anula_id`, `desc_pie`/`portes`/`rappel`, `pedido_id`,
+  canales, grupos empresariales, país/provincia, estado de cliente y límites de crédito.
+- **Pedidos/cartera**: `pedidos`, `pedido_lineas` (con `cantidad_servida` y `importe`
+  generado), `pedido_modificaciones`.
+- **Margen por lote**: `compras` (flete/aduana/seguro/transporte interior/tipo de cambio) +
+  `compra_lineas` (con `pct_roturas`) y la vista `v_coste_completo_por_lote` que reparte los
+  costes de llegada por cantidad del lote. `v_margen_por_articulo` sigue como base histórica.
+- **Stock**: `stock_actual` (snapshot por artículo/almacén, + `stock_reservado`),
+  `stock_movimientos` (histórico), `almacenes`, `stock_en_transito`; vistas
+  `v_consumo_diario` y `v_stock_cobertura` (cobertura en días, disponible y en tránsito).
+- **Cobros/crédito**: `cobros` (con flag `impagado`); vistas `v_aging` (pendiente y días
+  vencidos por factura) y `v_saldo_clientes`.
+- **Calidad/devoluciones**: `incidencias` (roturas, defectos, errores de pedido/expedición,
+  rechazo comercial).
+- **Presupuesto**: `presupuesto` desglosado por ejercicio/mes/cliente/comercial/familia.
+- **Alertas**: `alertas_config` (umbrales configurables) + `alertas_generadas`.
 - **Marketing**: `marketing_canales`, `marketing_inversion`, `ventas_semanales` (variable
   objetivo para el MMM).
 - **Financiero**: `financiero_cuentas_anuales` (balance/P&G/flujo de caja por partida),
   `financiero_kpis`.
-- **Meta**: `fuentes_datos_config` (registro no-secreto de qué sistema alimenta cada módulo).
+- **Meta**: `fuentes_datos_config` (módulos ampliados a pedidos/cobros/devoluciones).
+
+Todas las vistas nuevas usan `security_invoker = true` (como 0002 hizo con el margen) para
+que la RLS del usuario que consulta se aplique siempre.
 
 ## Modelo de roles (RLS)
 
 Tabla `profiles` con columna `role`: `admin`, `direccion`, `comercial`, `financiero`,
-`lectura`. Funciones auxiliares `auth_role()` / `auth_comercial_id()` (security invoker,
-`search_path` fijado) usadas en todas las políticas.
+`lectura`, `administracion`, `almacen`. Funciones auxiliares `auth_role()` /
+`auth_comercial_id()` (security invoker, `search_path` fijado) usadas en todas las políticas.
 
-- `comercial`: solo ve sus propias facturas/líneas/clientes (vía `comercial_id`).
-- `financiero`/`admin`/`direccion`: ven módulo financiero y marketing completos.
+- `comercial`: solo ve sus propias facturas/líneas/clientes/pedidos/presupuesto (vía
+  `comercial_id`); no ve compras ni cobros.
+- `administracion`: ve cobros/cartera y puede registrar cobros y modificaciones de pedido;
+  no ve compras ni márgenes.
+- `almacen`: ve pedidos, stock, stock en tránsito y cobertura; no ve importes de compra ni
+  cobros.
+- `financiero`/`admin`/`direccion`: ven todo, incluido compras/margen y financiero/marketing.
 - `lectura`: ve comercial/stock, no ve financiero ni marketing (confidencialidad).
-- Escritura reservada a `admin`/`direccion` desde la app; la ingesta automática usa la
-  `service_role key`, que bypassa RLS por diseño de Supabase.
+- Escritura reservada a `admin`/`direccion` desde la app (y `administracion` para cobros y
+  modificaciones de pedido); la ingesta automática usa la `service_role key`, que bypassa
+  RLS por diseño de Supabase.
 
 Advisors de seguridad de Supabase revisados y limpios tras la migración `0002`
 (vista con `security_invoker`, funciones con `search_path` fijado, `handle_new_user` con
