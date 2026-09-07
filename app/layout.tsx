@@ -1,5 +1,6 @@
 import './globals.css';
 import Nav from '@/components/Nav';
+import Header from '@/components/Header';
 import { createClient } from '@/lib/supabase/server';
 
 export const metadata = {
@@ -13,13 +14,22 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     data: { user },
   } = await supabase.auth.getUser();
 
+  let rol: string | undefined;
+  if (user) {
+    const { data: perfil } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
+    rol = perfil?.role ?? undefined;
+  }
+
   return (
     <html lang="es">
       <body>
         {user ? (
           <div className="layout">
             <Nav userEmail={user.email} />
-            <main className="content">{children}</main>
+            <div className="cuerpo">
+              <Header rol={rol} />
+              <main className="content">{children}</main>
+            </div>
           </div>
         ) : (
           <main>{children}</main>

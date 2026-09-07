@@ -1,21 +1,25 @@
+import Link from 'next/link';
+import { bloques } from '@/lib/bloques';
+
 export default function Home() {
   return (
     <div>
+      <p className="breadcrumb">Cuadro de mando · Resumen</p>
       <h1>Panel sfbathroom</h1>
-      <p style={{ color: 'var(--muted)', maxWidth: 640 }}>
-        Estructura base creada en Supabase (esquema y RLS) y desplegada en Vercel. Cada módulo del menú
-        muestra su estado: qué tablas existen ya y qué falta por conectar a la fuente de datos real (A3ERP,
-        contabilidad, plataformas de marketing). Ver CLAUDE.md para el contexto completo.
+      <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
+        Cuadro de mando comercial según la especificación del cliente. Los 11 bloques están
+        definidos; cada página indica los indicadores que incluirá. La navegación respeta el rol
+        conectado y la empresa seleccionada en la cabecera.
       </p>
-      <div className="card">
-        <h2>Próximos pasos</h2>
-        <ul className="tablas">
-          <li>Montar autenticación real (Supabase Auth) — hoy no hay login</li>
-          <li>Conectar A3ERP (SQL Server) vía workflow n8n nocturno</li>
-          <li>Cargar costes de artículo para activar el cálculo de margen real</li>
-          <li>Definir y cargar los KPIs financieros con el cliente</li>
-          <li>Cargar histórico de inversión en marketing (Excel) para el MMM</li>
-        </ul>
+
+      <div className="grid-bloques">
+        {bloques.map((b) => (
+          <Link key={b.slug} href={b.slug} className="card bloque-card">
+            <span className="badge construccion">Bloque {b.numero}</span>
+            <h3>{b.titulo}</h3>
+            <p>{b.resumen}</p>
+          </Link>
+        ))}
       </div>
     </div>
   );

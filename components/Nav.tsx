@@ -2,15 +2,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-
-const items = [
-  { href: '/', label: 'Resumen' },
-  { href: '/comercial', label: 'Comercial' },
-  { href: '/margen', label: 'Margen por producto' },
-  { href: '/stock', label: 'Stock en tiempo real' },
-  { href: '/marketing', label: 'Marketing Mix Modeling' },
-  { href: '/financiero', label: 'Financiero' }
-];
+import { bloques, otrosModulos } from '@/lib/bloques';
 
 export default function Nav({ userEmail }: { userEmail?: string }) {
   const pathname = usePathname();
@@ -23,14 +15,31 @@ export default function Nav({ userEmail }: { userEmail?: string }) {
     router.refresh();
   }
 
+  function activo(href: string) {
+    return pathname === href ? 'var(--accent)' : undefined;
+  }
+
   return (
     <nav className="sidebar">
       <h1>sfbathroom</h1>
-      {items.map((item) => (
-        <Link key={item.href} href={item.href} style={{ color: pathname === item.href ? 'var(--accent)' : undefined }}>
-          {item.label}
+      <Link key="/" href="/" style={{ color: activo('/') }}>
+        Resumen
+      </Link>
+
+      <p className="nav-group">Cuadro de mando</p>
+      {bloques.map((b) => (
+        <Link key={b.slug} href={b.slug} style={{ color: activo(b.slug) }}>
+          <span className="nav-numero">{b.numero}</span> {b.titulo}
         </Link>
       ))}
+
+      <p className="nav-group">Otros módulos</p>
+      {otrosModulos.map((m) => (
+        <Link key={m.slug} href={m.slug} style={{ color: activo(m.slug) }}>
+          {m.titulo}
+        </Link>
+      ))}
+
       {userEmail && (
         <div className="sidebar-usuario">
           <span>{userEmail}</span>
