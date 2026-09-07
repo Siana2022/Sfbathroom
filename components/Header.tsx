@@ -11,13 +11,15 @@ export default function Header({ rol }: { rol?: string }) {
   const [empresa, setEmpresa] = useState('SF');
 
   useEffect(() => {
-    const guardada = localStorage.getItem('sfb_empresa');
+    const desdeCookie = document.cookie.split('; ').find((c) => c.startsWith('sfb_empresa='))?.split('=')[1];
+    const guardada = desdeCookie || localStorage.getItem('sfb_empresa');
     if (guardada) setEmpresa(guardada);
   }, []);
 
   function cambiarEmpresa(codigo: string) {
     setEmpresa(codigo);
     localStorage.setItem('sfb_empresa', codigo);
+    document.cookie = `sfb_empresa=${codigo}; path=/; max-age=2592000; SameSite=Lax`;
   }
 
   return (
