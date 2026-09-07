@@ -2,6 +2,7 @@ import './globals.css';
 import Nav from '@/components/Nav';
 import Header from '@/components/Header';
 import RegistrarPWA from '@/components/RegistrarPWA';
+import ChatIA from '@/components/ChatIA';
 import { createClient } from '@/lib/supabase/server';
 
 export const metadata = {
@@ -41,6 +42,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <Header rol={rol} />
               <main className="content">{children}</main>
             </div>
+            <ChatIA />
           </div>
         ) : (
           <main>{children}</main>

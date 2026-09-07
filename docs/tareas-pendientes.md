@@ -52,6 +52,11 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
       facturas/abonos/notas de cargo y detalle con líneas (artículo, familia, marca),
       pedido de origen, albarán y abonos cruzados. La parte <i>documental</i> (enlaces al
       ERP) seguirá dependiendo del conector A3ERP.
+- [x] Asistente BI (prototipo) — widget flotante (`components/ChatIA.tsx`),
+      `app/api/chat/route.ts`, `lib/agente/` (tools + agent loop). Herramientas iniciales:
+      ventas por mes, evolución anual, top clientes, desglose variación, detalle clientes,
+      impagos. Requiere `ANTHROPIC_API_KEY` en Vercel. Documentación completa en
+      `docs/asistente-ia.md`.
 - [ ] Consolidada de holding (SF + DOT + Fuxsabany en un mismo número).
 - [x] Vistas semanal (ISO) y diaria; 12 meses rodantes y proyección de cierre (Q26) — página
       de facturación (`lib/datos/vistas.ts`, `app/facturacion`).

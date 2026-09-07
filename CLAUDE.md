@@ -85,6 +85,17 @@ Auditoría técnica externa contrastando repo vs producción `dgbxualxhrbbqglvxt
   vía trigger `on_auth_user_created`; solo falta asignar rol/cartera
   (`docs/asignar-roles-usuarios.sql`, emails a rellenar).
 
+## Asistente BI (prototipo, set 2026)
+
+Chat flotante en la app (`ChatIA` componente, `app/api/chat/route.ts`, `lib/agente/`).
+El usuario pregunta en español; el agente usa herramientas que ejecutan consultas
+RLS-scoped (misma sesión que el resto de la app) y responde con los datos reales.
+Requiere la variable de entorno `ANTHROPIC_API_KEY` en Vercel (Server-only).
+Modelo por defecto: `claude-sonnet-4-5` (configurable con `CHAT_MODEL`).
+Detalle completo: `docs/asistente-ia.md`. Tools actuales: `ventas_por_mes`,
+`evolucion_anual`, `top_clientes`, `desglose_variacion`, `detalle_clientes`,
+`clientes_impagados`.
+
 ## Convenciones de este repo
 
 - Nombres de tablas, columnas, rutas de la app y contenido visible al cliente: **en
