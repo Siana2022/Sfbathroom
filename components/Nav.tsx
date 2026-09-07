@@ -32,6 +32,9 @@ export default function Nav({ userEmail }: { userEmail?: string }) {
           <span className="nav-numero">{b.numero}</span> {b.titulo}
         </Link>
       ))}
+      <Link key="/cuadros" href="/cuadros" style={{ color: activo('/cuadros') }}>
+        Vistas por perfil y cadencia
+      </Link>
 
       <p className="nav-group">Otros módulos</p>
       {otrosModulos.map((m) => (
