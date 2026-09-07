@@ -64,16 +64,19 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
 - B5: [x] matriz cliente×familia, semáforo de fuga, definiciones Q2/Q3 aplicadas (activo por
       pedido 12M, aviso de clientes sin actividad, perdido 12M), evolución individual por
       delta (12M vs 12M previos), cohortes mensuales con retención.
-- B6: [ ] margen y unidades por segmento, crecimiento YoY, peso 12M en rodante, diferencial
-      de margen SB vs MB, marca blanca por cliente-fabricante.
+- B6: [x] margen y unidades por segmento, crecimiento YoY, peso 12M en rodante, diferencial
+      de margen SB vs MB, marca blanca por cliente-fabricante (`lib/datos/canalMarca.ts` +
+      página canal-y-marca, incluida exportación a Excel).
 - B7: [x] top 20, concentración de producto (3 familias / 20 refs / nº refs que dan el 80%),
       concentración geográfica por país, matriz cliente×familia de riesgo, riesgo de
       proveedor (chino, sin alternativas, plazos reales y pactados vs 75 días).
 - B8: [x] desvío DSO vs 30 días, DSO por cliente y su evolución, riesgo vivo vs límite de
       crédito (commit del paquete Ciclo de crédito); cobertura de seguro de crédito a la
       espera de Q23. [ ] impagos/devoluciones de efectos (manual vía Excel, Q24).
-- B9: [x] facturación, clientes, descuento medio, pedidos por persona. [ ] carga SF+DOT
-      consolidada, margen aportado, cumplimiento presupuesto, nuevos/perdidos, saturación.
+- B9: [x] facturación, clientes, descuento medio, pedidos por persona. [x] margen aportado,
+      cumplimiento presupuesto (vs `presupuesto` acumulado), nuevos/perdidos frente al año
+      anterior, saturación por comercial (umbrales configurables `comerciales.saturacion_*`).
+      [ ] carga SF+DOT consolidada (depende de cargar datos DOT en demo).
 - B10: [x] devoluciones por referencia y familia en unidades, margen perdido, incidencias por
       motivo/cliente/estado. [ ] plazo de resolución (funciona en la página, pero los datos
       demo no traen `fecha_cierre`; con A3ERP ya se puede nutrir, Q29). [ ] devoluciones por
