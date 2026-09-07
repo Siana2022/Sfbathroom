@@ -22,10 +22,20 @@ export default function Header({ rol }: { rol?: string }) {
     document.cookie = `sfb_empresa=${codigo}; path=/; max-age=2592000; SameSite=Lax`;
   }
 
+  const hoy = new Date().toLocaleDateString('es-ES', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+
   return (
     <header className="topbar">
-      <span className="breadcrumb">sfbathroom · BI</span>
+      <span className="breadcrumb">
+        <strong>sfbathroom · BI</strong>
+      </span>
       <div className="topbar-derecha">
+        <span className="topbar-fecha">{hoy}</span>
         <select
           aria-label="Empresa"
           value={empresa}

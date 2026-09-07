@@ -16,32 +16,42 @@ export default function Nav({ userEmail }: { userEmail?: string }) {
   }
 
   function activo(href: string) {
-    return pathname === href ? 'var(--accent)' : undefined;
+    return pathname === href ? 'activo' : '';
   }
 
   return (
     <nav className="sidebar">
-      <h1>sfbathroom</h1>
-      <Link key="/" href="/" style={{ color: activo('/') }}>
+      <div className="sidebar-marca">
+        <span className="sidebar-logo">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 19v-6M10 19V5M16 19v-9M22 19H2" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+        <span className="sidebar-marca-txt">
+          <b>sfbathroom</b>
+          <span>Cuadro de mando</span>
+        </span>
+      </div>
+      <Link key="/" href="/" className={activo('/')}>
         Resumen
       </Link>
 
       <p className="nav-group">Cuadro de mando</p>
       {bloques.map((b) => (
-        <Link key={b.slug} href={b.slug} style={{ color: activo(b.slug) }}>
+        <Link key={b.slug} href={b.slug} className={activo(b.slug)}>
           <span className="nav-numero">{b.numero}</span> {b.titulo}
         </Link>
       ))}
-      <Link key="/cuadros" href="/cuadros" style={{ color: activo('/cuadros') }}>
+      <Link key="/cuadros" href="/cuadros" className={activo('/cuadros')}>
         Vistas por perfil y cadencia
       </Link>
-      <Link key="/configuracion" href="/configuracion" style={{ color: activo('/configuracion') }}>
+      <Link key="/configuracion" href="/configuracion" className={activo('/configuracion')}>
         Configuración de umbrales
       </Link>
 
       <p className="nav-group">Otros módulos</p>
       {otrosModulos.map((m) => (
-        <Link key={m.slug} href={m.slug} style={{ color: activo(m.slug) }}>
+        <Link key={m.slug} href={m.slug} className={activo(m.slug)}>
           {m.titulo}
         </Link>
       ))}
