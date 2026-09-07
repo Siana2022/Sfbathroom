@@ -7,8 +7,8 @@ pregunta (Q#) y el estado de implementación.
 
 - **Q1. Portes**: la facturación neta NO incluye portes como venta. Si el porte supera un cierto
   importe se refleja, pero no se imputa al cliente. Se quiere el **coste de transporte anual**
-  como métrica propia, extraído de la línea de proveedores (flete/aduana/seguro/transporte de
-  `compras`). [PENDIENTE de implementación]
+  como métrica propia, extraída de la línea de proveedores (flete/aduana/seguro/transporte de
+  `compras`). [HECHO: `lib/datos/transporte.ts` + tarjeta en Facturación]
 - **Q2. Cliente activo** = ≥ 1 pedido en los últimos 12 meses. **+ aviso de clientes no activos**
   (listado y aviso en el semáforo de fuga).  [PENDIENTE: ajustar B5/alertas a definición 12M]
 - **Q3. Cliente perdido** = lleva 12 meses sin facturar habiendo facturado en los 12 meses

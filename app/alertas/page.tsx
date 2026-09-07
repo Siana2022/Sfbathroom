@@ -24,8 +24,9 @@ export default async function AlertasPage() {
       <p className="breadcrumb">Cuadro de mando · Bloque 11</p>
       <h1>Alertas</h1>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
-        Avisos por umbral sobre los datos de {d.empresa.nombre}: fuga de clientes, rotura de stock,
-        margen bajo objetivo, DSO al alza, vencidos y desviación de presupuesto.
+        Avisos por umbral sobre los datos de {d.empresa.nombre}: fuga y clientes no activos, rotura
+        de stock, vencidos, DSO al alza, saturación comercial, retraso de proveedor, dependencia de
+        cliente y erosión de precio. Los umbrales se editan en Configuración.
       </p>
 
       <ul className="grid-kpis">

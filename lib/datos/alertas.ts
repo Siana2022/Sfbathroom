@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getStock } from '@/lib/datos/stock';
 import { getCobros } from '@/lib/datos/cobros';
+import { getConcentracion } from '@/lib/datos/concentracion';
+import { getMargen } from '@/lib/datos/margen';
 
 export type Alerta = {
   id: string;
@@ -93,7 +95,6 @@ export async function getAlertas(codigoEmpresa: string, anio: number): Promise<A
     const id = (f as { cliente_id: string | null }).cliente_id;
     if (id) activosAnio.add(id);
   }
-  const totalActivos = (clientesRes.data ?? []).length;
   const fuga = ((clientesRes.data ?? []) as { id: string }[]).filter((c) => !activosAnio.has(c.id)).length;
 
   const activos12m = new Set<string>();
@@ -103,19 +104,46 @@ export async function getAlertas(codigoEmpresa: string, anio: number): Promise<A
   }
   const noActivos = ((clientesRes.data ?? []) as { id: string }[]).filter((c) => !activos12m.has(c.id)).length;
 
+  const concentracion = await getConcentracion(codigoEmpresa, anio);
+  const margen = await getMargen(codigoEmpresa, anio);
+
   const stockRoturas = stock.roturas;
   const vencido = cobros.vencido;
+  const umbralRetraso = umbralDe(configMap, 'proveedores.retraso');
+  const proveedoresConRetraso = concentracion.riesgoProveedor.filter((p) => p.plazoReal !== null && p.plazoReal > umbralRetraso).length;
+  const familiasDependientes = concentracion.riesgo.length;
+  const umbralDso = umbralDe(configMap, 'cobros.dso');
+  const clientesDsoAlAlza = cobros.porCliente.filter((c) => {
+    if (c.dso === null || c.dsoDelta === null) return false;
+    const mediaHistorica = c.dso - c.dsoDelta;
+    return mediaHistorica > 0 && c.dso > mediaHistorica * umbralDso;
+  }).length;
+  const umbralErosion = umbralDe(configMap, 'ventas.erosion_precio');
+  const erosionPrecio = margen.sinAcceso ? null : margen.erosionTarifa.filter((e) => e.erosionPct > umbralErosion).length;
+  const conAlerta = (n: number) => (n > 0 ? ('critico' as const) : ('ok' as const));
+
+  const satImporte = umbralDe(configMap, 'comerciales.saturacion_importe');
+  const satClientes = umbralDe(configMap, 'comerciales.saturacion_clientes');
 
   let neta = 0;
   let presupuesto = 0;
+  let trimNeta = 0;
+  const mesActual = Number(new Date().toISOString().slice(5, 7));
+  const trimActual = Math.floor((mesActual - 1) / 3) + 1;
   {
     const { data: netaRes } = await supabase
       .from('facturas')
-      .select('total')
+      .select('total, fecha')
       .eq('empresa_id', empresa.id)
       .gte('fecha', `${anio}-01-01`)
       .lte('fecha', `${anio}-12-31`);
-    for (const f of netaRes ?? []) neta += Number((f as { total: number }).total ?? 0);
+    for (const f of netaRes ?? []) {
+      const total = Number((f as { total: number }).total ?? 0);
+      neta += total;
+      const fecha = (f as { fecha: string }).fecha;
+      const trim = Math.floor((Number(fecha.slice(5, 7)) - 1) / 3) + 1;
+      if (trim === trimActual) trimNeta += total;
+    }
     const { data: presRes } = await supabase
       .from('presupuesto')
       .select('importe')
@@ -124,6 +152,9 @@ export async function getAlertas(codigoEmpresa: string, anio: number): Promise<A
     for (const p of presRes ?? []) presupuesto += Number((p as { importe: number }).importe ?? 0);
   }
   const cumplimiento = presupuesto > 0 ? (neta / presupuesto) * 100 : null;
+  const saturadoImporte = trimNeta > satImporte;
+  const saturadoClientes = activos12m.size > satClientes;
+  const saturacion = saturadoImporte || saturadoClientes;
 
   const senales: Senal[] = [
     {
@@ -150,6 +181,31 @@ export async function getAlertas(codigoEmpresa: string, anio: number): Promise<A
       etiqueta: 'Clientes activos sin pedidos en 12 meses (Q2)',
       valor: String(noActivos),
       severidad: severidad(noActivos, umbralDe(configMap, 'clientes.no_activos'), avisoDe(configMap, 'clientes.no_activos')),
+    },
+    {
+      etiqueta: 'Saturación comercial (Q6)',
+      valor: `${Math.round(trimNeta / 1000)} k€ trim. · ${activos12m.size} clientes activos`,
+      severidad: saturacion ? 'critico' : 'ok',
+    },
+    {
+      etiqueta: 'Proveedores con retraso real',
+      valor: String(proveedoresConRetraso),
+      severidad: conAlerta(proveedoresConRetraso),
+    },
+    {
+      etiqueta: 'Familias dependientes de un cliente',
+      valor: String(familiasDependientes),
+      severidad: conAlerta(familiasDependientes),
+    },
+    {
+      etiqueta: 'Clientes alargando pagos (DSO al alza)',
+      valor: String(clientesDsoAlAlza),
+      severidad: conAlerta(clientesDsoAlAlza),
+    },
+    {
+      etiqueta: 'Erosión de precio sobre tarifa',
+      valor: erosionPrecio === null ? '—' : String(erosionPrecio),
+      severidad: erosionPrecio === null ? 'ok' : conAlerta(erosionPrecio),
     },
     { etiqueta: 'Cumplimiento de presupuesto', valor: cumplimiento === null ? '—' : `${cumplimiento.toFixed(1)} %`, severidad: 'ok' },
   ];

@@ -44,7 +44,7 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
       `security_invoker` + RLS) y gating por rol en `app/margen`. Aplicada por el cliente.
 - [x] Aviso de clientes no activos (Q2) visible en la página de clientes y como señal en
       `lib/datos/alertas.ts` (señal "Clientes activos sin pedidos en 12 meses").
-- [ ] Coste de transporte anual como métrica propia, fuera de la neta (Q1).
+- [x] Coste de transporte anual como métrica propia, fuera de la neta (Q1).
 
 ### Bloques
 - B1: [x] métricas base + mensual vs previo + presupuesto. [ ] análisis de variación en
@@ -79,9 +79,10 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
       demo no traen `fecha_cierre`; con A3ERP ya se puede nutrir, Q29). [ ] devoluciones por
       lote (requiere que A3ERP mariage lote en línea de factura).
 - B11: [x] señales calculadas + alertas_generadas. [x] umbrales configurables desde interfaz
-      (`app/configuracion` + migración `0006`); [ ] envío por correo y disparadores restantes
-      (fuga top-10, erosión de precio, DSO al alza, saturación, retraso de proveedor, familia
-      dependiente de un cliente).
+      (`app/configuracion` + migración `0006`); [x] disparadores restantes calculados desde la
+      configuración (saturación Q6, proveedor con retraso, DSO al alza, familia dependiente de
+      cliente, erosión de precio, clientes no activos Q2). [ ] envío por correo y generación
+      automática de `alertas_generadas`.
 - B12: [x] cuadros de mando por perfil y cadencia (operativa/comercial/estratégica/holding)
       + consolidada de holding por estado (commit `7c8db83`).
 

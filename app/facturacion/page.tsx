@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { getFacturacion, getVariacion } from '@/lib/datos/facturacion';
 import { getVistasTemporales } from '@/lib/datos/vistas';
+import { getCosteTransporte } from '@/lib/datos/transporte';
 import { decimal, eur, numero, pct } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import GraficoBarras, { type Barra } from '@/components/GraficoBarras';
@@ -20,6 +21,7 @@ export default async function FacturacionPage() {
   const delta = d.netaPrevioTotal > 0 ? pct(((d.neta - d.netaPrevioTotal) / d.netaPrevioTotal) * 100) : '—';
 
   const v = await getVariacion(empresa, ANIO);
+  const trans = await getCosteTransporte(empresa, ANIO);
 
   const barras: Barra[] = d.series.map((s) => ({
     etiqueta: NOMBRE_MES[s.mes],
@@ -44,6 +46,25 @@ export default async function FacturacionPage() {
         <Kpi etiqueta="Ticket medio por factura" valor={eur(d.ticketMedio)} nota="sobre facturas netas" />
         <Kpi etiqueta="Precio medio de venta" valor={eur(d.precioMedio)} nota="por unidad facturada" />
       </ul>
+
+      <div className="card">
+        <h2>Coste de transporte anual · {d.anio}</h2>
+        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
+          Métrica propia Q1: portes, aduana, seguro y transporte interior de las compras. Se
+          informa aparte; no se imputa como venta al cliente.
+        </p>
+        <ul className="grid-kpis">
+          <Kpi etiqueta="Coste de transporte total" valor={trans.total === 0 ? '—' : eur(trans.total)} nota={`${trans.compras} compras en el ejercicio`} />
+          <Kpi etiqueta="Flete" valor={eur(trans.flete)} nota="marítimo/aéreo" />
+          <Kpi etiqueta="Aduana" valor={eur(trans.aduana)} nota="aranceles" />
+          <Kpi etiqueta="Seguro + transporte interior" valor={eur(trans.seguro + trans.transporteInterior)} nota={`seguro ${eur(trans.seguro)} · interior ${eur(trans.transporteInterior)}`} />
+        </ul>
+        {trans.total > 0 ? (
+          <p className="nota" style={{ color: 'var(--muted)', marginTop: 10 }}>
+            Equivale al {decimal(trans.pesoSobreImporte ?? 0)} % del importe de compra del ejercicio.
+          </p>
+        ) : null}
+      </div>
 
       <div className="card">
         <h2>Evolución mensual · {d.anio} frente a {previo}</h2>
