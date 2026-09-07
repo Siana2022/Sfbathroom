@@ -17,10 +17,24 @@ export type ConcentracionData = {
   refs80: number;
   porPais: { pais: string; neta: number; pct: number }[];
   riesgo: { familia: string; cliente: string; netaFamilia: number; pctCliente: number }[];
+  riesgoProveedor: {
+    proveedor: string;
+    pais: string;
+    plazo: number;
+    plazoReal: number | null;
+    volumen: number;
+    pctVolumen: number;
+    articulos: number;
+    alternativas: number;
+    chino: boolean;
+    plazoAlto: boolean;
+    sinAlternativa: boolean;
+  }[];
 };
 
 export const UMBRAL_FAMILIA_RELEVANTE = 0.08;
 export const UMBRAL_CLIENTE_DE_FAMILIA = 0.7;
+export const PLAZO_PROVEEDOR_ALTO_DIAS = 75;
 
 type Fila = { id: string; cliente_id: string | null; fecha: string; total: number };
 type FilaLinea = { factura_id: string; articulo_id: string | null; importe: number };
@@ -35,6 +49,86 @@ const NOMBRE_PAIS: Record<string, string> = {
   DE: 'Alemania',
   PT: 'Portugal',
 };
+
+const DIA_MS = 86400000;
+
+async function getRiesgoProveedorList(supabase: ReturnType<typeof createClient>, empresaId: string): Promise<ConcentracionData['riesgoProveedor']> {
+  const { data: provRaw } = await supabase.from('proveedores').select('id, nombre, pais, plazo_entrega_dias, activo');
+  const proveedores = (provRaw ?? []) as { id: string; nombre: string; pais: string; plazo_entrega_dias: number; activo: boolean }[];
+
+  const { data: comprasRaw } = await supabase
+    .from('compras')
+    .select('id, proveedor_id, fecha, fecha_estimada_llegada')
+    .eq('empresa_id', empresaId);
+  const compras = (comprasRaw ?? []) as { id: string; proveedor_id: string | null; fecha: string; fecha_estimada_llegada: string | null }[];
+  const proveedorDeCompra = new Map<string, string | null>(compras.map((c) => [c.id, c.proveedor_id]));
+  let plazoRealSum = 0;
+  let plazoRealN = 0;
+  const plazoRealPorProveedor = new Map<string, { sum: number; n: number }>();
+  for (const c of compras) {
+    if (c.proveedor_id && c.fecha_estimada_llegada) {
+      const dias = Math.max(0, Math.round((Date.parse(c.fecha_estimada_llegada) - Date.parse(c.fecha)) / DIA_MS));
+      const v = plazoRealPorProveedor.get(c.proveedor_id) ?? { sum: 0, n: 0 };
+      v.sum += dias;
+      v.n += 1;
+      plazoRealPorProveedor.set(c.proveedor_id, v);
+      plazoRealSum += dias;
+      plazoRealN += 1;
+    }
+  }
+
+  const volumen = new Map<string, number>();
+  if (compras.length) {
+    const { data: lineasRaw } = await supabase
+      .from('compra_lineas')
+      .select('compra_id, cantidad, coste_unitario_compra')
+      .in('compra_id', compras.map((c) => c.id));
+    for (const l of (lineasRaw ?? []) as { compra_id: string; cantidad: number; coste_unitario_compra: number }[]) {
+      const prov = proveedorDeCompra.get(l.compra_id);
+      if (!prov) continue;
+      const importe = Number(l.cantidad ?? 0) * Number(l.coste_unitario_compra ?? 0);
+      volumen.set(prov, (volumen.get(prov) ?? 0) + importe);
+    }
+  }
+  let volumenTotal = 0;
+  for (const v of volumen.values()) volumenTotal += v;
+
+  const { data: artRaw } = await supabase
+    .from('articulos')
+    .select('proveedor_id')
+    .eq('empresa_id', empresaId);
+  const articulos = (artRaw ?? []) as { proveedor_id: string | null }[];
+  const familiasDeProveedor = new Map<string, Set<string | null>>();
+  const articulosPorProveedor = new Map<string, number>();
+  for (const a of articulos) {
+    if (!a.proveedor_id) continue;
+    articulosPorProveedor.set(a.proveedor_id, (articulosPorProveedor.get(a.proveedor_id) ?? 0) + 1);
+  }
+
+  const riesgoProveedor = proveedores
+    .filter((p) => p.activo !== false)
+    .map((p) => {
+      const plazoReal = plazoRealPorProveedor.get(p.id);
+      return {
+        proveedor: p.nombre,
+        pais: p.pais ?? '—',
+        plazo: Number(p.plazo_entrega_dias ?? 0),
+        plazoReal: plazoReal && plazoReal.n > 0 ? plazoReal.sum / plazoReal.n : null,
+        volumen: volumen.get(p.id) ?? 0,
+        pctVolumen: 0,
+        articulos: articulosPorProveedor.get(p.id) ?? 0,
+        alternativas: proveedores.filter((q) => q.id !== p.id && q.activo !== false).length,
+        chino: (p.pais ?? '').toLowerCase() === 'china',
+        plazoAlto: Number(p.plazo_entrega_dias ?? 0) > PLAZO_PROVEEDOR_ALTO_DIAS,
+        sinAlternativa: proveedores.filter((q) => q.id !== p.id && q.activo !== false).length === 0,
+      };
+    })
+    .sort((a, b) => b.volumen - a.volumen);
+  for (const r of riesgoProveedor) {
+    r.pctVolumen = volumenTotal > 0 ? (r.volumen / volumenTotal) * 100 : 0;
+  }
+  return riesgoProveedor;
+}
 
 export async function getConcentracion(codigoEmpresa: string, anio: number): Promise<ConcentracionData> {
   const supabase = createClient();
@@ -182,6 +276,8 @@ export async function getConcentracion(codigoEmpresa: string, anio: number): Pro
   }
   riesgo.sort((a, b) => b.netaFamilia - a.netaFamilia);
 
+  const riesgoProveedor = await getRiesgoProveedorList(supabase, empresa.id);
+
   return {
     empresa,
     anio,
@@ -198,5 +294,6 @@ export async function getConcentracion(codigoEmpresa: string, anio: number): Pro
     refs80,
     porPais,
     riesgo,
+    riesgoProveedor,
   };
 }

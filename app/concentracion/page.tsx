@@ -87,6 +87,49 @@ export default async function ConcentracionPage() {
           </table>
         )}
       </div>
+
+      <div className="card">
+        <h2>Riesgo de proveedor</h2>
+        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
+          Origen, plazo de entrega (pactado y real observado en compras) y dependencia por
+          proveedor. La alerta dispara por encima de 75 días pactados; un solo proveedor
+          activo marca ausencia de alternativa.
+        </p>
+        <table className="tabla">
+          <thead>
+            <tr>
+              <th>Proveedor</th>
+              <th>País</th>
+              <th className="td-num">Plazo pactado</th>
+              <th className="td-num">Plazo real</th>
+              <th className="td-num">Volumen comprado</th>
+              <th className="td-num">% compra</th>
+              <th className="td-num">Artículos</th>
+              <th className="td-num">Alternativas</th>
+              <th>Riesgo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {d.riesgoProveedor.map((p) => (
+              <tr key={p.proveedor}>
+                <td>{p.proveedor}</td>
+                <td>{p.pais}</td>
+                <td className={`td-num ${p.plazoAlto ? 'td-pos' : ''}`}>{numero(p.plazo)} días</td>
+                <td className="td-num">{p.plazoReal === null ? '—' : `${numero(p.plazoReal)} días`}</td>
+                <td className="td-num">{eur(p.volumen)}</td>
+                <td className="td-num">{decimal(p.pctVolumen)} %</td>
+                <td className="td-num">{numero(p.articulos)}</td>
+                <td className="td-num">{numero(p.alternativas)}</td>
+                <td>
+                  <span className={`td-num ${p.chino || p.plazoAlto || p.sinAlternativa ? 'td-pos' : ''}`}>
+                    {[p.chino && 'origen China', p.plazoAlto && 'plazo alto', p.sinAlternativa && 'sin alternativa'].filter(Boolean).join(' · ') || '—'}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

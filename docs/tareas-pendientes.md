@@ -63,7 +63,7 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
       de margen SB vs MB, marca blanca por cliente-fabricante.
 - B7: [ ] top 20, concentración de producto (3 familias / 20 refs / nº refs que dan el 80%),
       concentración geográfica por país, matriz cliente×familia de riesgo, riesgo de
-      proveedor (chino, sin alternativas, plazos vs 90 días).
+      proveedor (chino, sin alternativas, plazos reales y pactados vs 75 días).
 - B8: [x] desvío DSO vs 30 días, DSO por cliente y su evolución, riesgo vivo vs límite de
       crédito (commit del paquete Ciclo de crédito); cobertura de seguro de crédito a la
       espera de Q23. [ ] impagos/devoluciones de efectos (manual vía Excel, Q24).
