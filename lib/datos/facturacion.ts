@@ -36,6 +36,108 @@ const TIPOS_UNIDADES = new Set(['factura']);
 type FilaFactura = { id: string; cliente_id: string | null; fecha: string; tipo_documento: string; total: number };
 type FilaLinea = { factura_id: string; cantidad: number };
 
+export type Variacion = {
+  delta: number;
+  precio: number;
+  volumen: number;
+  mix: number;
+  efectoClientes: { nuevos: number; perdidos: number; existentes: number };
+};
+
+type FilaFacturaVariacion = {
+  id: string;
+  cliente_id: string | null;
+  fecha: string;
+  tipo_documento: string;
+};
+type FilaLineaVariacion = { factura_id: string; articulo_id: string; cantidad: number; importe: number };
+
+export async function getVariacion(codigoEmpresa: string, anio: number): Promise<Variacion> {
+  const supabase = createClient();
+  const empresa = await getEmpresaPorCodigo(codigoEmpresa);
+  const anioPrevio = anio - 1;
+
+  const { data: filas } = await supabase
+    .from('facturas')
+    .select('id, cliente_id, fecha, tipo_documento')
+    .eq('empresa_id', empresa.id)
+    .gte('fecha', `${anioPrevio}-01-01`)
+    .lte('fecha', `${anio}-12-31`);
+  const facturas = (filas ?? []) as FilaFacturaVariacion[];
+
+  const infoPorId = new Map<string, { anio: number; tipo: string }>();
+  const clientePorId = new Map<string, string | null>();
+  for (const f of facturas) {
+    infoPorId.set(f.id, { anio: Number(f.fecha.slice(0, 4)), tipo: f.tipo_documento });
+    clientePorId.set(f.id, f.cliente_id);
+  }
+
+  const { data: lineas } = await supabase
+    .from('factura_lineas')
+    .select('factura_id, articulo_id, cantidad, importe')
+    .in('factura_id', [...infoPorId.keys()]);
+  const lineasArr = (lineas ?? []) as FilaLineaVariacion[];
+
+  const unidades = new Map<string, number[]>(); // articulo -> [P0 unidades, P1 unidades]
+  const valores = new Map<string, number[]>(); // articulo -> [P0 importe, P1 importe]
+  const porCliente = new Map<string, [number, number]>(); // cliente -> [previo, actual]
+
+  for (const l of lineasArr) {
+    const info = infoPorId.get(l.factura_id);
+    const cliente = clientePorId.get(l.factura_id);
+    if (!info) continue;
+    const idx = info.anio === anio ? 1 : 0;
+    const signo = info.tipo === 'abono' ? -1 : 1;
+    const importe = Number(l.importe ?? 0) * signo;
+    if (importe === 0) continue;
+
+    if (l.articulo_id) {
+      const u = (unidades.get(l.articulo_id) ?? [0, 0]) as [number, number];
+      if (info.tipo === 'factura') u[idx] += Number(l.cantidad ?? 0);
+      unidades.set(l.articulo_id, u);
+      const v = (valores.get(l.articulo_id) ?? [0, 0]) as [number, number];
+      v[idx] += importe;
+      valores.set(l.articulo_id, v);
+    }
+    if (cliente) {
+      const c = porCliente.get(cliente) ?? [0, 0];
+      c[idx] += importe;
+      porCliente.set(cliente, c);
+    }
+  }
+
+  let delta = 0;
+  let efectoPrecio = 0;
+  let restaVolumenMix = 0;
+  let uPrev = 0;
+  let uAct = 0;
+  let vPrev = 0;
+  for (const [articulo, vals] of valores) {
+    const [v0, v1] = vals as [number, number];
+    const [u0, u1] = (unidades.get(articulo) ?? [0, 0]) as [number, number];
+    const p0 = u0 > 0 ? v0 / u0 : 0;
+    const p1 = u1 > 0 ? v1 / u1 : 0;
+    delta += v1 - v0;
+    efectoPrecio += (p1 - p0) * u1;
+    restaVolumenMix += (u1 - u0) * p0;
+    uPrev += u0;
+    uAct += u1;
+    vPrev += v0;
+  }
+  const precioMedioPrev = uPrev > 0 ? vPrev / uPrev : 0;
+  const efectoVolumen = (uAct - uPrev) * precioMedioPrev;
+  const efectoMix = restaVolumenMix - efectoVolumen;
+
+  const clientes = { nuevos: 0, perdidos: 0, existentes: 0 };
+  for (const [previo, actual] of porCliente.values()) {
+    if (previo === 0 && actual !== 0) clientes.nuevos += actual;
+    else if (actual === 0 && previo !== 0) clientes.perdidos -= previo;
+    else clientes.existentes += actual - previo;
+  }
+
+  return { delta, precio: efectoPrecio, volumen: efectoVolumen, mix: efectoMix, efectoClientes: clientes };
+}
+
 export async function getEmpresaPorCodigo(codigo: string): Promise<EmpresaSel> {
   const supabase = createClient();
   const { data } = await supabase
