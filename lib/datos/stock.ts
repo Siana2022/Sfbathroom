@@ -10,6 +10,7 @@ export type StockData = {
   bajoPuntoPedido: number;
   bajoPunto: { articulo: string; almacen: string; disponible: number; punto: number; cobertura: number | null; transito: number }[];
   peorCobertura: { articulo: string; almacen: string; disponible: number; cobertura: number | null }[];
+  aprovisionamiento: { articulo: string; almacen: string; disponible: number; mediaDiaria: number; transito: number; propuesta: number }[];
 };
 
 type FilaCobertura = {
@@ -22,6 +23,9 @@ type FilaCobertura = {
   cobertura_dias: number | null;
   en_transito: number;
 };
+
+export const PLAZO_REPOSICION_DIAS = 60;
+export const DIAS_SEGURIDAD = 15;
 
 export async function getStock(codigoEmpresa: string): Promise<StockData> {
   const supabase = createClient();
@@ -47,6 +51,7 @@ export async function getStock(codigoEmpresa: string): Promise<StockData> {
   const roturas = new Set<string>();
   const bajoPunto: StockData['bajoPunto'] = [];
   const peorCobertura: StockData['peorCobertura'] = [];
+  const aprovisionamiento: StockData['aprovisionamiento'] = [];
 
   for (const r of rows) {
     const coste = costeUnit.get(r.articulo_id) ?? 0;
@@ -59,11 +64,30 @@ export async function getStock(codigoEmpresa: string): Promise<StockData> {
     }
     const disponible = Number(r.stock_disponible ?? 0);
     const punto = Number(r.punto_pedido ?? 0);
+    const mediaDiaria = Number(r.consumo_medio_diario ?? 0);
+    const transito = Number(r.en_transito ?? 0);
     if (disponible <= 0) roturas.add(r.articulo_id);
     if (punto > 0 && disponible < punto) {
-      bajoPunto.push({ articulo: r.articulo, almacen: r.almacen, disponible, punto, cobertura, transito: Number(r.en_transito ?? 0) });
+      bajoPunto.push({ articulo: r.articulo, almacen: r.almacen, disponible, punto, cobertura, transito });
     }
     peorCobertura.push({ articulo: r.articulo, almacen: r.almacen, disponible, cobertura });
+
+    if (mediaDiaria > 0) {
+      const propuesta = Math.max(
+        0,
+        Math.round(mediaDiaria * (PLAZO_REPOSICION_DIAS + DIAS_SEGURIDAD) - disponible - transito),
+      );
+      if (propuesta > 0) {
+        aprovisionamiento.push({
+          articulo: r.articulo,
+          almacen: r.almacen,
+          disponible,
+          mediaDiaria,
+          transito,
+          propuesta,
+        });
+      }
+    }
   }
 
   bajoPunto.sort((a, b) => a.disponible - b.disponible).slice(0, 15);
@@ -71,6 +95,7 @@ export async function getStock(codigoEmpresa: string): Promise<StockData> {
     .filter((x) => x.cobertura !== null)
     .sort((a, b) => (a.cobertura ?? Infinity) - (b.cobertura ?? Infinity))
     .slice(0, 12);
+  aprovisionamiento.sort((a, b) => b.propuesta - a.propuesta).slice(0, 15);
 
   return {
     empresa,
@@ -81,5 +106,6 @@ export async function getStock(codigoEmpresa: string): Promise<StockData> {
     bajoPuntoPedido: bajoPunto.length,
     bajoPunto,
     peorCobertura,
+    aprovisionamiento,
   };
 }

@@ -55,6 +55,79 @@ export default async function ClientesPage() {
           </table>
         )}
       </div>
+
+      <div className="card">
+        <h2>Matriz cliente × familia</h2>
+        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
+          Familias compradas por cada cliente del top {d.matriz.length} por facturación en {d.anio}.
+          Es el mapa de venta cruzada y, a la vez, el de vulnerabilidad: lo que un cliente no
+          compra hoy es la oportunidad y también la exposición.
+        </p>
+        <div style={{ overflowX: 'auto' }}>
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th className="td-num">Neta</th>
+                {d.familias.map((f) => (
+                  <th key={f} title={f}>{f.length > 12 ? `${f.slice(0, 12)}…` : f}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {d.matriz.map((c) => (
+                <tr key={c.id}>
+                  <td>{c.nombre}</td>
+                  <td className="td-num">{eur(c.neta)}</td>
+                  {c.compradas.map((s, i) => (
+                    <td key={d.familias[i]} style={{ textAlign: 'center' }}>
+                      <span className={s ? 'badge listo' : 'badge vacio'}>
+                        {s ? '✓' : '·'}
+                      </span>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="card">
+        <h2>Semáforo de fuga</h2>
+        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
+          Clientes activos con días sin pedir por encima de su frecuencia histórica. Rojo:
+          más de 2,5 veces su frecuencia habitual. Ámbar: entre su frecuencia y 2,5 veces.
+        </p>
+        {d.semaforo.length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>Ningún cliente activo está por encima de su frecuencia habitual.</p>
+        ) : (
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th className="td-num">Días sin pedir</th>
+                <th className="td-num">Frecuencia habitual</th>
+                <th>Semáforo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {d.semaforo.map((c) => (
+                <tr key={c.id}>
+                  <td>{c.nombre}</td>
+                  <td className="td-num">{numero(c.diasSin)}</td>
+                  <td className="td-num">{c.frecuencia === null ? '—' : `${decimal(c.frecuencia)} días`}</td>
+                  <td>
+                    <span className={c.nivel === 'aviso' ? 'badge pendiente' : 'badge construccion'}>
+                      {c.nivel === 'aviso' ? 'ámbar' : 'rojo'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }

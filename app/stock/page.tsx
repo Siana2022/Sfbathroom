@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import { getStock } from '@/lib/datos/stock';
+import { getStock, DIAS_SEGURIDAD, PLAZO_REPOSICION_DIAS } from '@/lib/datos/stock';
 import { decimal, eur, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 
@@ -24,6 +24,7 @@ export default async function StockPage() {
         <Kpi etiqueta="Cobertura media" valor={d.coberturaMedia > 0 ? `${decimal(d.coberturaMedia)} días` : '—'} nota="sobre consumo medio último 90 días" />
         <Kpi etiqueta="Roturas" valor={numero(d.roturas)} nota="referencias sin stock disponible" />
         <Kpi etiqueta="Bajo punto de pedido" valor={numero(d.bajoPuntoPedido)} nota="stock disponible inferior al punto" />
+        <Kpi etiqueta="Referencias a aprovisionar" valor={numero(d.aprovisionamiento.length)} nota="propuesta de compra con dato de consumo" />
       </ul>
 
       <div className="card">
@@ -79,6 +80,43 @@ export default async function StockPage() {
                   <td>{r.almacen}</td>
                   <td className="td-num">{numero(r.disponible)}</td>
                   <td className={`td-num ${r.cobertura !== null && r.cobertura < 20 ? 'td-pos' : ''}`}>{r.cobertura === null ? '—' : `${decimal(r.cobertura)} días`}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="card">
+        <h2>Propuesta de aprovisionamiento</h2>
+        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
+          Cantidad sugerida para cubrir el plazo de reposición de {PLAZO_REPOSICION_DIAS} días
+          más {DIAS_SEGURIDAD} días de seguridad, descontando stock disponible y en tránsito.
+          Umbrales orientativos hasta que dirección los fije.
+        </p>
+        {d.aprovisionamiento.length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>Ninguna referencia con consumo requiere reposición.</p>
+        ) : (
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Artículo</th>
+                <th>Almacén</th>
+                <th className="td-num">Consumo medio diario</th>
+                <th className="td-num">Stock disponible</th>
+                <th className="td-num">En tránsito</th>
+                <th className="td-num">Propuesta de compra</th>
+              </tr>
+            </thead>
+            <tbody>
+              {d.aprovisionamiento.map((r) => (
+                <tr key={r.articulo + r.almacen}>
+                  <td>{r.articulo}</td>
+                  <td>{r.almacen}</td>
+                  <td className="td-num">{numero(r.mediaDiaria)}</td>
+                  <td className="td-num">{numero(r.disponible)}</td>
+                  <td className="td-num">{numero(r.transito)}</td>
+                  <td className="td-num">{numero(r.propuesta)}</td>
                 </tr>
               ))}
             </tbody>

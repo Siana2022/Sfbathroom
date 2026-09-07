@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import { getConcentracion } from '@/lib/datos/concentracion';
+import { getConcentracion, UMBRAL_CLIENTE_DE_FAMILIA, UMBRAL_FAMILIA_RELEVANTE } from '@/lib/datos/concentracion';
 import { decimal, eur, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 
@@ -29,28 +29,58 @@ export default async function ConcentracionPage() {
       </ul>
 
       <div className="card">
-        <h2>Curva de Pareto de clientes</h2>
-        {d.pareto.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>Sin datos.</p>
+        <h2>Concentración de producto y geografía</h2>
+        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
+          Peso de las 3 familias principales: {decimal(d.pct3Familias)} % · las 20 referencias top:
+          {decimal(d.pctTop20Refs)} % · referencias que concentran el 80 % de la facturación:{' '}
+          {numero(d.refs80)}.
+        </p>
+        <table className="tabla">
+          <thead>
+            <tr>
+              <th>Mercado</th>
+              <th className="td-num">Facturación</th>
+              <th className="td-num">% sobre total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {d.porPais.map((p) => (
+              <tr key={p.pais}>
+                <td>{p.pais}</td>
+                <td className="td-num">{eur(p.neta)}</td>
+                <td className="td-num">{decimal(p.pct)} %</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="card">
+        <h2>Matriz cliente × familia de riesgo</h2>
+        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
+          Combinaciones donde una familia relevante (≥ {Math.round(UMBRAL_FAMILIA_RELEVANTE * 100)} % de la
+          facturación) depende de un solo cliente (≥ {Math.round(UMBRAL_CLIENTE_DE_FAMILIA * 100)} % de la
+          familia). Al perder ese cliente se pierde a la vez la viabilidad de la familia y su stock.
+        </p>
+        {d.riesgo.length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>Ninguna familia relevante depende de un solo cliente con los umbrales actuales.</p>
         ) : (
           <table className="tabla">
             <thead>
               <tr>
-                <th>#</th>
-                <th>Cliente</th>
-                <th className="td-num">Facturación</th>
-                <th className="td-num">% sobre total</th>
-                <th className="td-num">% acumulado</th>
+                <th>Familia</th>
+                <th>Cliente dominante</th>
+                <th className="td-num">Neta de la familia</th>
+                <th className="td-num">% que absorbe el cliente</th>
               </tr>
             </thead>
             <tbody>
-              {d.pareto.map((c, i) => (
-                <tr key={c.nombre}>
-                  <td>{i + 1}</td>
-                  <td>{c.nombre}</td>
-                  <td className="td-num">{eur(c.neta)}</td>
-                  <td className="td-num">{decimal(c.pct)} %</td>
-                  <td className="td-num">{decimal(c.acumulado)} %</td>
+              {d.riesgo.map((r) => (
+                <tr key={r.familia + r.cliente}>
+                  <td>{r.familia}</td>
+                  <td>{r.cliente}</td>
+                  <td className="td-num">{eur(r.netaFamilia)}</td>
+                  <td className="td-num">{decimal(r.pctCliente)} %</td>
                 </tr>
               ))}
             </tbody>
