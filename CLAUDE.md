@@ -28,7 +28,8 @@ Módulos:
 
 - **Supabase**: org "Sfbathroom" (`emvloponqtbpuuzmkxkb`), proyecto `dgbxualxhrbbqglvxtxq`,
   región `eu-central-1`. `0001` y `0002` aplicadas en producción; la `0003` (cuadro de mando)
-  está versionada pero **pendiente de aplicar** — ver `supabase/migrations/`.
+  la aplicó el cliente; la `0004` (fix recursión RLS + escalada de rol) está versionada y
+  **pendiente de aplicar**. Ver `supabase/migrations/`.
   URL: `https://dgbxualxhrbbqglvxtxq.supabase.co`.
 - **Vercel**: proyecto `sfbathroom-bi` bajo la cuenta personal conectada (sin team todavía).
   Hay un deployment preview ya generado con el esqueleto de páginas de este repo.
@@ -82,12 +83,12 @@ Módulos:
 
 ## Qué falta (ver `docs/tareas-pendientes.md` para el detalle)
 
-1. **Aplicar la migración `0003_esquema_cuadro_mando.sql`** en el SQL editor de Supabase
-   (pendiente de ejecución manual por el cliente/Siana — el repo ya la versiona). Incluye
-   multiempresa, pedidos, compras/coste por lote, stock avanzado, cobros, incidencias,
-   presupuesto, alertas y los roles ampliados a 7.
-2. Crear el usuario real en Supabase Auth y fijarle `profiles.role = 'admin'` (el login ya
-   está montado: página en `/login`, middleware que protege todas las rutas).
+1. **Aplicar la migración `0004_fix_recursion_y_escalada_roles.sql`** en el SQL editor de
+   Supabase: corrige la recursión de RLS que rompía cualquier consulta de datos tras el login
+   (`max_stack_depth`) y cierra la escalada de rol (antes cualquiera podía ponerse `admin`).
+2. Crear los usuarios de prueba (`docs/crear-usuarios-prueba.sql`, un rol por usuario) y,
+   tras validar, el usuario real del responsable con `profiles.role = 'admin'`. La matriz de
+   visibilidad y el estado de la RLS están en `docs/usuarios-y-roles.md`.
 3. Conector A3ERP → Supabase (workflow n8n, pendiente de credenciales de la base de datos SQL
    Server del cliente).
 4. Carga de costes reales de artículo (vía `compras`/`compra_lineas`) para que el margen deje

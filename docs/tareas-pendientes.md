@@ -9,11 +9,16 @@ Orden sugerido, no estricto — reordena si el cliente marca otra prioridad.
 - [ ] Validar en Supabase que no salta ningún advisor de seguridad (las vistas nuevas van con
       `security_invoker = true`) y que `auth_role()`/`auth_comercial_id()` siguen OK.
 
-## 1. Autenticación (bloqueante para casi todo lo demás)
+## 1. Autenticación y perfiles
 - [x] Activar Supabase Auth (email/password basta, es un único usuario por ahora).
 - [x] Página de login en Next.js + middleware que proteja todas las rutas salvo `/login`.
-- [ ] Dar de alta al responsable de sfbathroom con rol `admin` en `profiles`.
-      (crear el usuario en Supabase Auth + fijar `profiles.role = 'admin'`).
+- [x] Shell de navegación con los 11 bloques y selector de empresa (commit `292fd7a`).
+- [ ] Aplicar la migración `0004_fix_recursion_y_escalada_roles.sql` en el SQL editor de
+      Supabase (fix recursión RLS + cierre de escalada de rol). Bloquea cualquier página con
+      datos; la portada ya falla tras el login hasta que se aplique.
+- [ ] Crear usuarios de prueba por rol (`docs/crear-usuarios-prueba.sql`) y verificar la
+      matriz de visibilidad (`docs/usuarios-y-roles.md`).
+- [ ] Dar de alta al responsable con rol `admin` en `profiles` y borrar los usuarios demo.
 - [ ] (Más adelante, no ahora) pantalla simple de administración de usuarios para que el
       cliente pueda dar de alta a financiero/comercial/fabricación sin depender de Siana.
 
