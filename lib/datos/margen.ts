@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getRol, puedeVerMargenes } from '@/lib/datos/role';
+import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
 
 export type MargenData = {
   empresa: { id: string; codigo: string; nombre: string };
@@ -49,9 +50,11 @@ function pushMap(m: Map<string, { importe: number; coste: number }>, clave: stri
   m.set(clave, v);
 }
 
-export async function getMargen(codigoEmpresa: string, anio: number): Promise<MargenData> {
+export async function getMargen(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<MargenData> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
+
+  const idsFiltrados = await getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anio}-01-01`, `${anio}-12-31`);
 
   const rol = await getRol();
   if (!puedeVerMargenes(rol)) {
@@ -86,7 +89,7 @@ export async function getMargen(codigoEmpresa: string, anio: number): Promise<Ma
     .eq('tipo_documento', 'factura')
     .gte('fecha', `${anio}-01-01`)
     .lte('fecha', `${anio}-12-31`);
-  const facturas = (facturasRaw ?? []) as unknown as FilaFactura[];
+  const facturas = filtrarPorIds((facturasRaw ?? []) as unknown as FilaFactura[], idsFiltrados);
   const ids = facturas.map((f) => f.id);
 
   const { data: lineas } = ids.length

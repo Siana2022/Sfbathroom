@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
 
 export type EmpresaSel = { id: string; codigo: string; nombre: string };
 
@@ -52,10 +53,12 @@ type FilaFacturaVariacion = {
 };
 type FilaLineaVariacion = { factura_id: string; articulo_id: string; cantidad: number; importe: number };
 
-export async function getVariacion(codigoEmpresa: string, anio: number): Promise<Variacion> {
+export async function getVariacion(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<Variacion> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
   const anioPrevio = anio - 1;
+
+  const idsFiltrados = await getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anioPrevio}-01-01`, `${anio}-12-31`);
 
   const { data: filas } = await supabase
     .from('facturas')
@@ -63,7 +66,7 @@ export async function getVariacion(codigoEmpresa: string, anio: number): Promise
     .eq('empresa_id', empresa.id)
     .gte('fecha', `${anioPrevio}-01-01`)
     .lte('fecha', `${anio}-12-31`);
-  const facturas = (filas ?? []) as FilaFacturaVariacion[];
+  const facturas = filtrarPorIds((filas ?? []) as FilaFacturaVariacion[], idsFiltrados);
 
   const infoPorId = new Map<string, { anio: number; tipo: string }>();
   const clientePorId = new Map<string, string | null>();
@@ -154,11 +157,13 @@ export async function getEmpresaPorCodigo(codigo: string): Promise<EmpresaSel> {
   return (defecto as EmpresaSel) ?? { id: '', codigo: 'SF', nombre: 'SF Bathroom' };
 }
 
-export async function getFacturacion(codigoEmpresa: string, anio: number): Promise<FacturacionData> {
+export async function getFacturacion(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<FacturacionData> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
   const anioPrevio = anio - 1;
   const at = String(anio);
+
+  const idsFiltrados = await getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anioPrevio}-01-01`, `${anio}-12-31`);
 
   const { data: filas } = await supabase
     .from('facturas')
@@ -166,7 +171,7 @@ export async function getFacturacion(codigoEmpresa: string, anio: number): Promi
     .eq('empresa_id', empresa.id)
     .gte('fecha', `${anioPrevio}-01-01`)
     .lte('fecha', `${anio}-12-31`);
-  const facturas = (filas ?? []) as FilaFactura[];
+  const facturas = filtrarPorIds((filas ?? []) as FilaFactura[], idsFiltrados);
 
   const curs = { neta: 0, unidades: 0, facturas: 0, abonosYNotas: 0 };
   const prev = { neta: 0, unidades: 0, facturas: 0 };
@@ -230,16 +235,26 @@ export async function getFacturacion(codigoEmpresa: string, anio: number): Promi
     }
   }
 
-  const { data: presupuestoFilas } = await supabase
-    .from('presupuesto')
-    .select('mes, importe')
-    .eq('empresa_id', empresa.id)
-    .eq('ejercicio', anio);
+  let presupuestoFilas: { mes: number; importe: number }[] = [];
+  if (filtros?.marca) {
+    // el presupuesto no desglosa por marca: sin referencia comparativa
+  } else {
+    let pq = supabase
+      .from('presupuesto')
+      .select('mes, importe')
+      .eq('empresa_id', empresa.id)
+      .eq('ejercicio', anio);
+    if (filtros?.cliente) pq = pq.eq('cliente_id', filtros.cliente);
+    if (filtros?.comercial) pq = pq.eq('comercial_id', filtros.comercial);
+    if (filtros?.familia) pq = pq.eq('familia_id', filtros.familia);
+    const { data } = await pq;
+    presupuestoFilas = (data ?? []) as { mes: number; importe: number }[];
+  }
   const presupuestoMes = new Map<number, number>();
   let presupuesto = 0;
-  for (const p of presupuestoFilas ?? []) {
-    const mes = Number((p as { mes: number }).mes);
-    const importe = Number((p as { importe: number }).importe ?? 0);
+  for (const p of presupuestoFilas) {
+    const mes = Number(p.mes);
+    const importe = Number(p.importe ?? 0);
     presupuestoMes.set(mes, (presupuestoMes.get(mes) ?? 0) + importe);
     presupuesto += importe;
   }

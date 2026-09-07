@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getConfiguracionUmbrales } from '@/lib/datos/configuracion';
 import { getRol, puedeVerMargenes } from '@/lib/datos/role';
+import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
 
 export type ComercialRow = {
   id: string;
@@ -41,10 +42,12 @@ const UMBRALES_DEFECTO: Record<string, number> = {
   'comerciales.saturacion_clientes': 60,
 };
 
-export async function getActividad(codigoEmpresa: string, anio: number): Promise<ActividadData> {
+export async function getActividad(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<ActividadData> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
   const anioPrevio = anio - 1;
+
+  const idsComunes = await getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anioPrevio}-01-01`, `${anio}-12-31`);
 
   const [filasRes, filasPreviasRes, pedidosRes, presupuestoRes, config] = await Promise.all([
     supabase
@@ -56,7 +59,7 @@ export async function getActividad(codigoEmpresa: string, anio: number): Promise
       .lte('fecha', `${anio}-12-31`),
     supabase
       .from('facturas')
-      .select('comercial_id, cliente_id')
+      .select('id, comercial_id, cliente_id')
       .eq('empresa_id', empresa.id)
       .eq('tipo_documento', 'factura')
       .gte('fecha', `${anioPrevio}-01-01`)
@@ -71,8 +74,8 @@ export async function getActividad(codigoEmpresa: string, anio: number): Promise
     getConfiguracionUmbrales(),
   ]);
 
-  const filas = (filasRes.data ?? []) as Fila[];
-  const filasPrevias = (filasPreviasRes.data ?? []) as { comercial_id: string | null; cliente_id: string | null }[];
+  const filas = filtrarPorIds((filasRes.data ?? []) as Fila[], idsComunes);
+  const filasPrevias = filtrarPorIds((filasPreviasRes.data ?? []) as { id: string; comercial_id: string | null; cliente_id: string | null }[], idsComunes);
   const pedidosPorComercial = new Map<string, number>();
   for (const p of (pedidosRes.data ?? []) as FilaPedido[]) {
     if (p.comercial_id) pedidosPorComercial.set(p.comercial_id, (pedidosPorComercial.get(p.comercial_id) ?? 0) + 1);
@@ -144,11 +147,12 @@ export async function getActividad(codigoEmpresa: string, anio: number): Promise
 
   const presupuestoPorComercial = new Map<string, number>();
   for (const p of (presupuestoRes.data ?? []) as FilaPresupuesto[]) {
+    if (filtros?.comercial && p.comercial_id !== filtros.comercial) continue;
     if (p.comercial_id) presupuestoPorComercial.set(p.comercial_id, (presupuestoPorComercial.get(p.comercial_id) ?? 0) + Number(p.importe ?? 0));
   }
 
   const { data: comerciales } = await supabase.from('comerciales').select('id, nombre').eq('activo', true);
-  const filasComerciales = (comerciales ?? []) as FilaComercial[];
+  const filasComerciales = ((comerciales ?? []) as FilaComercial[]).filter((c) => !filtros?.comercial || c.id === filtros.comercial);
 
   const rol = await getRol();
   const sinAccesoMargen = !puedeVerMargenes(rol);

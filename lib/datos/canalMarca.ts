@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getRol, puedeVerMargenes } from '@/lib/datos/role';
+import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
 
 export type Segmento = {
   marca: string;
@@ -53,7 +54,10 @@ async function getSegmentos(
   anioPrevio: number,
   clientesCanal: Map<string, string | null>,
   canalNombre: Map<string, string>,
+  filtros?: Filtros,
 ) {
+  const idsFiltrados = await getFacturaIdsFiltradas(supabase, empresaId, filtros ?? {}, `${anioPrevio}-01-01`, `${anio}-12-31`);
+
   const { data: facturasRaw } = await supabase
     .from('facturas')
     .select('id, cliente_id, fecha')
@@ -61,7 +65,7 @@ async function getSegmentos(
     .eq('tipo_documento', 'factura')
     .gte('fecha', `${anioPrevio}-01-01`)
     .lte('fecha', `${anio}-12-31`);
-  const facturas = (facturasRaw ?? []) as FilaFactura[];
+  const facturas = filtrarPorIds((facturasRaw ?? []) as FilaFactura[], idsFiltrados);
   const ids = facturas.map((f) => f.id);
 
   const { data: lineasRaw } = ids.length
@@ -213,7 +217,7 @@ async function getSegmentos(
   };
 }
 
-export async function getCanalMarca(codigoEmpresa: string, anio: number): Promise<CanalMarcaData> {
+export async function getCanalMarca(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<CanalMarcaData> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
   const anioPrevio = anio - 1;
@@ -231,7 +235,7 @@ export async function getCanalMarca(codigoEmpresa: string, anio: number): Promis
     for (const c of (canales ?? []) as FilaCanal[]) canalNombre.set(c.id, c.nombre);
   }
 
-  const r = await getSegmentos(supabase, empresa.id, anio, anioPrevio, clienteCanal, canalNombre);
+  const r = await getSegmentos(supabase, empresa.id, anio, anioPrevio, clienteCanal, canalNombre, filtros);
 
   if (sinAccesoMargen) {
     for (const s of r.porMarca) {

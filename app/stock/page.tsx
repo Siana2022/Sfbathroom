@@ -1,13 +1,18 @@
 import { cookies } from 'next/headers';
 import { getStock, DIAS_SEGURIDAD, PLAZO_REPOSICION_DIAS } from '@/lib/datos/stock';
+import { parseFiltros, getOpcionesFiltros, type SearchParams } from '@/lib/datos/filtros';
 import { decimal, eur, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
+import DescargarExcel from '@/components/DescargarExcel';
+import Filtros from '@/components/Filtros';
 
 export const dynamic = 'force-dynamic';
 
-export default async function StockPage() {
+export default async function StockPage({ searchParams }: { searchParams: SearchParams }) {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
-  const d = await getStock(empresa);
+  const filtros = parseFiltros(searchParams);
+  const opciones = await getOpcionesFiltros(empresa);
+  const d = await getStock(empresa, filtros);
 
   return (
     <div>
@@ -17,6 +22,8 @@ export default async function StockPage() {
         Cobertura en días por artículo y almacén, stock disponible real, en tránsito, roturas y
         referencias bajo el punto de pedido de {d.empresa.nombre}.
       </p>
+
+      <Filtros opciones={opciones} />
 
       <ul className="grid-kpis">
         <Kpi etiqueta="Valor de stock disponible" valor={eur(d.valorStock)} nota="a coste de artículo" />
@@ -92,7 +99,14 @@ export default async function StockPage() {
       </div>
 
       <div className="card">
-        <h2>Propuesta de aprovisionamiento</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2>Propuesta de aprovisionamiento</h2>
+          <DescargarExcel
+            nombre={`stock-aprovisionamiento`}
+            columnas={['Artículo', 'Almacén', 'Consumo medio diario', 'Stock disponible', 'En tránsito', 'Propuesta de compra']}
+            registros={d.aprovisionamiento.map((r) => [r.articulo, r.almacen, r.mediaDiaria, r.disponible, r.transito, r.propuesta])}
+          />
+        </div>
         <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
           Cantidad sugerida para cubrir el plazo de reposición de {PLAZO_REPOSICION_DIAS} días
           más {DIAS_SEGURIDAD} días de seguridad, descontando stock disponible y en tránsito.

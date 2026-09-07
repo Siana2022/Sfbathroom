@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
+import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
 
 export type CalidadData = {
   empresa: { id: string; codigo: string; nombre: string };
@@ -28,9 +29,11 @@ const TIPO_LABEL: Record<string, string> = {
 type Fila = { tipo: string; importe: number; estado: string; cliente_id: string | null };
 type FilaAbonoLinea = { articulo_id: string | null; cantidad: number; importe: number; coste_unitario: number | null };
 
-export async function getCalidad(codigoEmpresa: string, anio: number): Promise<CalidadData> {
+export async function getCalidad(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<CalidadData> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
+
+  const idsFiltrados = await getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anio}-01-01`, `${anio}-12-31`);
 
   let neta = 0;
   let importeDevoluciones = 0;
@@ -42,11 +45,12 @@ export async function getCalidad(codigoEmpresa: string, anio: number): Promise<C
       .eq('empresa_id', empresa.id)
       .gte('fecha', `${anio}-01-01`)
       .lte('fecha', `${anio}-12-31`);
-    for (const f of filas ?? []) {
-      const total = Number((f as { total: number }).total ?? 0);
-      if ((f as { tipo_documento: string }).tipo_documento === 'abono') {
+    const facturas = filtrarPorIds((filas ?? []) as { id: string; tipo_documento: string; total: number }[], idsFiltrados);
+    for (const f of facturas) {
+      const total = Number(f.total ?? 0);
+      if (f.tipo_documento === 'abono') {
         importeDevoluciones += Math.abs(total);
-        idsAbonos.push((f as { id: string }).id);
+        idsAbonos.push(f.id);
       } else {
         neta += total;
       }

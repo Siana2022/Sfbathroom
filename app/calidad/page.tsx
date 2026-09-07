@@ -1,7 +1,10 @@
 import { cookies } from 'next/headers';
 import { getCalidad } from '@/lib/datos/calidad';
+import { parseFiltros, getOpcionesFiltros, type SearchParams } from '@/lib/datos/filtros';
 import { decimal, eur, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
+import DescargarExcel from '@/components/DescargarExcel';
+import Filtros from '@/components/Filtros';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,9 +18,11 @@ const TIPO_LABEL: Record<string, string> = {
   rechazo_comercial: 'Rechazo comercial',
 };
 
-export default async function CalidadPage() {
+export default async function CalidadPage({ searchParams }: { searchParams: SearchParams }) {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
-  const d = await getCalidad(empresa, ANIO);
+  const filtros = parseFiltros(searchParams);
+  const opciones = await getOpcionesFiltros(empresa);
+  const d = await getCalidad(empresa, ANIO, filtros);
 
   return (
     <div>
@@ -26,6 +31,8 @@ export default async function CalidadPage() {
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
         Devoluciones sobre facturación e incidencias registradas por {d.empresa.nombre} en {d.anio}.
       </p>
+
+      <Filtros opciones={opciones} />
 
       <ul className="grid-kpis">
         <Kpi etiqueta="% de devoluciones" valor={d.devolucionPct === null ? '—' : `${decimal(d.devolucionPct)} %`} nota={`importe devuelto ${eur(d.importeDevoluciones)}`} />
@@ -61,7 +68,14 @@ export default async function CalidadPage() {
       </div>
 
       <div className="card">
-        <h2>Devoluciones por familia</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2>Devoluciones por familia</h2>
+          <DescargarExcel
+            nombre={`calidad-devoluciones-familia-${d.anio}`}
+            columnas={['Familia', 'Unidades', 'Importe devuelto']}
+            registros={d.devolucionesFamilia.map((f) => [f.familia, f.unidades, f.importe])}
+          />
+        </div>
         <table className="tabla">
           <thead>
             <tr>
@@ -107,7 +121,14 @@ export default async function CalidadPage() {
       </div>
 
       <div className="card">
-        <h2>Incidencias por motivo</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2>Incidencias por motivo</h2>
+          <DescargarExcel
+            nombre={`calidad-incidencias-motivo-${d.anio}`}
+            columnas={['Motivo', 'Incidencias', 'Importe']}
+            registros={d.porTipo.map((t) => [TIPO_LABEL[t.tipo] ?? t.tipo, t.count, t.importe])}
+          />
+        </div>
         {d.porTipo.length === 0 ? (
           <p style={{ color: 'var(--muted)' }}>Sin incidencias registradas.</p>
         ) : (

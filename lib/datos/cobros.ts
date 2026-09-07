@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
+import type { Filtros } from '@/lib/datos/filtros';
 
 export type AgingBucket = { label: string; min: number; max: number | null; importe: number };
 
@@ -39,14 +40,17 @@ const DIAS_REPASO = 30;
 
 const DIA_MS = 86400000;
 
-export async function getCobros(codigoEmpresa: string, anio: number): Promise<CobrosData> {
+export async function getCobros(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<CobrosData> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
+  const clienteId = filtros?.cliente;
 
-  const { data: aging } = await supabase
+  let agingQuery = supabase
     .from('v_aging')
     .select('cliente_id, pendiente, dias_vencido')
     .eq('empresa_id', empresa.id);
+  if (clienteId) agingQuery = agingQuery.eq('cliente_id', clienteId);
+  const { data: aging } = await agingQuery;
   const filas = (aging ?? []) as FilaAging[];
 
   let saldoTotal = 0;
@@ -54,12 +58,14 @@ export async function getCobros(codigoEmpresa: string, anio: number): Promise<Co
   let netaAnio = 0;
 
   {
-    const { data: neta } = await supabase
+    let netaQuery = supabase
       .from('facturas')
       .select('total')
       .eq('empresa_id', empresa.id)
       .gte('fecha', `${anio}-01-01`)
       .lte('fecha', `${anio}-12-31`);
+    if (clienteId) netaQuery = netaQuery.eq('cliente_id', clienteId);
+    const { data: neta } = await netaQuery;
     for (const f of neta ?? []) netaAnio += Number((f as { total: number }).total ?? 0);
   }
 
@@ -94,28 +100,36 @@ export async function getCobros(codigoEmpresa: string, anio: number): Promise<Co
   const hoy = Math.floor(Date.now() / DIA_MS);
   const hoyMenosRepaso = hoy - DIAS_REPASO;
 
-  const { data: facturasRaw } = await supabase
+  let facturasQuery = supabase
     .from('facturas')
     .select('id, cliente_id, total, tipo_documento, fecha')
     .eq('empresa_id', empresa.id)
     .in('tipo_documento', ['factura', 'nota_cargo'])
     .gte('fecha', new Date((hoy - 400) * DIA_MS).toISOString().slice(0, 10));
+  if (clienteId) facturasQuery = facturasQuery.eq('cliente_id', clienteId);
+  const { data: facturasRaw } = await facturasQuery;
   const facturas = (facturasRaw ?? []) as unknown as FilaFactura[];
 
-  const { data: cobrosRaw } = await supabase
+  let cobrosQuery = supabase
     .from('cobros')
     .select('cliente_id, importe, impagado, fecha')
     .eq('empresa_id', empresa.id);
+  if (clienteId) cobrosQuery = cobrosQuery.eq('cliente_id', clienteId);
+  const { data: cobrosRaw } = await cobrosQuery;
   const cobros = ((cobrosRaw ?? []) as unknown as FilaCobro[]).filter((c) => !c.impagado);
 
-  const { data: pedidosRaw } = await supabase
+  let pedidosQuery = supabase
     .from('pedidos')
     .select('cliente_id, importe')
     .eq('empresa_id', empresa.id)
     .in('estado', ['captado', 'aceptado', 'parcial']);
+  if (clienteId) pedidosQuery = pedidosQuery.eq('cliente_id', clienteId);
+  const { data: pedidosRaw } = await pedidosQuery;
   const pedidos = (pedidosRaw ?? []) as unknown as FilaPedido[];
 
-  const { data: clisRaw } = await supabase.from('clientes').select('id, nombre, limite_credito').eq('empresa_id', empresa.id);
+  let clisQuery = supabase.from('clientes').select('id, nombre, limite_credito').eq('empresa_id', empresa.id);
+  if (clienteId) clisQuery = clisQuery.eq('id', clienteId);
+  const { data: clisRaw } = await clisQuery;
   const clientes = (clisRaw ?? []) as unknown as { id: string; nombre: string; limite_credito: number | null }[];
 
   const carteraPedido = new Map<string, number>();

@@ -1,16 +1,20 @@
 import { cookies } from 'next/headers';
 import { getCanalMarca } from '@/lib/datos/canalMarca';
+import { parseFiltros, getOpcionesFiltros, type SearchParams } from '@/lib/datos/filtros';
 import { decimal, eur } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
+import Filtros from '@/components/Filtros';
 
 export const dynamic = 'force-dynamic';
 
 const ANIO = 2026;
 
-export default async function CanalMarcaPage() {
+export default async function CanalMarcaPage({ searchParams }: { searchParams: SearchParams }) {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
-  const d = await getCanalMarca(empresa, ANIO);
+  const filtros = parseFiltros(searchParams);
+  const opciones = await getOpcionesFiltros(empresa);
+  const d = await getCanalMarca(empresa, ANIO, filtros);
 
   const cabeceraExcel = ['Segmento', 'Importe', '% facturación', 'Unidades', 'Precio medio', 'Clientes', 'Ref. activas', 'Cto. vs año anterior', 'Peso 12M rodante', 'Margen %', 'Margen €'];
   const filasExcel = d.porMarca.map((m) => [
@@ -34,6 +38,8 @@ export default async function CanalMarcaPage() {
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
         Starbath Plus frente a marca blanca, y facturación por canal de {d.empresa.nombre} en {d.anio}.
       </p>
+
+      <Filtros opciones={opciones} />
 
       <ul className="grid-kpis">
         <Kpi etiqueta="% facturación Starbath Plus" valor={d.pctStarbath === null ? '—' : `${decimal(d.pctStarbath)} %`} nota="indicador estratégico" />

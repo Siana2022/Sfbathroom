@@ -1,7 +1,10 @@
 import { cookies } from 'next/headers';
 import { getPedidos } from '@/lib/datos/pedidos';
+import { parseFiltros, getOpcionesFiltros, type SearchParams } from '@/lib/datos/filtros';
 import { decimal, eur, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
+import DescargarExcel from '@/components/DescargarExcel';
+import Filtros from '@/components/Filtros';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,9 +18,11 @@ const ESTADOS_LABEL: Record<string, string> = {
   anulado: 'Anulado',
 };
 
-export default async function PedidosPage() {
+export default async function PedidosPage({ searchParams }: { searchParams: SearchParams }) {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
-  const d = await getPedidos(empresa, ANIO);
+  const filtros = parseFiltros(searchParams);
+  const opciones = await getOpcionesFiltros(empresa);
+  const d = await getPedidos(empresa, ANIO, filtros);
 
   return (
     <div>
@@ -27,6 +32,8 @@ export default async function PedidosPage() {
         Captación de pedidos de {d.empresa.nombre}, cartera pendiente de servir, antigüedad y
         cumplimiento frente a la facturación.
       </p>
+
+      <Filtros opciones={opciones} />
 
       <ul className="grid-kpis">
         <Kpi etiqueta={`Pedidos captados ${d.anio}`} valor={numero(d.captados)} nota={`importe ${eur(d.importeCaptado)}`} />
@@ -41,7 +48,14 @@ export default async function PedidosPage() {
       </ul>
 
       <div className="card">
-        <h2>Cartera pendiente por compromiso</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2>Cartera pendiente por compromiso</h2>
+          <DescargarExcel
+            nombre={`pedidos-cartera-compromiso-${d.anio}`}
+            columnas={['Compromiso', 'Pendiente']}
+            registros={d.carteraFechaSolicitada.map((b) => [b.label, b.importe])}
+          />
+        </div>
         <table className="tabla">
           <thead>
             <tr>
@@ -61,7 +75,14 @@ export default async function PedidosPage() {
       </div>
 
       <div className="card">
-        <h2>Cartera pendiente por cliente</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2>Cartera pendiente por cliente</h2>
+          <DescargarExcel
+            nombre={`pedidos-cartera-por-cliente-${d.anio}`}
+            columnas={['Cliente', 'Pedidos', 'Pendiente', 'Antigüedad media']}
+            registros={d.enCarteraCliente.map((c) => [c.nombre, c.pedidos, c.pendiente, c.antiguedadMedia.toFixed(2)])}
+          />
+        </div>
         {d.enCarteraCliente.length === 0 ? (
           <p style={{ color: 'var(--muted)' }}>Sin cartera pendiente.</p>
         ) : (
@@ -89,7 +110,14 @@ export default async function PedidosPage() {
       </div>
 
       <div className="card">
-        <h2>Pedidos por estado</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2>Pedidos por estado</h2>
+          <DescargarExcel
+            nombre={`pedidos-por-estado-${d.anio}`}
+            columnas={['Estado', 'Pedidos', 'Importe']}
+            registros={d.porEstado.map((e) => [ESTADOS_LABEL[e.estado] ?? e.estado, e.pedidos, e.importe])}
+          />
+        </div>
         <table className="tabla">
           <thead>
             <tr>

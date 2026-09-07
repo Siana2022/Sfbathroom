@@ -1,16 +1,20 @@
 import { cookies } from 'next/headers';
 import { getMargen } from '@/lib/datos/margen';
+import { parseFiltros, getOpcionesFiltros, type SearchParams } from '@/lib/datos/filtros';
 import { decimal, eur, eur2 } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
+import Filtros from '@/components/Filtros';
 
 export const dynamic = 'force-dynamic';
 
 const ANIO = 2026;
 
-export default async function MargenPage() {
+export default async function MargenPage({ searchParams }: { searchParams: SearchParams }) {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
-  const d = await getMargen(empresa, ANIO);
+  const filtros = parseFiltros(searchParams);
+  const opciones = await getOpcionesFiltros(empresa);
+  const d = await getMargen(empresa, ANIO, filtros);
 
   if (d.sinAcceso) {
     return (
@@ -35,6 +39,8 @@ export default async function MargenPage() {
         Margen de {d.empresa.nombre} en {d.anio}, calculado sobre el coste unitario de cada línea y
         el coste completo de llegada por lote (flete, aduana, seguro, transporte y tipo de cambio).
       </p>
+
+      <Filtros opciones={opciones} />
 
       <ul className="grid-kpis">
         <Kpi etiqueta="Margen bruto" valor={eur(d.margen)} nota={`${decimal(d.margenPct)} % sobre venta`} />

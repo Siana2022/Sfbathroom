@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
+import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
 
 export type ConcentracionData = {
   empresa: { id: string; codigo: string; nombre: string };
@@ -130,9 +131,11 @@ async function getRiesgoProveedorList(supabase: ReturnType<typeof createClient>,
   return riesgoProveedor;
 }
 
-export async function getConcentracion(codigoEmpresa: string, anio: number): Promise<ConcentracionData> {
+export async function getConcentracion(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<ConcentracionData> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
+
+  const idsFiltrados = await getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anio}-01-01`, `${anio}-12-31`);
 
   const { data: filasRaw } = await supabase
     .from('facturas')
@@ -140,7 +143,7 @@ export async function getConcentracion(codigoEmpresa: string, anio: number): Pro
     .eq('empresa_id', empresa.id)
     .gte('fecha', `${anio}-01-01`)
     .lte('fecha', `${anio}-12-31`);
-  const filas = (filasRaw ?? []) as Fila[];
+  const filas = filtrarPorIds((filasRaw ?? []) as Fila[], idsFiltrados);
 
   const porCliente = new Map<string, number>();
   let netaTotal = 0;

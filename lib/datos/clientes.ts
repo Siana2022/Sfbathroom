@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
+import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
 
 export type ClientesData = {
   empresa: { id: string; codigo: string; nombre: string };
@@ -29,7 +30,7 @@ type FilaPedido = { cliente_id: string | null; fecha_entrada: string };
 
 const DIA = 86400000;
 
-export async function getClientes(codigoEmpresa: string, anio: number): Promise<ClientesData> {
+export async function getClientes(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<ClientesData> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
   const anioPrevio = anio - 1;
@@ -38,13 +39,15 @@ export async function getClientes(codigoEmpresa: string, anio: number): Promise<
   const hoy = Math.floor(Date.now() / DIA);
   const iso = (dias: number) => new Date((hoy - dias) * DIA).toISOString().slice(0, 10);
 
+  const idsFiltrados = await getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, iso(730), `${anio}-12-31`);
+
   const { data: filas } = await supabase
     .from('facturas')
     .select('id, cliente_id, fecha, total')
     .eq('empresa_id', empresa.id)
     .gte('fecha', iso(730))
     .lte('fecha', `${anio}-12-31`);
-  const facturas = (filas ?? []) as FilaFactura[];
+  const facturas = filtrarPorIds((filas ?? []) as FilaFactura[], idsFiltrados);
 
   const activos = new Set<string>();
   const activosPrevio = new Set<string>();

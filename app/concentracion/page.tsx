@@ -1,15 +1,20 @@
 import { cookies } from 'next/headers';
 import { getConcentracion, UMBRAL_CLIENTE_DE_FAMILIA, UMBRAL_FAMILIA_RELEVANTE } from '@/lib/datos/concentracion';
+import { parseFiltros, getOpcionesFiltros, type SearchParams } from '@/lib/datos/filtros';
 import { decimal, eur, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
+import DescargarExcel from '@/components/DescargarExcel';
+import Filtros from '@/components/Filtros';
 
 export const dynamic = 'force-dynamic';
 
 const ANIO = 2026;
 
-export default async function ConcentracionPage() {
+export default async function ConcentracionPage({ searchParams }: { searchParams: SearchParams }) {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
-  const d = await getConcentracion(empresa, ANIO);
+  const filtros = parseFiltros(searchParams);
+  const opciones = await getOpcionesFiltros(empresa);
+  const d = await getConcentracion(empresa, ANIO, filtros);
 
   return (
     <div>
@@ -20,6 +25,8 @@ export default async function ConcentracionPage() {
         índice de Herfindahl y curva de Pareto.
       </p>
 
+      <Filtros opciones={opciones} />
+
       <ul className="grid-kpis">
         <Kpi etiqueta="Facturación total" valor={eur(d.netaTotal)} nota={`${d.numClientes} clientes con venta`} />
         <Kpi etiqueta="% top 1" valor={d.top1 === null ? '—' : `${decimal(d.top1)} %`} nota="mayor cliente sobre el total" />
@@ -29,7 +36,14 @@ export default async function ConcentracionPage() {
       </ul>
 
       <div className="card">
-        <h2>Concentración de producto y geografía</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2>Concentración de producto y geografía</h2>
+          <DescargarExcel
+            nombre={`concentracion-por-pais-${d.anio}`}
+            columnas={['Mercado', 'Facturación', '% sobre total']}
+            registros={d.porPais.map((p) => [p.pais, p.neta, p.pct])}
+          />
+        </div>
         <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
           Peso de las 3 familias principales: {decimal(d.pct3Familias)} % · las 20 referencias top:
           {decimal(d.pctTop20Refs)} % · referencias que concentran el 80 % de la facturación:{' '}
@@ -89,7 +103,14 @@ export default async function ConcentracionPage() {
       </div>
 
       <div className="card">
-        <h2>Riesgo de proveedor</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2>Riesgo de proveedor</h2>
+          <DescargarExcel
+            nombre={`concentracion-riesgo-proveedor-${d.anio}`}
+            columnas={['Proveedor', 'País', 'Plazo pactado', 'Plazo real', 'Volumen', '% compra', 'Artículos', 'Alternativas']}
+            registros={d.riesgoProveedor.map((p) => [p.proveedor, p.pais, p.plazo, p.plazoReal ?? '', p.volumen, p.pctVolumen, p.articulos, p.alternativas])}
+          />
+        </div>
         <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
           Origen, plazo de entrega (pactado y real observado en compras) y dependencia por
           proveedor. La alerta dispara por encima de 75 días pactados; un solo proveedor

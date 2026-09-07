@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
+import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
 
 export type FilaDiaria = { fecha: string; neta: number; facturas: number };
 export type FilaSemanal = { semana: string; neta: number; facturas: number };
@@ -30,7 +31,7 @@ function getISOWeek(fecha: string): number {
   return Math.ceil((((date.getTime() - yearStart.getTime()) / DIA_MS) + 1) / 7);
 }
 
-export async function getVistasTemporales(codigoEmpresa: string, anio: number): Promise<VistasData> {
+export async function getVistasTemporales(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<VistasData> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
 
@@ -38,14 +39,16 @@ export async function getVistasTemporales(codigoEmpresa: string, anio: number): 
   const hoyIso = hoy.toISOString().slice(0, 10);
   const desdeIso = new Date(Date.now() - 395 * DIA_MS).toISOString().slice(0, 10);
 
+  const idsFiltrados = await getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, desdeIso, hoyIso);
+
   const { data: filas } = await supabase
     .from('facturas')
-    .select('fecha, tipo_documento, total')
+    .select('id, fecha, tipo_documento, total')
     .eq('empresa_id', empresa.id)
     .in('tipo_documento', [...TIPOS_NETA])
     .gte('fecha', desdeIso)
     .lte('fecha', hoyIso);
-  const facturas = (filas ?? []) as { fecha: string; tipo_documento: string; total: number }[];
+  const facturas = filtrarPorIds((filas ?? []) as { id: string; fecha: string; tipo_documento: string; total: number }[], idsFiltrados);
 
   const neta = (f: { fecha: string; tipo_documento: string; total: number }) => {
     const total = Number(f.total ?? 0);
@@ -86,13 +89,21 @@ export async function getVistasTemporales(codigoEmpresa: string, anio: number): 
   const diasRestantes = diasEnAnio - diasTranscurridos;
   const proyectado = ritmoDiario * diasEnAnio;
 
-  const { data: presupuestoRaw } = await supabase
-    .from('presupuesto')
-    .select('importe')
-    .eq('empresa_id', empresa.id)
-    .eq('ejercicio', anio);
   let presupuesto = 0;
-  for (const p of presupuestoRaw ?? []) presupuesto += Number((p as { importe: number }).importe ?? 0);
+  if (filtros?.marca) {
+    // el presupuesto no desglosa por marca
+  } else {
+    let pq = supabase
+      .from('presupuesto')
+      .select('importe')
+      .eq('empresa_id', empresa.id)
+      .eq('ejercicio', anio);
+    if (filtros?.cliente) pq = pq.eq('cliente_id', filtros.cliente);
+    if (filtros?.comercial) pq = pq.eq('comercial_id', filtros.comercial);
+    if (filtros?.familia) pq = pq.eq('familia_id', filtros.familia);
+    const { data: presupuestoRaw } = await pq;
+    for (const p of presupuestoRaw ?? []) presupuesto += Number((p as { importe: number }).importe ?? 0);
+  }
 
   return {
     diaria: [...diaria.values()].sort((a, b) => (a.fecha < b.fecha ? -1 : 1)).slice(-30),

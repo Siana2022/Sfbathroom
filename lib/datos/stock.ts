@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
+import { getArticuloIdsFiltrados, type Filtros } from '@/lib/datos/filtros';
 
 export type StockData = {
   empresa: { id: string; codigo: string; nombre: string };
@@ -33,15 +34,17 @@ type FilaCobertura = {
 export const PLAZO_REPOSICION_DIAS = 60;
 export const DIAS_SEGURIDAD = 15;
 
-export async function getStock(codigoEmpresa: string): Promise<StockData> {
+export async function getStock(codigoEmpresa: string, filtros?: Filtros): Promise<StockData> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
+
+  const idsArticulo = await getArticuloIdsFiltrados(supabase, empresa.id, filtros ?? {});
 
   const { data: filas } = await supabase
     .from('v_stock_cobertura')
     .select('articulo_id, articulo, almacen, punto_pedido, stock_disponible, consumo_medio_diario, cobertura_dias, en_transito')
     .eq('empresa_id', empresa.id);
-  const rows = (filas ?? []) as FilaCobertura[];
+  const rows = ((filas ?? []) as FilaCobertura[]).filter((r) => !idsArticulo || idsArticulo.has(r.articulo_id));
 
   const { data: arts } = await supabase.from('articulos').select('id, coste_unitario').eq('empresa_id', empresa.id);
   const costeUnit = new Map<string, number>();

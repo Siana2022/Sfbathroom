@@ -1,16 +1,20 @@
 import { cookies } from 'next/headers';
 import { getClientes } from '@/lib/datos/clientes';
+import { parseFiltros, getOpcionesFiltros, type SearchParams } from '@/lib/datos/filtros';
 import { decimal, eur, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
+import Filtros from '@/components/Filtros';
 
 export const dynamic = 'force-dynamic';
 
 const ANIO = 2026;
 
-export default async function ClientesPage() {
+export default async function ClientesPage({ searchParams }: { searchParams: SearchParams }) {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
-  const d = await getClientes(empresa, ANIO);
+  const filtros = parseFiltros(searchParams);
+  const opciones = await getOpcionesFiltros(empresa);
+  const d = await getClientes(empresa, ANIO, filtros);
 
   return (
     <div>
@@ -20,6 +24,8 @@ export default async function ClientesPage() {
         Clientes activos, nuevos y perdidos de {d.empresa.nombre}, retención entre {ANIO - 1} y
         {d.anio}.
       </p>
+
+      <Filtros opciones={opciones} />
 
       <ul className="grid-kpis">
         <Kpi etiqueta={`Clientes activos ${d.anio}`} valor={numero(d.activos)} nota={`en ${ANIO - 1}: ${d.activosPrevio}`} />

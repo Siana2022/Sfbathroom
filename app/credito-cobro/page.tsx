@@ -1,15 +1,20 @@
 import { cookies } from 'next/headers';
 import { getCobros } from '@/lib/datos/cobros';
+import { parseFiltros, getOpcionesFiltros, type SearchParams } from '@/lib/datos/filtros';
 import { decimal, eur, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
+import DescargarExcel from '@/components/DescargarExcel';
+import Filtros from '@/components/Filtros';
 
 export const dynamic = 'force-dynamic';
 
 const ANIO = 2026;
 
-export default async function CreditoCobroPage() {
+export default async function CreditoCobroPage({ searchParams }: { searchParams: SearchParams }) {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
-  const d = await getCobros(empresa, ANIO);
+  const filtros = parseFiltros(searchParams);
+  const opciones = await getOpcionesFiltros(empresa);
+  const d = await getCobros(empresa, ANIO, filtros);
 
   return (
     <div>
@@ -18,6 +23,8 @@ export default async function CreditoCobroPage() {
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
         Saldo de clientes, DSO, aging de la deuda y vencidos de {d.empresa.nombre}.
       </p>
+
+      <Filtros opciones={opciones} />
 
       <ul className="grid-kpis">
         <Kpi etiqueta="Saldo total de clientes" valor={eur(d.saldoTotal)} nota={`de los que ${eur(d.vencido)} vencido`} />
@@ -52,7 +59,14 @@ export default async function CreditoCobroPage() {
       </div>
 
       <div className="card">
-        <h2>Crédito y cobro por cliente</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2>Crédito y cobro por cliente</h2>
+          <DescargarExcel
+            nombre="credito-cobro-por-cliente"
+            columnas={['Cliente', 'Saldo', 'Vencido', 'Riesgo vivo', 'Límite', '% límite', 'DSO', 'Δ DSO 30 días']}
+            registros={d.porCliente.map((c) => [c.nombre, c.saldo, c.vencido, c.riesgoVivo, c.limite ?? '', c.consumoLimitePct === null ? '' : c.consumoLimitePct.toFixed(2), c.dso === null ? '' : c.dso.toFixed(2), c.dsoDelta === null ? '' : c.dsoDelta.toFixed(2)])}
+          />
+        </div>
         {d.porCliente.length === 0 ? (
           <p style={{ color: 'var(--muted)' }}>Sin saldos pendientes.</p>
         ) : (

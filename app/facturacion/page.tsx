@@ -2,10 +2,13 @@ import { cookies } from 'next/headers';
 import { getFacturacion, getVariacion } from '@/lib/datos/facturacion';
 import { getVistasTemporales } from '@/lib/datos/vistas';
 import { getCosteTransporte } from '@/lib/datos/transporte';
+import { getDesvioPresupuesto } from '@/lib/datos/desvioPresupuesto';
+import { parseFiltros, getOpcionesFiltros, type SearchParams } from '@/lib/datos/filtros';
 import { decimal, eur, numero, pct } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import GraficoBarras, { type Barra } from '@/components/GraficoBarras';
 import DescargarExcel from '@/components/DescargarExcel';
+import Filtros from '@/components/Filtros';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,15 +16,47 @@ const ANIO = 2026;
 
 const NOMBRE_MES = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
-export default async function FacturacionPage() {
+function TablaDesvio({ filas }: { filas: { nombre: string; presupuesto: number; neta: number; desvio: number; desvioPct: number | null }[] }) {
+  return (
+    <table className="tabla">
+      <thead>
+        <tr>
+          <th>Dimensión</th>
+          <th className="td-num">Presupuesto</th>
+          <th className="td-num">Facturación</th>
+          <th className="td-num">Desvío</th>
+          <th className="td-num">%</th>
+        </tr>
+      </thead>
+      <tbody>
+        {filas.map((f) => (
+          <tr key={f.nombre}>
+            <td>{f.nombre}</td>
+            <td className="td-num">{eur(f.presupuesto)}</td>
+            <td className="td-num">{eur(f.neta)}</td>
+            <td className={`td-num ${f.desvio < 0 ? 'td-pos' : ''}`}>{f.desvio > 0 ? '+' : ''}{eur(f.desvio)}</td>
+            <td className={`td-num ${f.desvioPct != null && f.desvioPct < 0 ? 'td-pos' : ''}`}>
+              {f.desvioPct === null ? '—' : `${f.desvioPct > 0 ? '+' : ''}${decimal(f.desvioPct)} %`}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+export default async function FacturacionPage({ searchParams }: { searchParams: SearchParams }) {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
-  const d = await getFacturacion(empresa, ANIO);
-  const t = await getVistasTemporales(empresa, ANIO);
+  const filtros = parseFiltros(searchParams);
+  const opciones = await getOpcionesFiltros(empresa);
+  const d = await getFacturacion(empresa, ANIO, filtros);
+  const t = await getVistasTemporales(empresa, ANIO, filtros);
   const previo = d.anioPrevio;
   const delta = d.netaPrevioTotal > 0 ? pct(((d.neta - d.netaPrevioTotal) / d.netaPrevioTotal) * 100) : '—';
 
-  const v = await getVariacion(empresa, ANIO);
+  const v = await getVariacion(empresa, ANIO, filtros);
   const trans = await getCosteTransporte(empresa, ANIO);
+  const desvio = await getDesvioPresupuesto(empresa, ANIO, filtros);
 
   const barras: Barra[] = d.series.map((s) => ({
     etiqueta: NOMBRE_MES[s.mes],
@@ -38,6 +73,8 @@ export default async function FacturacionPage() {
         Facturación neta de {d.empresa.nombre} ({d.empresa.codigo}). Neta = facturas + notas de
         cargo − abonos, imputando cada documento en su fecha.
       </p>
+
+      <Filtros opciones={opciones} />
 
       <ul className="grid-kpis">
         <Kpi etiqueta={`Facturación neta ${d.anio}`} valor={eur(d.neta)} nota={`vs ${previo}: ${delta}`} />
@@ -184,6 +221,22 @@ export default async function FacturacionPage() {
               ))}
             </tbody>
           </table>
+        )}
+      </div>
+
+      <div className="card">
+        <h2>Desviación presupuestaria por dimensión · {d.anio}</h2>
+        {desvio.sinPresupuesto ? (
+          <p style={{ color: 'var(--muted)' }}>No hay presupuesto cargado para {d.anio}.</p>
+        ) : (
+          <>
+            <h3 style={{ fontSize: 15, margin: '12px 0 4px' }}>Por comercial</h3>
+            <TablaDesvio filas={desvio.porComercial} />
+            <h3 style={{ fontSize: 15, margin: '20px 0 4px' }}>Por cliente</h3>
+            <TablaDesvio filas={desvio.porCliente} />
+            <h3 style={{ fontSize: 15, margin: '20px 0 4px' }}>Por familia</h3>
+            <TablaDesvio filas={desvio.porFamilia} />
+          </>
         )}
       </div>
 

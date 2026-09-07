@@ -1,16 +1,20 @@
 import { cookies } from 'next/headers';
 import { getActividad } from '@/lib/datos/actividad';
+import { parseFiltros, getOpcionesFiltros, type SearchParams } from '@/lib/datos/filtros';
 import { eur2, numero, decimal } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
+import Filtros from '@/components/Filtros';
 
 export const dynamic = 'force-dynamic';
 
 const ANIO = 2026;
 
-export default async function ActividadComercialPage() {
+export default async function ActividadComercialPage({ searchParams }: { searchParams: SearchParams }) {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
-  const d = await getActividad(empresa, ANIO);
+  const filtros = parseFiltros(searchParams);
+  const opciones = await getOpcionesFiltros(empresa);
+  const d = await getActividad(empresa, ANIO, filtros);
 
   const totalNeta = d.comerciales.reduce((a, c) => a + c.neta, 0);
   const totalPresupuesto = d.comerciales.reduce((a, c) => a + c.presupuesto, 0);
@@ -48,6 +52,8 @@ export default async function ActividadComercialPage() {
         activos, descuentos, pedidos, margen aportado, cumplimiento de presupuesto, clientes
         nuevos y perdidos frente a {d.anio - 1}, y saturación del equipo.
       </p>
+
+      <Filtros opciones={opciones} />
 
       <ul className="grid-kpis">
         <Kpi etiqueta={`Facturación gestionada ${d.anio}`} valor={numero(totalNeta)} nota={`${d.comerciales.length} comerciales activos`} />

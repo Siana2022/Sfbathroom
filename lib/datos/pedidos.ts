@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
+import { filtrarPorIds, getPedidoIdsFiltrados, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
 
 export type PedidosData = {
   empresa: { id: string; codigo: string; nombre: string };
@@ -50,9 +51,11 @@ function importeLinea(l: FilaLinea, servida: boolean): number {
   return cant * Number(l.precio_unitario ?? 0) * (1 - Number(l.descuento_pct ?? 0) / 100);
 }
 
-export async function getPedidos(codigoEmpresa: string, anio: number): Promise<PedidosData> {
+export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<PedidosData> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
+
+  const idsFiltrados = await getPedidoIdsFiltrados(supabase, empresa.id, filtros ?? {}, `${anio}-01-01`, `${anio}-12-31`);
 
   const { data: filas } = await supabase
     .from('pedidos')
@@ -60,7 +63,7 @@ export async function getPedidos(codigoEmpresa: string, anio: number): Promise<P
     .eq('empresa_id', empresa.id)
     .gte('fecha_entrada', `${anio}-01-01`)
     .lte('fecha_entrada', `${anio}-12-31`);
-  const pedidos = (filas ?? []) as FilaPedido[];
+  const pedidos = filtrarPorIds((filas ?? []) as FilaPedido[], idsFiltrados);
 
   const porId = new Map(pedidos.map((p) => [p.id, p]));
   const estadoImporte = new Map<string, number>();
@@ -177,7 +180,7 @@ export async function getPedidos(codigoEmpresa: string, anio: number): Promise<P
   const captadosNoAnulados = pedidos.filter((p) => p.estado !== 'anulado').length;
   const ticketMedio = captadosNoAnulados > 0 ? importeCaptado / captadosNoAnulados : 0;
 
-  const { neta } = await getFacturacionProxy(supabase, empresa.id, anio);
+  const { neta } = await getFacturacionProxy(supabase, empresa.id, anio, filtros);
   const ratioServidoVsFacturado = neta > 0 ? (importeServido / neta) * 100 : null;
 
   const porEstado = [...estadoImporte.entries()]
@@ -215,14 +218,23 @@ export async function getPedidos(codigoEmpresa: string, anio: number): Promise<P
 }
 
 // evita un segundo createClient dentro de getFacturacion
-async function getFacturacionProxy(supabase: ReturnType<typeof createClient>, empresaId: string, anio: number): Promise<{ neta: number }> {
+async function getFacturacionProxy(
+  supabase: ReturnType<typeof createClient>,
+  empresaId: string,
+  anio: number,
+  filtros?: Filtros,
+): Promise<{ neta: number }> {
+  const idsFiltrados = await getFacturaIdsFiltradas(supabase, empresaId, filtros ?? {}, `${anio}-01-01`, `${anio}-12-31`);
   const { data } = await supabase
     .from('facturas')
-    .select('total')
+    .select('id, total')
     .eq('empresa_id', empresaId)
     .gte('fecha', `${anio}-01-01`)
     .lte('fecha', `${anio}-12-31`);
   let neta = 0;
-  for (const f of data ?? []) neta += Number((f as { total: number }).total ?? 0);
+  for (const f of (data ?? []) as { id: string; total: number }[]) {
+    if (idsFiltrados && !idsFiltrados.has(f.id)) continue;
+    neta += Number(f.total ?? 0);
+  }
   return { neta };
 }
