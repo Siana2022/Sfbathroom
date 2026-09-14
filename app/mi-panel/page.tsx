@@ -6,7 +6,7 @@ import { getFacturacion, getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 
 const DragDashboard = dynamic(() => import('@/components/DragDashboard'), { ssr: false, loading: () => <p style={{ color: 'var(--muted)' }}>Cargando panel…</p> });
 
-export const dynamic = 'force-dynamic';
+export const dynamicForce = 'force-dynamic';
 
 const ANIO = 2026;
 
