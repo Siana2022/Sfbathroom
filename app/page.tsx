@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { bloques } from '@/lib/bloques';
 import { getFacturacion, getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getKpisPersonalizadosVistos } from '@/lib/datos/kpisVisibles';
+import { getMiDia } from '@/lib/datos/miDia';
 import { decimal, eur, numero, pct } from '@/lib/formato';
 import { FORMATOS } from '@/lib/datos/kpisCatalogo';
 import Kpi from '@/components/Kpi';
@@ -26,8 +27,127 @@ async function getResumenHoy(codigoEmpresa: string) {
   return data?.[0] ?? null;
 }
 
+async function getRolUsuario() {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
+  return data?.role ?? null;
+}
+
 export default async function Home() {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
+  const [rol, mix] = await Promise.all([getRolUsuario(), getMiDia(empresa, ANIO)]);
+
+  if (rol === 'comercial' && mix) {
+    return (
+      <div>
+        <p className="breadcrumb">Cuadro de mando · Mi día</p>
+        <h1>Mi día · {mix.comercial.nombre ?? 'Comercial'}</h1>
+        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
+          {mix.clientesCargo} clientes de tu cartera. Ejercicio {mix.anio}.
+        </p>
+
+        <ul className="grid-kpis">
+          <Kpi etiqueta={`Facturación neta ${mix.anio}`} valor={eur(mix.neta)} nota="de tu cartera" />
+          <Kpi etiqueta="Facturas" valor={numero(mix.facturas)} nota="de tus clientes" />
+          <Kpi etiqueta="Ticket medio" valor={eur(mix.ticketMedio)} nota="en tu cartera" />
+        </ul>
+
+        <div className="card">
+          <h2>Clientes en riesgo de inactividad (&gt; 60 días)</h2>
+          {mix.enRiesgo.length === 0 ? (
+            <p style={{ color: 'var(--muted)' }}>Todos tus clientes han comprado en los últimos 60 días.</p>
+          ) : (
+            <table className="tabla">
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th className="td-num">Días sin compra</th>
+                  <th>Última compra</th>
+                </tr>
+              </thead>
+              <tbody>
+                {mix.enRiesgo.slice(0, 8).map((c) => (
+                  <tr key={c.id}>
+                    <td><Link href={`/clientes/${c.id}`} className="enlace">{c.nombre}</Link></td>
+                    <td className="td-num">{c.diasSin >= 999 ? '—' : numero(c.diasSin)}</td>
+                    <td>{c.ultimaFactura}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div className="card">
+          <h2>Pendientes de tu cartera</h2>
+          {mix.pendencias.length === 0 ? (
+            <p style={{ color: 'var(--muted)' }}>Sin pedidos captados/aceptados sin servir.</p>
+          ) : (
+            <table className="tabla">
+              <thead>
+                <tr>
+                  <th>Pedido</th>
+                  <th>Cliente</th>
+                  <th>Fecha entrada</th>
+                  <th className="td-num">Importe</th>
+                </tr>
+              </thead>
+              <tbody>
+                {mix.pendencias.map((p) => (
+                  <tr key={p.id}>
+                    <td>{p.numero}</td>
+                    <td>{p.cliente}</td>
+                    <td>{p.fecha}</td>
+                    <td className="td-num">{eur(p.importe)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div className="card">
+          <h2>Últimas compras</h2>
+          {mix.ultimas.length === 0 ? (
+            <p style={{ color: 'var(--muted)' }}>Sin facturas registradas.</p>
+          ) : (
+            <table className="tabla">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Cliente</th>
+                  <th className="td-num">Importe</th>
+                </tr>
+              </thead>
+              <tbody>
+                {mix.ultimas.map((u) => (
+                  <tr key={u.id}>
+                    <td>{u.fecha}</td>
+                    <td>{u.nombre}</td>
+                    <td className="td-num">{eur(u.importe)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div className="card">
+          <h2>Bloques del cuadro de mando</h2>
+          <div className="chips">
+            {bloques.map((b) => (
+              <Link key={b.slug} href={b.slug} className="chip bloque chip-enlace">
+                {b.numero}. {b.titulo}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const d = await getFacturacion(empresa, ANIO);
   const MAX_KPI_PORTADA = 8;
   const kpisExtraTotal = await getKpisPersonalizadosVistos(empresa);
