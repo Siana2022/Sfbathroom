@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import Link from 'next/link';
 import { getClientes } from '@/lib/datos/clientes';
 import { parseFiltros, getOpcionesFiltros, type SearchParams } from '@/lib/datos/filtros';
 import { decimal, eur, numero } from '@/lib/formato';
@@ -151,7 +152,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: Sea
             <tbody>
               {d.tabla.map((c) => (
                 <tr key={c.id}>
-                  <td>{c.nombre}</td>
+                  <td><Link href={`/clientes/${c.id}`} className="enlace">{c.nombre}</Link></td>
                   <td className="td-num">{eur(c.neta)}</td>
                   <td className="td-num">{numero(c.facturas)}</td>
                   <td className="td-num">{eur(c.ticket)}</td>

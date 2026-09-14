@@ -584,6 +584,9 @@ table.tabla .td-num { text-align: right; font-variant-numeric: tabular-nums; whi
 
 table.tabla .td-pos { color: var(--verde); }
 
+.enlace { color: var(--accent); font-weight: 600; }
+.enlace:hover { text-decoration: underline; }
+
 .doc-enlace { color: var(--accent); font-weight: 700; }
 
 .doc-enlace:hover { text-decoration: underline; }
