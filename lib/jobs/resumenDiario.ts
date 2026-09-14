@@ -1,5 +1,6 @@
 import { registrarJob, type ContextoJob } from '@/lib/jobs/registro';
 import { reunirResumen, plantillaResumen } from '@/lib/jobs/reunirResumen';
+import { detectarAnomalias } from '@/lib/jobs/anomalias';
 import { generarNarrativa } from '@/lib/agente/narrativa';
 import { enviarNotificacion } from '@/lib/datos/notificaciones';
 
@@ -63,6 +64,31 @@ registrarJob({
           enlace: '/',
           canales: ['email'],
         });
+
+        // F1.3: anomalías heurísticas → alertas_generadas (dedupe por tipo+referencia+fecha)
+        const anomalias = await detectarAnomalias(supabase, e.id);
+        for (const a of anomalias) {
+          const q = supabase
+            .from('alertas_generadas')
+            .select('id')
+            .eq('empresa_id', e.id)
+            .eq('tipo', a.tipo)
+            .eq('fecha', hoy);
+          const queryFiltrada = a.referencia != null ? q.eq('referencia', a.referencia) : q.is('referencia', null);
+          const { data: yaExiste } = await queryFiltrada.maybeSingle();
+          if (yaExiste) continue;
+          const { error: errAlerta } = await supabase.from('alertas_generadas').insert({
+            empresa_id: e.id,
+            tipo: a.tipo,
+            severidad: a.severidad,
+            fecha: hoy,
+            referencia: a.referencia,
+            importe: a.importe ?? null,
+            mensaje: a.mensaje,
+            estado: 'nueva',
+          });
+          if (errAlerta) console.warn('[resumen-diario] No se pudo insertar alerta:', errAlerta.message);
+        }
 
         detalle.push(`${e.codigo}: ok (${fuente})`);
       } catch (err) {

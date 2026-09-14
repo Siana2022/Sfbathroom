@@ -88,6 +88,7 @@ export default async function AlertasPage() {
                 <th>Referencia</th>
                 <th className="td-num">Importe</th>
                 <th>Mensaje</th>
+                <th>Severidad</th>
                 <th>Gestión</th>
               </tr>
             </thead>
@@ -98,6 +99,15 @@ export default async function AlertasPage() {
                   <td>{g.referencia ?? '—'}</td>
                   <td className="td-num">{g.importe === null ? '—' : eur(g.importe)}</td>
                   <td>{g.mensaje ?? '—'}</td>
+                  <td>
+                    {g.severidad === 'critico' ? (
+                      <span className="badge construccion">Crítico</span>
+                    ) : g.severidad === 'aviso' ? (
+                      <span className="badge pendiente">Aviso</span>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
                   <td>
                     <GestionAlerta
                       alertaId={g.id}
