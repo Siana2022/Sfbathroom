@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getRol, puedeVerMargenes } from '@/lib/datos/role';
 import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
+import { lineasPorFacturas } from '@/lib/datos/lineas';
 import { signoDocumento } from '@/lib/datos/neta';
 
 export type MargenData = {
@@ -93,10 +94,7 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
   const facturas = filtrarPorIds((facturasRaw ?? []) as unknown as FilaFactura[], idsFiltrados);
   const ids = facturas.map((f) => f.id);
 
-  const { data: lineas } = ids.length
-    ? await supabase.from('factura_lineas').select('factura_id, articulo_id, cantidad, importe, coste_unitario').in('factura_id', ids)
-    : { data: [] };
-  const filasLineas = (lineas ?? []) as FilaLinea[];
+  const filasLineas = await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, articulo_id, cantidad, importe, coste_unitario', ids);
 
   const { data: articulosRaw } = await supabase
     .from('articulos')

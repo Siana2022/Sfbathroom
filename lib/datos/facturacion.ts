@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
+import { lineasPorFacturas } from '@/lib/datos/lineas';
 
 export type EmpresaSel = { id: string; codigo: string; nombre: string };
 
@@ -75,11 +76,11 @@ export async function getVariacion(codigoEmpresa: string, anio: number, filtros?
     clientePorId.set(f.id, f.cliente_id);
   }
 
-  const { data: lineas } = await supabase
-    .from('factura_lineas')
-    .select('factura_id, articulo_id, cantidad, importe')
-    .in('factura_id', [...infoPorId.keys()]);
-  const lineasArr = (lineas ?? []) as FilaLineaVariacion[];
+  const lineasArr = await lineasPorFacturas<FilaLineaVariacion>(
+    supabase,
+    'factura_id, articulo_id, cantidad, importe',
+    [...infoPorId.keys()],
+  );
 
   const unidades = new Map<string, number[]>(); // articulo -> [P0 unidades, P1 unidades]
   const valores = new Map<string, number[]>(); // articulo -> [P0 importe, P1 importe]
@@ -215,12 +216,9 @@ export async function getFacturacion(codigoEmpresa: string, anio: number, filtro
   const unidadesMes = new Map<number, number>();
   const unidadesMesPrev = new Map<number, number>();
   if (idsActivo.length || idsPrevio.length) {
-    const { data: lineas } = await supabase
-      .from('factura_lineas')
-      .select('factura_id, cantidad')
-      .in('factura_id', [...idsActivo, ...idsPrevio]);
+    const lineas = await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, cantidad', [...idsActivo, ...idsPrevio]);
     const setActivo = new Set(idsActivo);
-    for (const l of (lineas ?? []) as FilaLinea[]) {
+    for (const l of lineas) {
       const cant = Number(l.cantidad ?? 0);
       const mes = mesDeLaFactura.get(l.factura_id);
       if (setActivo.has(l.factura_id)) {

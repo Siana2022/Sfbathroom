@@ -511,7 +511,9 @@ const presupuesto = [];
 comerciales.forEach((c) => {
   familias.forEach((fa) => {
     for (let mes = 1; mes <= 12; mes++) {
-      const imp = red((6000 + rnd() * 14000) * (c.nombre === 'Lucía Ferrer' ? 1.3 : 1));
+      // Calibrado para quedar ~10-15% por encima de la venta real que genera
+      // esta demo (~0,5 M€/año), para que el cumplimiento sea realista.
+      const imp = red((1200 + rnd() * 2100) * (c.nombre === 'Lucía Ferrer' ? 1.3 : 1));
       presupuesto.push({ comercial: c, familia: fa, mes, importe: imp });
     }
   });
