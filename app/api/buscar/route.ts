@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
+import { sanearTermino } from '@/lib/buscar';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://dgbxualxhrbbqglvxtxq.supabase.co';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? 'sb_publishable_0GvTeBiMy4pbE6hZGn5eaw_2xa3W-bi';
@@ -27,15 +28,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ clientes: [], facturas: [], articulos: [] });
   }
 
-  // Sanear caracteres que podrían romper el filtro PostgREST .or()/.ilike()
-  // (las comas separan condiciones dentro de .or(); el resto son metacaracteres)
-  const safe = q
-    .replace(/,/g, ' ')
-    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    .replace(/%/g, '\\%')
-    .replace(/_/g, '\\_')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const safe = sanearTermino(q);
   const like = `%${safe}%`;
 
   const supabase = await cliente();

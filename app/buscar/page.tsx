@@ -1,18 +1,21 @@
 import Link from 'next/link';
 import { cookies } from 'next/headers';
+import { createServerClient } from '@supabase/ssr';
+import { sanearTermino } from '@/lib/buscar';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://dgbxualxhrbbqglvxtxq.supabase.co';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? 'sb_publishable_0GvTeBiMy4pbE6hZGn5eaw_2xa3W-bi';
 
 export const dynamic = 'force-dynamic';
 
 async function buscar(q: string) {
   if (!q || q.length < 2) return null;
   const cookieStore = cookies();
-  const { createServerClient } = await import('@supabase/ssr');
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? '',
-    { cookies: { getAll() { return cookieStore.getAll(); }, setAll() {} } },
-  );
-  const like = `%${q}%`;
+  const supabase = createServerClient(supabaseUrl, supabaseKey, {
+    cookies: { getAll() { return cookieStore.getAll(); }, setAll() {} },
+  });
+  const safe = sanearTermino(q);
+  const like = `%${safe}%`;
   const [clientes, facturas, articulos] = await Promise.all([
     supabase.from('clientes').select('id, nombre, codigo_erp').or(`nombre.ilike.${like},codigo_erp.ilike.${like},cif.ilike.${like}`).limit(20),
     supabase.from('facturas').select('id, numero_erp, fecha, cliente_id, clientes:cliente_id(nombre)').or(`numero_erp.ilike.${like}`).limit(20),
