@@ -23,13 +23,9 @@ export default function Nav({ userEmail }: { userEmail?: string }) {
   return (
     <nav className="sidebar">
       <div className="sidebar-marca">
-        <span className="sidebar-logo">
-          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M4 19v-6M10 19V5M16 19v-9M22 19H2" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </span>
+        <span className="sidebar-logo">SF</span>
         <span className="sidebar-marca-txt">
-          <b>sfbathroom</b>
+          <b>Bathroom</b>
           <span>Cuadro de mando</span>
         </span>
       </div>
