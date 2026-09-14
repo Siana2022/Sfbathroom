@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import CampanaNotificaciones from '@/components/CampanaNotificaciones';
 import BuscadorGlobal from '@/components/BuscadorGlobal';
+import FrescuraDatos from '@/components/FrescuraDatos';
 
 const empresas = [
   { codigo: 'SF', nombre: 'SF Bathroom' },
@@ -37,6 +38,7 @@ export default function Header({ rol }: { rol?: string }) {
         <strong>sfbathroom · BI</strong>
       </span>
       <div className="topbar-derecha">
+        <FrescuraDatos />
         <BuscadorGlobal />
         <span className="topbar-fecha">{hoy}</span>
         <select
