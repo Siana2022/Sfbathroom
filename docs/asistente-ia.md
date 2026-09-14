@@ -1,7 +1,7 @@
 # Asistente BI — Arquitectura y diseño
 
-Prototipo mínimo viable (set 2026). Ficheros: `lib/agente/tools.ts`, `lib/agente/agent.ts`,
-`app/api/chat/route.ts`, `components/ChatIA.tsx`.
+Prototipo mínimo viable (set 2026). Ficheros: `lib/agente/llm.ts`, `lib/agente/tools.ts`,
+`lib/agente/agent.ts`, `app/api/chat/route.ts`, `components/ChatIA.tsx`.
 
 ## Modelo de seguridad
 
@@ -16,14 +16,25 @@ autenticado puede ver.
 
 ## Variables de entorno
 
-| Variable              | Requerida | Descripción                                                        |
-| --------------------- | --------- | ------------------------------------------------------------------ |
-| `ANTHROPIC_API_KEY`   | sí        | Clave de API de Anthropic (modelos Claude). Se guarda en Vercel.  |
-| `CHAT_MODEL`          | no        | Modelo a usar (default: `claude-sonnet-4-5`).                      |
-| `NEXT_PUBLIC_*`       | —         | Ya existentes de Supabase; el chat los reutiliza.                  |
+| Variable              | Requerida | Descripción                                                                 |
+| --------------------- | --------- | --------------------------------------------------------------------------- |
+| `LLM_PROVIDER`        | no        | Proveedor: `gemini` (default), `openai`, `anthropic`.                      |
+| `GEMINI_API_KEY`      | si*       | Clave de Google AI Studio (tier gratuita).                                  |
+| `OPENAI_API_KEY`      | si*       | Clave OpenAI-compatible (Groq, Together, etc.).                             |
+| `OPENAI_BASE_URL`     | no        | URL base si usas un proveedor compatible (default: OpenAI).                 |
+| `ANTHROPIC_API_KEY`   | si*       | Clave de Anthropic.                                                         |
+| `CHAT_MODEL`          | no        | Modelo a usar (default según proveedor: `gemini-2.0-flash`, `llama-3.3-70b-versatile`, `claude-sonnet-4-5`). |
+| `NEXT_PUBLIC_*`       | —         | Ya existentes de Supabase; el chat los reutiliza.                           |
 
-**Importante** (Vercel): añadir `ANTHROPIC_API_KEY` en *Settings → Environment Variables*
-y marcarla como Server-only (no exponer al cliente).
+*Solo necesitas la key del proveedor activo (`LLM_PROVIDER`).
+
+**Recomendación para empezar**: usa Gemini (gratis, 15 RPM, 1M tokens/día).
+1. Ve a [Google AI Studio](https://aistudio.google.com/apikey) y genera una key.
+2. En Vercel: `LLM_PROVIDER=gemini`, `GEMINI_API_KEY=aiza...`.
+3. Para cambiar a otro proveedor, solo cambia las env vars (no toques código).
+
+**Importante** (Vercel): todas las keys van en *Settings → Environment Variables*,
+marcadas como Server-only (no exponer al cliente).
 
 ## Prompt de sistema (resumen)
 
@@ -75,10 +86,10 @@ cuando los datos lo permitan).
 2. El componente envía el historial completo (máx. 20 mensajes) a `POST /api/chat`.
 3. El route handler recoge la sesión (empresa + rol), llama a `consult()` en
    `lib/agente/agent.ts`.
-4. `consult` construye la petición a la Messages API de Anthropic con las tools y el
-   historial. Si el modelo devuelve un `tool_use`, ejecuta la herramienta correspondiente,
-   devuelve el resultado como `tool_result`, y repite hasta que el modelo responda con
-   texto final (máx. 6 iteraciones).
+4. `consult` construye la petición al LLM activo (gemini/openai/anthropic) con las tools y
+   el historial. Si el modelo devuelve un tool call, ejecuta la herramienta correspondiente,
+   devuelve el resultado, y repite hasta que el modelo responda con texto final (máx. 6
+   iteraciones).
 5. El route handler devuelve `{ texto, datos }` donde `datos` contiene el JSON del
    resultado de la última herramienta utilizada (si la hubo), para que el componente
    pueda renderizar una tabla.
