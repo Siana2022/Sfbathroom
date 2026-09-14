@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { cookies } from 'next/headers';
+import { createClient } from '@/lib/supabase/server';
 import { bloques } from '@/lib/bloques';
-import { getFacturacion } from '@/lib/datos/facturacion';
+import { getFacturacion, getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getKpisPersonalizadosVistos } from '@/lib/datos/kpisVisibles';
 import { decimal, eur, numero, pct } from '@/lib/formato';
 import { FORMATOS } from '@/lib/datos/kpisCatalogo';
@@ -13,12 +14,25 @@ export const dynamic = 'force-dynamic';
 const ANIO = 2026;
 const NOMBRE_MES = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
+async function getResumenHoy(codigoEmpresa: string) {
+  const supabase = createClient();
+  const empresa = await getEmpresaPorCodigo(codigoEmpresa);
+  const { data } = await supabase
+    .from('resumenes')
+    .select('texto, fecha, fuente')
+    .eq('empresa_id', empresa.id)
+    .order('fecha', { ascending: false })
+    .limit(1);
+  return data?.[0] ?? null;
+}
+
 export default async function Home() {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
   const d = await getFacturacion(empresa, ANIO);
   const MAX_KPI_PORTADA = 8;
   const kpisExtraTotal = await getKpisPersonalizadosVistos(empresa);
   const kpisExtra = kpisExtraTotal.slice(0, MAX_KPI_PORTADA);
+  const resumen = await getResumenHoy(empresa);
   const delta = d.netaPrevioTotal > 0 ? pct(((d.neta - d.netaPrevioTotal) / d.netaPrevioTotal) * 100) : '—';
 
   const barras: Barra[] = d.series.map((s) => ({
@@ -36,6 +50,18 @@ export default async function Home() {
         Ejercicio {d.anio}. Los indicadores leen de Supabase con la RLS del rol conectado y de la
         empresa seleccionada en la cabecera.
       </p>
+
+      {resumen && (
+        <div className="card" style={{ borderLeft: '3px solid var(--accent)' }}>
+          <h2 style={{ marginBottom: 4 }}>Tu resumen de hoy</h2>
+          <p style={{ fontFamily: 'var(--serif, serif)', fontSize: 17, lineHeight: 1.55, margin: 0 }}>
+            {resumen.texto}
+          </p>
+          <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+            {resumen.fecha} · {resumen.fuente === 'ia' ? 'generado con IA' : 'plantilla determinista'}
+          </span>
+        </div>
+      )}
 
       <ul className="grid-kpis">
         <Kpi etiqueta={`Facturación neta ${d.anio}`} valor={eur(d.neta)} nota={`vs ${d.anioPrevio}: ${delta}`} />

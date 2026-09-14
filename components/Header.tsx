@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import CampanaNotificaciones from '@/components/CampanaNotificaciones';
 
 const empresas = [
   { codigo: 'SF', nombre: 'SF Bathroom' },
@@ -47,8 +48,9 @@ export default function Header({ rol }: { rol?: string }) {
               {e.nombre}
             </option>
           ))}
-        </select>
-        {rol && <span className="badge rol">{rol}</span>}
+</select>
+          <CampanaNotificaciones />
+          {rol && <span className="badge rol">{rol}</span>}
       </div>
     </header>
   );
