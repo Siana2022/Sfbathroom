@@ -217,7 +217,7 @@ export async function callLLM(
 
 const defaults: Record<LLMProvider, string> = {
   gemini: 'gemini-2.0-flash',
-  openai: 'llama-3.3-70b-versatile',
+  openai: 'openai/gpt-oss-20b',
   anthropic: 'claude-sonnet-4-5',
 };
 

@@ -23,7 +23,7 @@ autenticado puede ver.
 | `OPENAI_API_KEY`      | si*       | Clave OpenAI-compatible (Groq, Together, etc.).                             |
 | `OPENAI_BASE_URL`     | no        | URL base si usas un proveedor compatible (default: OpenAI).                 |
 | `ANTHROPIC_API_KEY`   | si*       | Clave de Anthropic.                                                         |
-| `CHAT_MODEL`          | no        | Modelo a usar (default según proveedor: `gemini-2.0-flash`, `llama-3.3-70b-versatile`, `claude-sonnet-4-5`). |
+| `CHAT_MODEL`          | no        | Modelo a usar (default según proveedor: `gemini-2.0-flash`, `openai/gpt-oss-20b`, `claude-sonnet-4-5`). |
 | `NEXT_PUBLIC_*`       | —         | Ya existentes de Supabase; el chat los reutiliza.                           |
 
 *Solo necesitas la key del proveedor activo (`LLM_PROVIDER`).
