@@ -23,10 +23,10 @@ with abonos_por_factura as (
 ),
 abonos_sueltos as (
   select
-    f.cliente_id,
-    f.empresa_id,
     f.id as factura_id,
     f.numero_erp,
+    f.empresa_id,
+    f.cliente_id,
     f.fecha,
     coalesce(f.total, 0)::numeric as importe,
     coalesce(f.total, 0)::numeric as pendiente,
@@ -57,16 +57,7 @@ where f.tipo_documento in ('factura', 'nota_cargo')
 
 union all
 
-select
-  cliente_id,
-  empresa_id,
-  factura_id,
-  numero_erp,
-  fecha,
-  importe,
-  pendiente,
-  dias_mora
-from abonos_sueltos;
+select * from abonos_sueltos;
 
 alter view public.v_aging set (security_invoker = true);
 
