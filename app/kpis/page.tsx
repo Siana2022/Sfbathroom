@@ -2,8 +2,8 @@ import { cookies } from 'next/headers';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { createClient } from '@/lib/supabase/server';
 import { getKpisPersonalizadosVistos } from '@/lib/datos/kpisVisibles';
-import { METRICAS, FORMATOS } from '@/lib/datos/kpisCatalogo';
 import ConstructorKpi from '@/components/kpis/ConstructorKpi';
+import KpiCard from '@/components/kpis/KpiCard';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,22 +36,7 @@ export default async function KpisPage() {
               <h2>KPIs guardados ({kpis.length})</h2>
               <ul className="grid-kpis" style={{ gap: 10 }}>
                 {kpis.map((k) => (
-                  <li key={k.id} className="kpi">
-                    <span className="kpi-etiqueta">
-                      {k.nombre}
-                      <span style={{ display: 'block', fontSize: 10, fontWeight: 400, color: 'var(--tenue)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 2 }}>
-                        {METRICAS[k.metrica as keyof typeof METRICAS]?.etiqueta ?? k.metrica} · {k.calculo}
-                      </span>
-                    </span>
-                    <strong className="kpi-valor" style={{ color: k.estaBueno === null ? undefined : k.estaBueno ? 'var(--verde)' : 'var(--rojo)' }}>
-                      {k.fmt}
-                    </strong>
-                    <span className="kpi-nota">
-                      {k.objetivo != null
-                        ? `${k.objetivo_op === 'gte' ? 'Objetivo ≥' : 'Objetivo ≤'} ${FORMATOS[k.formato]?.fmt(k.objetivo) ?? k.objetivo}`
-                        : 'Sin objetivo'}
-                    </span>
-                  </li>
+                  <KpiCard key={k.id} {...k} empresa={empresa} />
                 ))}
               </ul>
             </div>
