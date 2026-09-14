@@ -8,9 +8,9 @@
 -- Aplicar manualmente en Supabase SQL Editor antes de usar la app.
 
 -- ========== v_aging ==========
--- Pendiente por factura, con días de mora usando plazo_pactado_dias.
--- Incluye abonos vinculados (via factura_anula_id) y abonos sueltos como filas negativas.
-create or replace view public.v_aging as
+drop view if exists public.v_aging;
+
+create view public.v_aging as
 with abonos_por_factura as (
   select
     f.factura_anula_id,
@@ -55,13 +55,14 @@ where f.tipo_documento in ('factura', 'nota_cargo')
 
 union all
 
-select * from abonos_sueltos
+select * from abonos_sueltos;
 
-with (security_invoker = true);
+alter view public.v_aging set (security_invoker = true);
 
 -- ========== v_saldo_clientes ==========
--- Saldo por cliente: en_cartera (negativo = a favor), vencido (mora ≥ 0), saldo total.
-create or replace view public.v_saldo_clientes as
+drop view if exists public.v_saldo_clientes;
+
+create view public.v_saldo_clientes as
 select
   empresa_id,
   cliente_id,
@@ -69,5 +70,6 @@ select
   sum(case when dias_mora >= 0 and pendiente > 0 then pendiente else 0 end) as vencido,
   sum(pendiente) as saldo_total
 from public.v_aging
-group by empresa_id, cliente_id
-with (security_invoker = true);
+group by empresa_id, cliente_id;
+
+alter view public.v_saldo_clientes set (security_invoker = true);
