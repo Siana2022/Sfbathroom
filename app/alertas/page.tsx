@@ -3,6 +3,7 @@ import { getAlertas } from '@/lib/datos/alertas';
 import { eur, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
+import GestionAlerta from '@/components/GestionAlerta';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,10 +15,18 @@ const SEVERIDAD: Record<string, string> = {
   critico: 'badge construccion',
 };
 
+async function getPerfiles() {
+  const { createClient } = await import('@/lib/supabase/server');
+  const supabase = createClient();
+  const { data } = await supabase.from('profiles').select('id, full_name, role');
+  return (data ?? []) as { id: string; full_name: string | null; role: string | null }[];
+}
+
 export default async function AlertasPage() {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
   const d = await getAlertas(empresa, ANIO);
   const criticas = d.senales.filter((s) => s.severidad === 'critico').length;
+  const perfiles = await getPerfiles();
 
   return (
     <div>
@@ -79,15 +88,24 @@ export default async function AlertasPage() {
                 <th>Referencia</th>
                 <th className="td-num">Importe</th>
                 <th>Mensaje</th>
+                <th>Gestión</th>
               </tr>
             </thead>
             <tbody>
               {d.generadas.map((g) => (
-                <tr key={g.id}>
+                <tr key={g.id} className={g.estado === 'descartada' ? 'fila-apagada' : undefined}>
                   <td>{g.fecha.slice(0, 10)}</td>
                   <td>{g.referencia ?? '—'}</td>
                   <td className="td-num">{g.importe === null ? '—' : eur(g.importe)}</td>
                   <td>{g.mensaje ?? '—'}</td>
+                  <td>
+                    <GestionAlerta
+                      alertaId={g.id}
+                      estadoActual={g.estado}
+                      asignadaActual={g.asignada_a}
+                      perfiles={perfiles.map((p) => ({ id: p.id, full_name: p.full_name }))}
+                    />
+                  </td>
                 </tr>
               ))}
             </tbody>

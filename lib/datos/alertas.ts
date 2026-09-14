@@ -20,6 +20,9 @@ export type AlertaGenerada = {
   importe: number | null;
   mensaje: string | null;
   leida: boolean;
+  estado?: 'nueva' | 'revisada' | 'pospuesta' | 'descartada';
+  asignada_a?: string | null;
+  fecha_estado?: string | null;
   fecha: string;
 };
 
@@ -74,7 +77,7 @@ export async function getAlertas(codigoEmpresa: string, anio: number): Promise<A
     getStock(codigoEmpresa),
     getCobros(codigoEmpresa, anio),
     supabase.from('alertas_config').select('id, modulo, nombre, activo, umbral, unidad, config').order('modulo'),
-    supabase.from('alertas_generadas').select('id, referencia, importe, mensaje, leida, fecha').eq('empresa_id', empresa.id).order('fecha', { ascending: false }).limit(15),
+    supabase.from('alertas_generadas').select('id, referencia, importe, mensaje, leida, estado, asignada_a, fecha_estado, fecha').eq('empresa_id', empresa.id).order('fecha', { ascending: false }).limit(15),
     supabase
       .from('facturas')
       .select('cliente_id')
