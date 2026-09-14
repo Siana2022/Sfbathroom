@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
+import { lineasPorFacturas } from '@/lib/datos/lineas';
 
 export type FilaDesvio = {
   nombre: string;
@@ -47,11 +48,7 @@ export async function getDesvioPresupuesto(codigoEmpresa: string, anio: number, 
 
   const netaFamilia = new Map<string, number>();
   if (ids.length) {
-    const { data: lineasRaw } = await supabase
-      .from('factura_lineas')
-      .select('factura_id, articulo_id, importe')
-      .in('factura_id', ids);
-    const lineas = (lineasRaw ?? []) as FilaLinea[];
+    const lineas = await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, articulo_id, importe', ids);
     const artIds = [...new Set(lineas.map((l) => l.articulo_id).filter(Boolean))] as string[];
     const familiaDeArticulo = new Map<string, string | null>();
     if (artIds.length) {

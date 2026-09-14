@@ -4,6 +4,7 @@ import { getConfiguracionUmbrales } from '@/lib/datos/configuracion';
 import { getRol, puedeVerMargenes } from '@/lib/datos/role';
 import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
 import { netaDeDocumento } from '@/lib/datos/neta';
+import { lineasPorFacturas } from '@/lib/datos/lineas';
 
 export type ComercialRow = {
   id: string;
@@ -96,8 +97,7 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
 
   let lineas: FilaLinea[] = [];
   if (ids.length) {
-    const { data } = await supabase.from('factura_lineas').select('factura_id, articulo_id, cantidad, importe, coste_unitario').in('factura_id', ids);
-    lineas = (data ?? []) as FilaLinea[];
+    lineas = await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, articulo_id, cantidad, importe, coste_unitario', ids);
   }
   const articuloCoste = new Map<string, number | null>();
   if (lineas.length) {

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
+import { lineasPorFacturas } from '@/lib/datos/lineas';
 import { signoDocumento } from '@/lib/datos/neta';
 
 export type ConcentracionData = {
@@ -214,11 +215,8 @@ export async function getConcentracion(codigoEmpresa: string, anio: number, filt
   const porFamiliaPorCliente = new Map<string, Map<string, number>>();
 
   if (filas.length) {
-    const { data: lineasRaw } = await supabase
-      .from('factura_lineas')
-      .select('factura_id, articulo_id, importe')
-      .in('factura_id', filas.map((f) => f.id));
-    for (const l of (lineasRaw ?? []) as FilaLinea[]) {
+    const lineasRaw = await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, articulo_id, importe', filas.map((f) => f.id));
+    for (const l of lineasRaw) {
       const sign = tipoPorFactura.get(l.factura_id) === 'abono' ? -1 : 1;
       const importe = sign * Number(l.importe ?? 0);
       if (importe === 0) continue;

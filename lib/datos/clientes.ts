@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
+import { lineasPorFacturas } from '@/lib/datos/lineas';
 
 export type ClientesData = {
   empresa: { id: string; codigo: string; nombre: string };
@@ -180,11 +181,8 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
 
   const familiasCliente = new Map<string, Set<string>>();
   if (idsFacturasAnio.length) {
-    const { data: lineas } = await supabase
-      .from('factura_lineas')
-      .select('factura_id, articulo_id')
-      .in('factura_id', idsFacturasAnio);
-    for (const l of (lineas ?? []) as FilaLinea[]) {
+    const lineas = await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, articulo_id', idsFacturasAnio);
+    for (const l of lineas) {
       const cli = clienteDeFactura.get(l.factura_id);
       const fam = l.articulo_id ? familiaDeArticulo.get(l.articulo_id) : null;
       if (!cli || !fam) continue;

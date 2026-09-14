@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getRol, puedeVerMargenes } from '@/lib/datos/role';
 import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
+import { lineasPorFacturas } from '@/lib/datos/lineas';
 
 export type Segmento = {
   marca: string;
@@ -68,10 +69,7 @@ async function getSegmentos(
   const facturas = filtrarPorIds((facturasRaw ?? []) as FilaFactura[], idsFiltrados);
   const ids = facturas.map((f) => f.id);
 
-  const { data: lineasRaw } = ids.length
-    ? await supabase.from('factura_lineas').select('factura_id, articulo_id, cantidad, importe, coste_unitario').in('factura_id', ids)
-    : { data: [] };
-  const lineas = (lineasRaw ?? []) as FilaLinea[];
+  const lineas = await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, articulo_id, cantidad, importe, coste_unitario', ids);
 
   const { data: articulosRaw } = await supabase.from('articulos').select('id, marca_id, marca_blanca_cliente_id, coste_unitario').eq('empresa_id', empresaId);
   const articulos = (articulosRaw ?? []) as FilaArticulo[];

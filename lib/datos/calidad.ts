@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
+import { lineasPorFacturas } from '@/lib/datos/lineas';
 
 export type CalidadData = {
   empresa: { id: string; codigo: string; nombre: string };
@@ -67,11 +68,8 @@ export async function getCalidad(codigoEmpresa: string, anio: number, filtros?: 
   const devFamilia = new Map<string, { unidades: number; importe: number }>();
   let margenPerdidoDevoluciones = 0;
   if (idsAbonos.length) {
-    const { data: lineasRaw } = await supabase
-      .from('factura_lineas')
-      .select('articulo_id, cantidad, importe, coste_unitario')
-      .in('factura_id', idsAbonos);
-    for (const l of (lineasRaw ?? []) as FilaAbonoLinea[]) {
+    const lineasRaw = await lineasPorFacturas<FilaAbonoLinea>(supabase, 'articulo_id, cantidad, importe, coste_unitario', idsAbonos);
+    for (const l of lineasRaw) {
       const unidades = Math.abs(Number(l.cantidad ?? 0));
       const importeAbs = Math.abs(Number(l.importe ?? 0));
       const a = l.articulo_id ? articuloPorId.get(l.articulo_id) : undefined;
