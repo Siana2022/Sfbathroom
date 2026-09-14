@@ -3,6 +3,7 @@ import { reunirResumen, plantillaResumen } from '@/lib/jobs/reunirResumen';
 import { detectarAnomalias } from '@/lib/jobs/anomalias';
 import { generarNarrativa } from '@/lib/agente/narrativa';
 import { enviarNotificacion } from '@/lib/datos/notificaciones';
+import { enviarPush } from '@/lib/datos/push';
 
 const AMBITO = 'global';
 
@@ -64,6 +65,11 @@ registrarJob({
           enlace: '/',
           canales: ['email'],
         });
+
+        // Push (solo para los usuarios con suscripción activa)
+        for (const uid of adminIds) {
+          await enviarPush({ titulo: `Resumen ${e.codigo} · ${hoy}`, cuerpo: texto.slice(0, 120), enlace: '/' }, uid);
+        }
 
         // F1.3: anomalías heurísticas → alertas_generadas (dedupe por tipo+referencia+fecha)
         const anomalias = await detectarAnomalias(supabase, e.id);

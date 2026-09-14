@@ -1,5 +1,6 @@
 import { getConfiguracion } from '@/lib/datos/configuracion';
 import EditorUmbrales from '@/components/EditorUmbrales';
+import PushSuscripcion from '@/components/PushSuscripcion';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,11 +10,16 @@ export default async function ConfiguracionPage() {
   return (
     <div>
       <p className="breadcrumb">Cuadro de mando · Configuración</p>
-      <h1>Configuración de umbrales</h1>
-      <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
-        Umbrales de las alertas del cuadro de mando (decisiones Q6 y Q8–Q19 del cuestionario). Los
-        cambios se aplican de inmediato a las señales del buzón de alertas.
-      </p>
+      <h1>Configuración</h1>
+
+      <div className="card">
+        <h2>Mis avisos en este dispositivo</h2>
+        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
+          Recibe el resumen diario y las alertas como notificación push del navegador (PWA),
+          además del correo. Requiere claves VAPID del servidor y aceptar el permiso.
+        </p>
+        <PushSuscripcion />
+      </div>
 
       {!d.puedesEditar ? (
         <div className="card">

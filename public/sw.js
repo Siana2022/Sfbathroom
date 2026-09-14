@@ -1,59 +1,41 @@
-const VERSION = 'sfb-bi-v1';
+const URL_BASE64_KEY = 'urlBase64ToUint8Array';
 
-const CACHE_STATICO = `${VERSION}-estaticos`;
-
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_STATICO).then((cache) =>
-      cache.addAll(['/', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png']).catch(() => {})
-    )
-  );
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_STATICO).map((k) => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
+  event.waitUntil(self.clients.claim());
 });
 
-self.addEventListener('fetch', (event) => {
-  const { request } = event;
-  if (request.method !== 'GET') return;
-  const url = new URL(request.url);
-
-  if (url.pathname.startsWith('/api/')) {
-    return;
+self.addEventListener('push', (event) => {
+  let datos = { title: 'sfbathroom · BI', body: '', url: '/' };
+  try {
+    datos = { ...datos, ...event.data?.json?.() };
+  } catch {
+    /* mensaje plano */
   }
+  event.waitUntil(
+    self.registration.showNotification(datos.title, {
+      body: datos.body,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      data: { url: datos.url },
+    }),
+  );
+});
 
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then((resp) => {
-          const copia = resp.clone();
-          caches.open(CACHE_STATICO).then((cache) => cache.put(request, copia));
-          return resp;
-        })
-        .catch(() =>
-          caches.match('/').then((desdeCache) => desdeCache ?? Response.error())
-        )
-    );
-    return;
-  }
-
-  event.respondWith(
-    caches.match(request).then((desdeCache) => {
-      if (desdeCache) return desdeCache;
-      return fetch(request).then((resp) => {
-        if (resp.ok && url.origin === self.location.origin) {
-          const copia = resp.clone();
-          caches.open(CACHE_STATICO).then((cache) => cache.put(request, copia));
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url ?? '/';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientes) => {
+      for (const cliente of clientes) {
+        if (cliente.url.includes(self.location.origin)) {
+          return cliente.navigate(url).then(() => cliente.focus());
         }
-        return resp;
-      });
-    })
+      }
+      return self.clients.openWindow(url);
+    }),
   );
 });

@@ -361,6 +361,26 @@ ul.tablas { color: var(--muted); font-size: 13px; margin: 8px 0 0; padding-left:
 .card-tarjeta h3 { margin: 0 0 6px; font-size: 15px; }
 .card-tarjeta .badge { margin-bottom: 6px; }
 
+/* ---- Drag dashboard (react-grid-layout) ---- */
+.layout-drag .panel-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+}
+.panel-handle {
+  padding: 10px 12px 0;
+  cursor: grab;
+  color: var(--muted);
+  font-size: 12px;
+}
+.react-grid-placeholder {
+  opacity: 0.15;
+  border: 2px dashed var(--accent);
+  background: var(--wash);
+}
+
 /* ---------------- Portada de bloques ---------------- */
 
 .grid-bloques {
