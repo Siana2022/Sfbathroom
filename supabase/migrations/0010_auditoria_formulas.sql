@@ -7,9 +7,11 @@
 --
 -- Aplicar manualmente en Supabase SQL Editor antes de usar la app.
 
--- ========== v_aging ==========
+-- Primero la dependiente, luego la base
+drop view if exists public.v_saldo_clientes;
 drop view if exists public.v_aging;
 
+-- ========== v_aging ==========
 create view public.v_aging as
 with abonos_por_factura as (
   select
@@ -60,8 +62,6 @@ select * from abonos_sueltos;
 alter view public.v_aging set (security_invoker = true);
 
 -- ========== v_saldo_clientes ==========
-drop view if exists public.v_saldo_clientes;
-
 create view public.v_saldo_clientes as
 select
   empresa_id,
