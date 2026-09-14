@@ -59,15 +59,16 @@ export async function getVariacion(codigoEmpresa: string, anio: number, filtros?
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
   const anioPrevio = anio - 1;
 
-  const idsFiltrados = await getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anioPrevio}-01-01`, `${anio}-12-31`);
-
-  const { data: filas } = await supabase
-    .from('facturas')
-    .select('id, cliente_id, fecha, tipo_documento')
-    .eq('empresa_id', empresa.id)
-    .gte('fecha', `${anioPrevio}-01-01`)
-    .lte('fecha', `${anio}-12-31`);
-  const facturas = filtrarPorIds((filas ?? []) as FilaFacturaVariacion[], idsFiltrados);
+  const [idsFiltrados, filasRes] = await Promise.all([
+    getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anioPrevio}-01-01`, `${anio}-12-31`),
+    supabase
+      .from('facturas')
+      .select('id, cliente_id, fecha, tipo_documento')
+      .eq('empresa_id', empresa.id)
+      .gte('fecha', `${anioPrevio}-01-01`)
+      .lte('fecha', `${anio}-12-31`),
+  ]);
+  const facturas = filtrarPorIds((filasRes.data ?? []) as FilaFacturaVariacion[], idsFiltrados);
 
   const infoPorId = new Map<string, { anio: number; tipo: string }>();
   const clientePorId = new Map<string, string | null>();
@@ -163,16 +164,38 @@ export async function getFacturacion(codigoEmpresa: string, anio: number, filtro
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
   const anioPrevio = anio - 1;
   const at = String(anio);
+  const conFiltros = Boolean(filtros && (filtros.cliente || filtros.comercial || filtros.familia || filtros.marca));
 
-  const idsFiltrados = await getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anioPrevio}-01-01`, `${anio}-12-31`);
-
-  const { data: filas } = await supabase
+  const idsFiltrados = getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anioPrevio}-01-01`, `${anio}-12-31`);
+  const facturasP = supabase
     .from('facturas')
     .select('id, cliente_id, fecha, tipo_documento, total')
     .eq('empresa_id', empresa.id)
     .gte('fecha', `${anioPrevio}-01-01`)
     .lte('fecha', `${anio}-12-31`);
-  const facturas = filtrarPorIds((filas ?? []) as FilaFactura[], idsFiltrados);
+  const presupuestoP = filtros?.marca
+    ? Promise.resolve({ data: [] as unknown[] })
+    : (() => {
+        let pq = supabase
+          .from('presupuesto')
+          .select('mes, importe')
+          .eq('empresa_id', empresa.id)
+          .eq('ejercicio', anio);
+        if (filtros?.cliente) pq = pq.eq('cliente_id', filtros.cliente);
+        if (filtros?.comercial) pq = pq.eq('comercial_id', filtros.comercial);
+        if (filtros?.familia) pq = pq.eq('familia_id', filtros.familia);
+        return pq;
+      })();
+  const vistaP = conFiltros
+    ? Promise.resolve({ data: null as unknown, error: null })
+    : supabase
+        .from('v_perf_facturacion_mensual')
+        .select('mes, ejercicio, neta_total, n_facturas, unidades')
+        .eq('empresa_id', empresa.id)
+        .in('ejercicio', [anio, anioPrevio]);
+
+  const [idsFiltradosRes, filasRes, presupuestoRes, vistaRes] = await Promise.all([idsFiltrados, facturasP, presupuestoP, vistaP]);
+  const facturas = filtrarPorIds((filasRes.data ?? []) as FilaFactura[], idsFiltradosRes);
 
   const curs = { neta: 0, unidades: 0, facturas: 0, abonosYNotas: 0 };
   const prev = { neta: 0, unidades: 0, facturas: 0 };
@@ -186,10 +209,38 @@ export async function getFacturacion(codigoEmpresa: string, anio: number, filtro
   const facturasMesCur = new Map<number, number>();
   const porCliente = new Map<string, number>();
 
+  const vistaDisp = !conFiltros && !vistaRes.error && Array.isArray(vistaRes.data);
+
+  if (vistaDisp) {
+    for (const v of vistaRes.data as { mes: number; ejercicio: number; neta_total: number; n_facturas: number; unidades: number }[]) {
+      const mes = Number(v.mes);
+      if (Number(v.ejercicio) === anio) {
+        curs.neta += Number(v.neta_total ?? 0);
+        curs.unidades += Number(v.unidades ?? 0);
+        curs.facturas += Number(v.n_facturas ?? 0);
+        netaMesCur.set(mes, (netaMesCur.get(mes) ?? 0) + Number(v.neta_total ?? 0));
+        facturasMesCur.set(mes, (facturasMesCur.get(mes) ?? 0) + Number(v.n_facturas ?? 0));
+      } else {
+        prev.neta += Number(v.neta_total ?? 0);
+        prev.unidades += Number(v.unidades ?? 0);
+        prev.facturas += Number(v.n_facturas ?? 0);
+        netaMesPrev.set(mes, (netaMesPrev.get(mes) ?? 0) + Number(v.neta_total ?? 0));
+      }
+    }
+  }
+
   for (const f of facturas) {
     const esActual = f.fecha.slice(0, 4) === at;
-    const mes = Number(f.fecha.slice(5, 7));
     const total = Number(f.total ?? 0);
+    if (esActual) {
+      if (TIPOS_UNIDADES.has(f.tipo_documento)) {
+        if (f.cliente_id) porCliente.set(f.cliente_id, (porCliente.get(f.cliente_id) ?? 0) + total);
+      } else {
+        curs.abonosYNotas += 1;
+      }
+    }
+    if (vistaDisp) continue;
+    const mes = Number(f.fecha.slice(5, 7));
     if (esActual) {
       curs.neta += total;
       netaMesCur.set(mes, (netaMesCur.get(mes) ?? 0) + total);
@@ -198,7 +249,6 @@ export async function getFacturacion(codigoEmpresa: string, anio: number, filtro
         facturasMesCur.set(mes, (facturasMesCur.get(mes) ?? 0) + 1);
         idsActivo.push(f.id);
         mesDeLaFactura.set(f.id, mes);
-        if (f.cliente_id) porCliente.set(f.cliente_id, (porCliente.get(f.cliente_id) ?? 0) + total);
       } else {
         curs.abonosYNotas += 1;
       }
@@ -215,7 +265,7 @@ export async function getFacturacion(codigoEmpresa: string, anio: number, filtro
 
   const unidadesMes = new Map<number, number>();
   const unidadesMesPrev = new Map<number, number>();
-  if (idsActivo.length || idsPrevio.length) {
+  if (!vistaDisp && (idsActivo.length || idsPrevio.length)) {
     const lineas = await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, cantidad', [...idsActivo, ...idsPrevio]);
     const setActivo = new Set(idsActivo);
     for (const l of lineas) {
@@ -231,23 +281,16 @@ export async function getFacturacion(codigoEmpresa: string, anio: number, filtro
         unidadesMesPrev.set(mes, (unidadesMesPrev.get(mes) ?? 0) + cant);
       }
     }
+  } else if (vistaDisp) {
+    for (const v of vistaRes.data as { mes: number; ejercicio: number; unidades: number }[]) {
+      const mes = Number(v.mes);
+      const u = Number(v.unidades ?? 0);
+      if (Number(v.ejercicio) === anio) unidadesMes.set(mes, (unidadesMes.get(mes) ?? 0) + u);
+      else unidadesMesPrev.set(mes, (unidadesMesPrev.get(mes) ?? 0) + u);
+    }
   }
 
-  let presupuestoFilas: { mes: number; importe: number }[] = [];
-  if (filtros?.marca) {
-    // el presupuesto no desglosa por marca: sin referencia comparativa
-  } else {
-    let pq = supabase
-      .from('presupuesto')
-      .select('mes, importe')
-      .eq('empresa_id', empresa.id)
-      .eq('ejercicio', anio);
-    if (filtros?.cliente) pq = pq.eq('cliente_id', filtros.cliente);
-    if (filtros?.comercial) pq = pq.eq('comercial_id', filtros.comercial);
-    if (filtros?.familia) pq = pq.eq('familia_id', filtros.familia);
-    const { data } = await pq;
-    presupuestoFilas = (data ?? []) as { mes: number; importe: number }[];
-  }
+  const presupuestoFilas = (presupuestoRes.data ?? []) as { mes: number; importe: number }[];
   const presupuestoMes = new Map<number, number>();
   let presupuesto = 0;
   for (const p of presupuestoFilas) {

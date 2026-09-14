@@ -56,14 +56,15 @@ const NOMBRE_PAIS: Record<string, string> = {
 const DIA_MS = 86400000;
 
 async function getRiesgoProveedorList(supabase: ReturnType<typeof createClient>, empresaId: string): Promise<ConcentracionData['riesgoProveedor']> {
-  const { data: provRaw } = await supabase.from('proveedores').select('id, nombre, pais, plazo_entrega_dias, activo');
-  const proveedores = (provRaw ?? []) as { id: string; nombre: string; pais: string; plazo_entrega_dias: number; activo: boolean }[];
-
-  const { data: comprasRaw } = await supabase
-    .from('compras')
-    .select('id, proveedor_id, fecha, fecha_estimada_llegada, fecha_llegada')
-    .eq('empresa_id', empresaId);
-  const compras = (comprasRaw ?? []) as { id: string; proveedor_id: string | null; fecha: string; fecha_estimada_llegada: string | null; fecha_llegada: string | null }[];
+  const [provRes, comprasRes] = await Promise.all([
+    supabase.from('proveedores').select('id, nombre, pais, plazo_entrega_dias, activo'),
+    supabase
+      .from('compras')
+      .select('id, proveedor_id, fecha, fecha_estimada_llegada, fecha_llegada')
+      .eq('empresa_id', empresaId),
+  ]);
+  const proveedores = (provRes.data ?? []) as { id: string; nombre: string; pais: string; plazo_entrega_dias: number; activo: boolean }[];
+  const compras = (comprasRes.data ?? []) as { id: string; proveedor_id: string | null; fecha: string; fecha_estimada_llegada: string | null; fecha_llegada: string | null }[];
   const proveedorDeCompra = new Map<string, string | null>(compras.map((c) => [c.id, c.proveedor_id]));
   let plazoRealSum = 0;
   let plazoRealN = 0;
@@ -82,26 +83,28 @@ async function getRiesgoProveedorList(supabase: ReturnType<typeof createClient>,
   }
 
   const volumen = new Map<string, number>();
-  if (compras.length) {
-    const { data: lineasRaw } = await supabase
-      .from('compra_lineas')
-      .select('compra_id, cantidad, coste_unitario_compra')
-      .in('compra_id', compras.map((c) => c.id));
-    for (const l of (lineasRaw ?? []) as { compra_id: string; cantidad: number; coste_unitario_compra: number }[]) {
-      const prov = proveedorDeCompra.get(l.compra_id);
-      if (!prov) continue;
-      const importe = Number(l.cantidad ?? 0) * Number(l.coste_unitario_compra ?? 0);
-      volumen.set(prov, (volumen.get(prov) ?? 0) + importe);
-    }
+  const [lineasP, artRes] = await Promise.all([
+    compras.length
+      ? supabase
+          .from('compra_lineas')
+          .select('compra_id, cantidad, coste_unitario_compra')
+          .in('compra_id', compras.map((c) => c.id))
+      : Promise.resolve({ data: [] as unknown[] }),
+    supabase
+      .from('articulos')
+      .select('proveedor_id, familia_id')
+      .eq('empresa_id', empresaId),
+  ]);
+  for (const l of (lineasP.data ?? []) as { compra_id: string; cantidad: number; coste_unitario_compra: number }[]) {
+    const prov = proveedorDeCompra.get(l.compra_id);
+    if (!prov) continue;
+    const importe = Number(l.cantidad ?? 0) * Number(l.coste_unitario_compra ?? 0);
+    volumen.set(prov, (volumen.get(prov) ?? 0) + importe);
   }
   let volumenTotal = 0;
   for (const v of volumen.values()) volumenTotal += v;
 
-  const { data: artRaw } = await supabase
-    .from('articulos')
-    .select('proveedor_id, familia_id')
-    .eq('empresa_id', empresaId);
-  const articulos = (artRaw ?? []) as { proveedor_id: string | null; familia_id: string | null }[];
+  const articulos = (artRes.data ?? []) as { proveedor_id: string | null; familia_id: string | null }[];
   const familiasDeProveedor = new Map<string, Set<string>>();
   const articulosPorProveedor = new Map<string, number>();
   for (const a of articulos) {
@@ -151,15 +154,20 @@ export async function getConcentracion(codigoEmpresa: string, anio: number, filt
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
 
-  const idsFiltrados = await getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anio}-01-01`, `${anio}-12-31`);
-
-  const { data: filasRaw } = await supabase
-    .from('facturas')
-    .select('id, cliente_id, fecha, total, tipo_documento')
-    .eq('empresa_id', empresa.id)
-    .gte('fecha', `${anio}-01-01`)
-    .lte('fecha', `${anio}-12-31`);
-  const filas = filtrarPorIds((filasRaw ?? []) as Fila[], idsFiltrados);
+  const [idsFiltrados, filasRes, clisRes, articulosRes, familiasRes, riesgoProveedor] = await Promise.all([
+    getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anio}-01-01`, `${anio}-12-31`),
+    supabase
+      .from('facturas')
+      .select('id, cliente_id, fecha, total, tipo_documento')
+      .eq('empresa_id', empresa.id)
+      .gte('fecha', `${anio}-01-01`)
+      .lte('fecha', `${anio}-12-31`),
+    supabase.from('clientes').select('id, nombre, pais_facturacion').eq('empresa_id', empresa.id),
+    supabase.from('articulos').select('id, nombre, familia_id').eq('empresa_id', empresa.id),
+    supabase.from('familias_articulo').select('id, nombre').eq('empresa_id', empresa.id),
+    getRiesgoProveedorList(supabase, empresa.id),
+  ]);
+  const filas = filtrarPorIds((filasRes.data ?? []) as Fila[], idsFiltrados);
 
   const porCliente = new Map<string, number>();
   let netaTotal = 0;
@@ -189,8 +197,7 @@ export async function getConcentracion(codigoEmpresa: string, anio: number, filt
     }
   }
 
-  const { data: clisRaw } = await supabase.from('clientes').select('id, nombre, pais_facturacion').eq('empresa_id', empresa.id);
-  const clis = (clisRaw ?? []) as FilaCliente[];
+  const clis = (clisRes.data ?? []) as FilaCliente[];
   const nombreCliente = new Map(clis.map((c) => [c.id, c.nombre]));
   const paisCliente = new Map(clis.map((c) => [c.id, c.pais_facturacion]));
 
@@ -200,12 +207,10 @@ export async function getConcentracion(codigoEmpresa: string, anio: number, filt
     return { nombre: nombreCliente.get(id) ?? '—', neta, pct: pctOf(neta), acumulado: pctOf(acumulado) };
   }).slice(0, 15);
 
-  const { data: articulosRaw } = await supabase.from('articulos').select('id, nombre, familia_id').eq('empresa_id', empresa.id);
-  const articulos = (articulosRaw ?? []) as FilaArticulo[];
+  const articulos = (articulosRes.data ?? []) as FilaArticulo[];
   const familiaDeArticulo = new Map(articulos.map((a) => [a.id, a.familia_id]));
 
-  const { data: familiasRaw } = await supabase.from('familias_articulo').select('id, nombre').eq('empresa_id', empresa.id);
-  const familias = (familiasRaw ?? []) as FilaFamilia[];
+  const familias = (familiasRes.data ?? []) as FilaFamilia[];
   const nombreFamilia = new Map(familias.map((f) => [f.id, f.nombre]));
 
   const porArticulo = new Map<string, { nombre: string; neta: number }>();
@@ -294,8 +299,6 @@ export async function getConcentracion(codigoEmpresa: string, anio: number, filt
     }
   }
   riesgo.sort((a, b) => b.netaFamilia - a.netaFamilia);
-
-  const riesgoProveedor = await getRiesgoProveedorList(supabase, empresa.id);
 
   return {
     empresa,

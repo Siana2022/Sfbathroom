@@ -5,6 +5,7 @@ import { bloques } from '@/lib/bloques';
 import { getFacturacion, getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getKpisPersonalizadosVistos } from '@/lib/datos/kpisVisibles';
 import { getMiDia } from '@/lib/datos/miDia';
+import { memo } from '@/lib/perf/memo';
 import { decimal, eur, numero, pct } from '@/lib/formato';
 import { FORMATOS } from '@/lib/datos/kpisCatalogo';
 import Kpi from '@/components/Kpi';
@@ -30,14 +31,14 @@ async function getResumenHoy(codigoEmpresa: string) {
 async function getRolUsuario() {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  if (!user) return { rol: null, uid: null };
   const { data } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
-  return data?.role ?? null;
+  return { rol: data?.role ?? null, uid: user.id };
 }
 
 export default async function Home() {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
-  const [rol, mix] = await Promise.all([getRolUsuario(), getMiDia(empresa, ANIO)]);
+  const [{ rol, uid }, mix] = await Promise.all([getRolUsuario(), getMiDia(empresa, ANIO)]);
 
   if (rol === 'comercial' && mix) {
     return (
@@ -148,11 +149,14 @@ export default async function Home() {
     );
   }
 
-  const d = await getFacturacion(empresa, ANIO);
+  const clave = uid ?? 'anon';
+  const [d, kpisExtraTotal, resumen] = await Promise.all([
+    memo(`facturacion:${clave}:${empresa}:${ANIO}`, () => getFacturacion(empresa, ANIO)),
+    memo(`kpis:${clave}:${empresa}`, () => getKpisPersonalizadosVistos(empresa)),
+    getResumenHoy(empresa),
+  ]);
   const MAX_KPI_PORTADA = 8;
-  const kpisExtraTotal = await getKpisPersonalizadosVistos(empresa);
   const kpisExtra = kpisExtraTotal.slice(0, MAX_KPI_PORTADA);
-  const resumen = await getResumenHoy(empresa);
   const delta = d.netaPrevioTotal > 0 ? pct(((d.neta - d.netaPrevioTotal) / d.netaPrevioTotal) * 100) : '—';
 
   const barras: Barra[] = d.series.map((s) => ({
