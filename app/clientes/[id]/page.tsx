@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { getFichaCliente } from '@/lib/datos/fichaCliente';
+import { getCrossSell } from '@/lib/datos/crosssell';
 import { decimal, eur, numero, pct } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import GraficoBarras from '@/components/GraficoBarras';
@@ -14,6 +15,7 @@ export default async function FichaClientePage({ params }: { params: { id: strin
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
   const d = await getFichaCliente(empresa, params.id, ANIO);
   if (!d) notFound();
+  const crossSell = await getCrossSell(empresa, params.id, ANIO);
 
   const barras = d.historico.map((m) => ({ etiqueta: m.mes, valor: Math.max(0, m.neta), titulo: `${m.mes}: ${eur(m.neta)}` }));
 
@@ -68,6 +70,31 @@ export default async function FichaClientePage({ params }: { params: { id: strin
               ))}
             </tbody>
           </table>
+        )}
+      </div>
+
+      <div className="card">
+        <h2>Cross-sell por afinidad de familias</h2>
+        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
+          Familias que compran clientes similares y que este cliente aún no compra, con la
+          co-ocurrencia ponderada sobre sus propias familias.
+        </p>
+        {crossSell.length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>Sin compras de familias registradas para este cliente en {d.anio}.</p>
+        ) : (
+          <div className="grid-cards">
+            {crossSell.map((r) => (
+              <div key={r.familia} className="card-tarjeta">
+                <h3>{r.familia}</h3>
+                <span className="badge pendiente">{decimal(r.afinidad)} % afinidad</span>
+                <ul className="tablas">
+                  {r.articulos.map((a) => (
+                    <li key={a.nombre}>{a.nombre} <span className="td-num">({numero(a.veces)} uds)</span></li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 

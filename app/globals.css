@@ -347,6 +347,20 @@ ul.tablas { color: var(--muted); font-size: 13px; margin: 8px 0 0; padding-left:
 
 .fila-apagada { opacity: 0.55; }
 
+.grid-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 14px;
+}
+.card-tarjeta {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: #fff;
+}
+.card-tarjeta h3 { margin: 0 0 6px; font-size: 15px; }
+.card-tarjeta .badge { margin-bottom: 6px; }
+
 /* ---------------- Portada de bloques ---------------- */
 
 .grid-bloques {
