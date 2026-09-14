@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import type { Filtros } from '@/lib/datos/filtros';
+import { netaDeDocumento } from '@/lib/datos/neta';
 
 export type AgingBucket = { label: string; min: number; max: number | null; importe: number };
 
@@ -29,12 +30,12 @@ export type CobrosData = {
   porCliente: ClienteCredito[];
 };
 
-type FilaAging = { cliente_id: string | null; pendiente: number; dias_vencido: number };
+type FilaAging = { cliente_id: string | null; pendiente: number; dias_mora: number };
 type FilaFactura = { id: string; cliente_id: string | null; total: number; tipo_documento: string; fecha: string };
 type FilaCobro = { cliente_id: string | null; importe: number; impagado: boolean; fecha: string };
 type FilaPedido = { cliente_id: string | null; importe: number | null };
 
-const TIPOS_SALDO = new Set(['factura', 'nota_cargo']);
+const TIPOS_SALDO = new Set(['factura', 'nota_cargo', 'abono']);
 const DIAS_PACTADOS = 30;
 const DIAS_REPASO = 30;
 
@@ -47,7 +48,7 @@ export async function getCobros(codigoEmpresa: string, anio: number, filtros?: F
 
   let agingQuery = supabase
     .from('v_aging')
-    .select('cliente_id, pendiente, dias_vencido')
+    .select('cliente_id, pendiente, dias_mora')
     .eq('empresa_id', empresa.id);
   if (clienteId) agingQuery = agingQuery.eq('cliente_id', clienteId);
   const { data: aging } = await agingQuery;
@@ -55,34 +56,39 @@ export async function getCobros(codigoEmpresa: string, anio: number, filtros?: F
 
   let saldoTotal = 0;
   let vencidoTotal = 0;
-  let netaAnio = 0;
 
+  // DSO: saldo abierto actual ÷ ventas de los últimos 365 días (neta12m)
+  let neta12m = 0;
   {
-    let netaQuery = supabase
+    const hoy = Math.floor(Date.now() / DIA_MS);
+    const hace12m = new Date((hoy - 365) * DIA_MS).toISOString().slice(0, 10);
+    let q = supabase
       .from('facturas')
-      .select('total')
+      .select('total, tipo_documento, fecha')
       .eq('empresa_id', empresa.id)
-      .gte('fecha', `${anio}-01-01`)
-      .lte('fecha', `${anio}-12-31`);
-    if (clienteId) netaQuery = netaQuery.eq('cliente_id', clienteId);
-    const { data: neta } = await netaQuery;
-    for (const f of neta ?? []) netaAnio += Number((f as { total: number }).total ?? 0);
+      .gte('fecha', hace12m);
+    if (clienteId) q = q.eq('cliente_id', clienteId);
+    const { data } = await q;
+    for (const f of data ?? []) {
+      const row = f as { total: number; tipo_documento: string; fecha: string };
+      neta12m += netaDeDocumento(row.tipo_documento, row.total);
+    }
   }
 
   const buckets: AgingBucket[] = [
-    { label: 'Al día (futuro)', min: -Infinity, max: -0.000001, importe: 0 },
-    { label: 'Vencido 1-30', min: 0, max: 30, importe: 0 },
-    { label: 'Vencido 31-60', min: 31, max: 60, importe: 0 },
-    { label: 'Vencido 61-90', min: 61, max: 90, importe: 0 },
-    { label: 'Vencido +90', min: 91, max: null, importe: 0 },
+    { label: 'Al corriente', min: -Infinity, max: -0.000001, importe: 0 },
+    { label: 'Mora 1-30', min: 0, max: 30, importe: 0 },
+    { label: 'Mora 31-60', min: 31, max: 60, importe: 0 },
+    { label: 'Mora 61-90', min: 61, max: 90, importe: 0 },
+    { label: 'Mora +90', min: 91, max: null, importe: 0 },
   ];
 
   const vencidoPorCliente = new Map<string, number>();
   for (const f of filas) {
     const pend = Number(f.pendiente ?? 0);
-    if (pend <= 0) continue;
-    const dias = Number(f.dias_vencido ?? 0);
     saldoTotal += pend;
+    if (pend <= 0) continue;
+    const dias = Number(f.dias_mora ?? 0);
     if (dias >= 0) vencidoTotal += pend;
     for (const b of buckets) {
       const enRango = dias >= b.min && (b.max === null || dias <= b.max);
@@ -93,7 +99,7 @@ export async function getCobros(codigoEmpresa: string, anio: number, filtros?: F
     }
   }
 
-  const dso = netaAnio > 0 ? saldoTotal / (netaAnio / 365) : null;
+  const dso = neta12m > 0 ? saldoTotal / (neta12m / 365) : null;
   const dsoDesvioDias = dso !== null ? Math.max(0, dso - DIAS_PACTADOS) : 0;
   const dsoDesvioEuros = (saldoTotal / 365) * dsoDesvioDias;
 
@@ -104,7 +110,7 @@ export async function getCobros(codigoEmpresa: string, anio: number, filtros?: F
     .from('facturas')
     .select('id, cliente_id, total, tipo_documento, fecha')
     .eq('empresa_id', empresa.id)
-    .in('tipo_documento', ['factura', 'nota_cargo'])
+    .in('tipo_documento', ['factura', 'nota_cargo', 'abono'])
     .gte('fecha', new Date((hoy - 400) * DIA_MS).toISOString().slice(0, 10));
   if (clienteId) facturasQuery = facturasQuery.eq('cliente_id', clienteId);
   const { data: facturasRaw } = await facturasQuery;
@@ -142,7 +148,7 @@ export async function getCobros(codigoEmpresa: string, anio: number, filtros?: F
   }
   riesgoVivoTotal += saldoTotal;
 
-  const neta12m = new Map<string, number>();
+  const neta12mCliente = new Map<string, number>();
   const saldoHoy = new Map<string, number>();
   const saldoRepaso = new Map<string, number>();
   const neta12mRepaso = new Map<string, number>();
@@ -152,11 +158,11 @@ export async function getCobros(codigoEmpresa: string, anio: number, filtros?: F
   for (const f of facturas) {
     if (!f.cliente_id) continue;
     const dia = Math.floor(Date.parse(f.fecha) / DIA_MS);
-    const total = Number(f.total ?? 0);
+    const total = netaDeDocumento(f.tipo_documento, f.total);
     if (TIPOS_SALDO.has(f.tipo_documento)) {
       if (dia <= hoy) sumaPorCliente(saldoHoy, f.cliente_id, total);
       if (dia <= hoyMenosRepaso) sumaPorCliente(saldoRepaso, f.cliente_id, total);
-      if (dia > hoy - 365) sumaPorCliente(neta12m, f.cliente_id, total);
+      if (dia > hoy - 365) sumaPorCliente(neta12mCliente, f.cliente_id, total);
       if (dia > hoyMenosRepaso - 365 && dia <= hoyMenosRepaso) sumaPorCliente(neta12mRepaso, f.cliente_id, total);
     }
   }
@@ -175,7 +181,7 @@ export async function getCobros(codigoEmpresa: string, anio: number, filtros?: F
   const porCliente: ClienteCredito[] = [...claves]
     .map((id) => {
       const saldo = saldoHoy.get(id) ?? 0;
-      const netaClient = neta12m.get(id) ?? 0;
+      const netaClient = neta12mCliente.get(id) ?? 0;
       const dsoCliente = netaClient > 0 ? saldo / (netaClient / 365) : null;
       const saldoRep = saldoRepaso.get(id) ?? 0;
       const netaClientRep = neta12mRepaso.get(id) ?? 0;

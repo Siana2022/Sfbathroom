@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getRol, puedeVerMargenes } from '@/lib/datos/role';
 import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
+import { signoDocumento } from '@/lib/datos/neta';
 
 export type MargenData = {
   empresa: { id: string; codigo: string; nombre: string };
@@ -26,7 +27,7 @@ export type MargenData = {
   ultimosLotes: { lote: string; articulo: string; fecha: string; costeCompra: number; costeRepartido: number; costeCompleto: number }[];
 };
 
-type FilaFactura = { id: string; cliente_id: string | null; comercial_id: string | null; fecha: string };
+type FilaFactura = { id: string; cliente_id: string | null; comercial_id: string | null; fecha: string; tipo_documento: string; total: number; descuento_pie: number; rappel_devengado: number };
 type FilaLinea = { factura_id: string; articulo_id: string | null; cantidad: number; importe: number; coste_unitario: number | null };
 type FilaArticulo = { id: string; nombre: string; familia_id: string | null; marca_id: string | null; marca_blanca_cliente_id: string | null; coste_unitario: number | null; precio_tarifa: number | null };
 type FilaCliente = { id: string; nombre: string; canal_id: string | null; pais_facturacion: string | null };
@@ -84,9 +85,9 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
 
   const { data: facturasRaw } = await supabase
     .from('facturas')
-    .select('id, cliente_id, comercial_id, fecha')
+    .select('id, cliente_id, comercial_id, fecha, tipo_documento, total, descuento_pie, rappel_devengado')
     .eq('empresa_id', empresa.id)
-    .eq('tipo_documento', 'factura')
+    .in('tipo_documento', ['factura', 'abono', 'nota_cargo'])
     .gte('fecha', `${anio}-01-01`)
     .lte('fecha', `${anio}-12-31`);
   const facturas = filtrarPorIds((facturasRaw ?? []) as unknown as FilaFactura[], idsFiltrados);
@@ -131,6 +132,31 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
   }
 
   const facturaPorId = new Map(facturas.map((f) => [f.id, f]));
+  // Factor de reparto de descuento_pie y rappel por línea (distribuye proporcionalmente)
+  const importeLineasPorFactura = new Map<string, number>();
+  for (const l of filasLineas) {
+    importeLineasPorFactura.set(l.factura_id, (importeLineasPorFactura.get(l.factura_id) ?? 0) + Number(l.importe ?? 0));
+  }
+  const factorPorFactura = new Map<string, number>();
+  for (const f of facturas) {
+    const base = importeLineasPorFactura.get(f.id) ?? 0;
+    const ajuste = Number(f.descuento_pie ?? 0) + Number(f.rappel_devengado ?? 0);
+    factorPorFactura.set(f.id, base > 0 ? (base - ajuste) / base : 1);
+  }
+  // Coste completo por artículo (media ponderada de v_coste_completo_por_lote)
+  const costeLlegada = new Map<string, { sum: number; qty: number }>();
+  {
+    const { data: lotesRaw } = await supabase
+      .from('v_coste_completo_por_lote')
+      .select('articulo_id, coste_completo_unitario, cantidad')
+      .eq('empresa_id', empresa.id);
+    for (const l of (lotesRaw ?? []) as { articulo_id: string; coste_completo_unitario: number | null; cantidad: number | null }[]) {
+      const v = costeLlegada.get(l.articulo_id) ?? { sum: 0, qty: 0 };
+      v.sum += Number(l.coste_completo_unitario ?? 0) * Number(l.cantidad ?? 0);
+      v.qty += Number(l.cantidad ?? 0);
+      costeLlegada.set(l.articulo_id, v);
+    }
+  }
 
   const porFamiliaRaw = new Map<string, { importe: number; coste: number }>();
   const porArticuloRaw = new Map<string, { nombre: string; unidades: number; importe: number; coste: number }>();
@@ -150,9 +176,17 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
     const a = l.articulo_id ? articuloPorId.get(l.articulo_id) : undefined;
     const f = facturaPorId.get(l.factura_id);
     const c = f?.cliente_id ? clientesPorId.get(f.cliente_id) : undefined;
-    const importe = Number(l.importe ?? 0);
-    const costeUnit = Number(l.coste_unitario ?? (a?.coste_unitario as number | undefined) ?? 0);
-    const coste = Number(l.cantidad ?? 0) * costeUnit;
+    const factor = factorPorFactura.get(l.factura_id) ?? 1;
+    const sign = f?.tipo_documento === 'abono' ? -1 : 1;
+    const importe = sign * Number(l.importe ?? 0) * factor;
+    // Preferir coste de llegada completo, luego coste de línea, luego coste de artículo
+    let costeUnit = Number(l.coste_unitario ?? 0);
+    if (costeUnit === 0 && l.articulo_id) {
+      const llegada = costeLlegada.get(l.articulo_id);
+      if (llegada && llegada.qty > 0) costeUnit = llegada.sum / llegada.qty;
+      else costeUnit = Number((a?.coste_unitario as number | undefined) ?? 0);
+    }
+    const coste = sign * Number(l.cantidad ?? 0) * costeUnit;
     importeVendido += importe;
     costeVenta += coste;
 

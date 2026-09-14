@@ -3,6 +3,7 @@ import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getConfiguracionUmbrales } from '@/lib/datos/configuracion';
 import { getRol, puedeVerMargenes } from '@/lib/datos/role';
 import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
+import { netaDeDocumento } from '@/lib/datos/neta';
 
 export type ComercialRow = {
   id: string;
@@ -30,7 +31,7 @@ export type ActividadData = {
   comerciales: ComercialRow[];
 };
 
-type Fila = { id: string; comercial_id: string | null; cliente_id: string | null; total: number; descuento_pie: number; fecha: string };
+type Fila = { id: string; comercial_id: string | null; cliente_id: string | null; total: number; tipo_documento: string; descuento_pie: number; fecha: string };
 type FilaComercial = { id: string; nombre: string };
 type FilaPedido = { comercial_id: string | null };
 type FilaLinea = { factura_id: string; articulo_id: string | null; cantidad: number; importe: number; coste_unitario: number | null };
@@ -52,9 +53,9 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
   const [filasRes, filasPreviasRes, pedidosRes, presupuestoRes, config] = await Promise.all([
     supabase
       .from('facturas')
-      .select('id, comercial_id, cliente_id, total, descuento_pie, fecha')
+      .select('id, comercial_id, cliente_id, total, tipo_documento, descuento_pie, fecha')
       .eq('empresa_id', empresa.id)
-      .eq('tipo_documento', 'factura')
+      .in('tipo_documento', ['factura', 'abono', 'nota_cargo'])
       .gte('fecha', `${anio}-01-01`)
       .lte('fecha', `${anio}-12-31`),
     supabase
@@ -116,15 +117,20 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
   const mesActual = new Date().getMonth() + 1;
   const trimActual = Math.floor((mesActual - 1) / 3) + 1;
 
+  const tipoPorFactura = new Map<string, string>();
+  for (const f of filas) {
+    tipoPorFactura.set(f.id, f.tipo_documento);
+  }
+
   for (const f of filas) {
     const key = f.comercial_id ?? '';
     const c = porComercial.get(key) ?? { neta: 0, trimNeta: 0, facturas: 0, clientes: new Set<string>(), descuento: 0, margenImporte: 0, margenCoste: 0 };
-    c.neta += Number(f.total ?? 0);
+    c.neta += netaDeDocumento(f.tipo_documento, f.total);
     c.facturas += 1;
     if (f.cliente_id) c.clientes.add(f.cliente_id);
     c.descuento += Number(f.descuento_pie ?? 0);
     const trim = Math.floor((Number(f.fecha.slice(5, 7)) - 1) / 3) + 1;
-    if (trim === trimActual) c.trimNeta += Number(f.total ?? 0);
+    if (trim === trimActual) c.trimNeta += netaDeDocumento(f.tipo_documento, f.total);
     porComercial.set(key, c);
   }
 
@@ -133,9 +139,10 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
     const key = comercialId ?? '';
     const c = porComercial.get(key);
     if (!c) continue;
-    c.margenImporte += Number(l.importe ?? 0);
+    const sign = tipoPorFactura.get(l.factura_id) === 'abono' ? -1 : 1;
+    c.margenImporte += sign * Number(l.importe ?? 0);
     const coste = Number(l.coste_unitario ?? articuloCoste.get(l.articulo_id ?? '') ?? 0);
-    c.margenCoste += Number(l.cantidad ?? 0) * coste;
+    c.margenCoste += sign * Number(l.cantidad ?? 0) * coste;
   }
 
   for (const f of filasPrevias) {

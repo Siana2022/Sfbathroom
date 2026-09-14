@@ -18,6 +18,28 @@ Auditoría externa de repo vs producción (`dgbxualxhrbbqglvxtxq`). Estado:
 - [ ] **H-4 (bajo)** — activar Leaked Password Protection en Supabase Auth (un clic).
 - [x] **H-5 (bajo)** — CI: `opencode.yml` fijado a SHA `02a167e0…` (v1.18.29).
 
+## 0a. Auditoría de fórmulas y KPIs (sep 2026) — RESUELTA
+
+Auditoría externa de cálculos en `lib/datos/` y vistas SQL. Aplicada en commit de auditoría.
+Migración `0010` pendiente de aplicación por el cliente. Hallazgos corregidos:
+
+| # | Hallazgo | Archivo(s) | Fix |
+|---|----------|------------|-----|
+| 1 | Abonos sumados en vistas temporales | `vistas.ts` | `netaDeDocumento()` unificada |
+| 2 | Aging ignora `plazo_pactado_dias` | `v_aging` (0010) | `dias_mora = hoy − (fecha + plazo)` |
+| 3 | Dos DSO distintos | `cobros.ts`, `financiero/page.tsx` | DSO unificado: saldo ÷ neta12m |
+| 4 | "recuperados" cuenta fugas | `clientes.ts` | Recuperados = vuelven tras parón |
+| 5 | Margen ignora abonos/descuento pie/rappel | `margen.ts`, `actividad.ts` | Incluye abonos, factor de descuento |
+| 6 | Margen usa coste simple | `margen.ts` | Usa `v_coste_completo_por_lote` como fallback |
+| 7 | Aging no netea abonos | `v_aging` (0010) | Abonos vinculados + sueltos incluidos |
+| 8 | Alternativas de proveedor por familia | `concentracion.ts` | Filtra por misma familia |
+| 9 | % concentración inflados | `concentracion.ts` | Firmas abono en líneas |
+| 10 | `.slice(0,10)` descartado | `clientes.ts` | Asignación in-place |
+| 11 | `ANIO=2026` hardcodeado | `financiero/page.tsx` | `new Date().getFullYear()` |
+
+Creada función central `lib/datos/neta.ts` (`netaDeDocumento`, `signoDocumento`).
+Creado `scripts/smoke-kpis.mjs` para validación automática.
+
 ## 0. Migración del cuadro de mando (0003)
 - [x] Aplicar `0003` en Supabase (hecho por el cliente).
 - [x] Aplicar `0004` (fix recursión RLS + escalada de rol) y crear superusuarios.

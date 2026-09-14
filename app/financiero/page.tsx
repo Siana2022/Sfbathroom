@@ -1,83 +1,16 @@
 import { cookies } from 'next/headers';
-import { createServerClient } from '@supabase/ssr';
-import { createClient } from '@/lib/supabase/server';
-import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
+import { getCobros } from '@/lib/datos/cobros';
 import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
 import { decimal, eur, numero, pct } from '@/lib/formato';
 
 export const dynamic = 'force-dynamic';
 
-const ANIO = 2026;
-
-type FilaFactura = { id: string; fecha: string; total: number };
-type FilaCobro = { factura_id: string | null; importe: number; impagado: boolean };
-
-type SerieEdad = { antiguedad: string; importe: number; porc: number };
-
-async function getDso(supabase: ReturnType<typeof createClient>, empresaId: string, anio: number) {
-  const { data: facturas } = await supabase
-    .from('facturas')
-    .select('id, fecha, total')
-    .eq('empresa_id', empresaId)
-    .gte('fecha', `${anio}-01-01`)
-    .lte('fecha', `${anio}-12-31`);
-  const { data: cobros } = await supabase
-    .from('cobros')
-    .select('factura_id, importe, impagado')
-    .eq('empresa_id', empresaId);
-
-  const porFactura = new Map<string, number>();
-  for (const c of (cobros ?? []) as FilaCobro[]) {
-    if (c.impagado || !c.factura_id) continue;
-    porFactura.set(c.factura_id, (porFactura.get(c.factura_id) ?? 0) + Number(c.importe ?? 0));
-  }
-
-  const hoy = new Date(`${anio}-12-31T00:00:00`);
-  const serie: SerieEdad[] = [
-    { antiguedad: 'Corriente', importe: 0, porc: 0 },
-    { antiguedad: '1-30 días', importe: 0, porc: 0 },
-    { antiguedad: '31-60 días', importe: 0, porc: 0 },
-    { antiguedad: '61-90 días', importe: 0, porc: 0 },
-    { antiguedad: '+90 días', importe: 0, porc: 0 },
-  ];
-
-  let neta = 0;
-  let saldoPendiente = 0;
-  let saldoVencido = 0;
-  for (const f of (facturas ?? []) as FilaFactura[]) {
-    const total = Number(f.total ?? 0);
-    neta += total;
-    const cobrado = porFactura.get(f.id) ?? 0;
-    if (cobrado >= total) continue;
-    const pendiente = total - cobrado;
-    saldoPendiente += pendiente;
-    const dias = Math.max(0, Math.floor((hoy.getTime() - new Date(`${f.fecha}T00:00:00`).getTime()) / 86400000));
-    if (dias > 0) saldoVencido += pendiente;
-    if (dias <= 0) serie[0].importe += pendiente;
-    else if (dias <= 30) serie[1].importe += pendiente;
-    else if (dias <= 60) serie[2].importe += pendiente;
-    else if (dias <= 90) serie[3].importe += pendiente;
-    else serie[4].importe += pendiente;
-  }
-
-  const ventaDiaria = neta / 365;
-  const dso = ventaDiaria > 0 ? saldoPendiente / ventaDiaria : 0;
-  const totalSerie = serie.reduce((a, b) => a + b.importe, 0);
-  for (const s of serie) s.porc = totalSerie > 0 ? Math.round((s.importe / totalSerie) * 1000) / 10 : 0;
-
-  return { dso, ventaDiaria, saldoPendiente, saldoVencido, serie };
-}
-
 export default async function FinancieroPage() {
   const cookieStore = cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://dgbxualxhrbbqglvxtxq.supabase.co',
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? 'sb_publishable_0GvTeBiMy4pbE6hZGn5eaw_2xa3W-bi',
-    { cookies: { getAll() { return cookieStore.getAll(); }, setAll() {} } }
-  );
-  const empresa = await getEmpresaPorCodigo(cookieStore.get('sfb_empresa')?.value ?? 'SF');
-  const dso = await getDso(supabase, empresa.id, ANIO);
+  const empresa = cookieStore.get('sfb_empresa')?.value ?? 'SF';
+  const anio = new Date().getFullYear();
+  const cobros = await getCobros(empresa, anio);
 
   return (
     <div>
@@ -90,31 +23,30 @@ export default async function FinancieroPage() {
       </p>
 
       <div className="card">
-        <h2>DSO — Días de venta pendiente de cobro · {ANIO}</h2>
+        <h2>DSO — Días de venta pendiente de cobro</h2>
         <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
-          Calculado sobre facturas del ejercicio menos los cobros registrados. Criterio:
-          saldo pendiente ÷ venta diaria (neta anual ÷ 365).
+          Saldo abierto actual ÷ ventas netas de los últimos 365 días.
         </p>
         <ul className="grid-kpis">
-          <Kpi etiqueta="DSO estimado" valor={`${decimal(dso.dso, 1)} días`} nota="objetivo ≤ 30 días" />
-          <Kpi etiqueta="Saldo pendiente" valor={eur(dso.saldoPendiente)} nota={`${eur(dso.saldoVencido)} vencido`} />
-          <Kpi etiqueta="Venta diaria" valor={eur(dso.ventaDiaria)} nota="neta anual ÷ 365" />
-          <Kpi etiqueta="Cartera total" valor={numero(dso.serie.reduce((a, b) => a + b.importe, 0))} nota="suma por antigüedad" />
+          <Kpi etiqueta="DSO estimado" valor={cobros.dso !== null ? `${decimal(cobros.dso, 1)} días` : '—'} nota="objetivo ≤ 30 días" />
+          <Kpi etiqueta="Saldo pendiente" valor={eur(cobros.saldoTotal)} nota={`${eur(cobros.vencido)} vencido`} />
+          <Kpi etiqueta="Riesgo vivo" valor={eur(cobros.riesgoVivoTotal)} nota="saldo + cartera pedidos" />
+          <Kpi etiqueta="En mora +90" valor={eur(cobros.buckets[4]?.importe ?? 0)} nota="atención prioritaria" />
         </ul>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 16 }}>
-          {dso.serie.map((s) => (
-            <div key={s.antiguedad} className="kpi" style={{ flex: 1, minWidth: 120 }}>
-              <span className="kpi-etiqueta">{s.antiguedad}</span>
-              <strong className="kpi-valor">{eur(s.importe)}</strong>
-              <span className="kpi-nota">{pct(s.porc)} del saldo</span>
+          {cobros.buckets.map((b) => (
+            <div key={b.label} className="kpi" style={{ flex: 1, minWidth: 120 }}>
+              <span className="kpi-etiqueta">{b.label}</span>
+              <strong className="kpi-valor">{eur(b.importe)}</strong>
+              <span className="kpi-nota">{cobros.saldoTotal > 0 ? pct((b.importe / cobros.saldoTotal) * 100) : '0 %'} del saldo</span>
             </div>
           ))}
         </div>
         <div style={{ marginTop: 16 }}>
           <DescargarExcel
             nombre="dso-financiero"
-            columnas={['Antigüedad', 'Importe', '%']}
-            registros={dso.serie.map((s) => [s.antiguedad, s.importe, s.porc])}
+            columnas={['Tramo', 'Importe', '%']}
+            registros={cobros.buckets.map((b) => [b.label, b.importe, cobros.saldoTotal > 0 ? (b.importe / cobros.saldoTotal) * 100 : 0])}
             etiqueta="Exportar DSO"
           />
         </div>

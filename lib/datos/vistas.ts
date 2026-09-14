@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
+import { netaDeDocumento } from '@/lib/datos/neta';
 
 export type FilaDiaria = { fecha: string; neta: number; facturas: number };
 export type FilaSemanal = { semana: string; neta: number; facturas: number };
@@ -50,10 +51,7 @@ export async function getVistasTemporales(codigoEmpresa: string, anio: number, f
     .lte('fecha', hoyIso);
   const facturas = filtrarPorIds((filas ?? []) as { id: string; fecha: string; tipo_documento: string; total: number }[], idsFiltrados);
 
-  const neta = (f: { fecha: string; tipo_documento: string; total: number }) => {
-    const total = Number(f.total ?? 0);
-    return f.tipo_documento === 'factura' || f.tipo_documento === 'nota_cargo' ? total : -total;
-  };
+  const importes = facturas.map((f) => netaDeDocumento(f.tipo_documento, f.total));
 
   const diaria = new Map<string, FilaDiaria>();
   const semanal = new Map<string, FilaSemanal>();
@@ -61,8 +59,9 @@ export async function getVistasTemporales(codigoEmpresa: string, anio: number, f
   let ytd = 0;
   let facturasActivo = 0;
 
-  for (const f of facturas) {
-    const importe = neta(f);
+  for (let i = 0; i < facturas.length; i++) {
+    const f = facturas[i];
+    const importe = importes[i];
     const d = diaria.get(f.fecha) ?? { fecha: f.fecha, neta: 0, facturas: 0 };
     d.neta += importe;
     if (f.tipo_documento === 'factura') d.facturas += 1;

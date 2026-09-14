@@ -96,8 +96,14 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
   const clientes = (clis ?? []) as FilaCliente[];
 
   const perdidos = clientes.filter((c) => c.estado === 'perdido' || c.estado === 'inactivo').length;
-  const nuevos = [...activos].filter((id) => !activosPrevio.has(id)).length;
-  const recuperados = [...activosPrevio].filter((id) => !activos.has(id)).length;
+  // nuevos = compran este año y no compraron el año previo en la ventana
+  const nuevosRaw = [...activos].filter((id) => !activosPrevio.has(id));
+  const nuevos = nuevosRaw.filter((id) => {
+    const cli = clientes.find((c) => c.id === id);
+    return !cli?.fecha_primer_pedido || cli.fecha_primer_pedido.slice(0, 4) === at;
+  }).length;
+  // recuperados = compran este año, no compraron el previo, pero sí tenían histórico → vuelven tras parón
+  const recuperados = nuevosRaw.length - nuevos;
   const retencion = activosPrevio.size > 0 ? [...activos].filter((id) => activosPrevio.has(id)).length / activosPrevio.size * 100 : null;
 
   const noActivos: ClientesData['noActivos'] = [];
@@ -111,7 +117,8 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
       noActivos.push({ nombre: c.nombre, diasSin, ultimaFactura: ultima });
     }
   }
-  noActivos.sort((a, b) => b.diasSin - a.diasSin).slice(0, 10);
+  noActivos.sort((a, b) => b.diasSin - a.diasSin);
+  if (noActivos.length > 10) noActivos.length = 10;
 
   const netaW1 = new Map<string, number>();
   const netaW2 = new Map<string, number>();
