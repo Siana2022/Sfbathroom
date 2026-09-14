@@ -130,6 +130,10 @@ Detalle completo: `docs/asistente-ia.md`. Tools actuales: `ventas_por_mes`,
 7. Alertas por correo: infra lista (`app/api/alertas/enviar/route.ts`, `lib/datos/email.ts`
    Resend, log `alertas_correos_enviados` en `0008`); falta `RESEND_API_KEY`,
    `ALERTAS_EMAIL_TO`, `ALERTAS_CRON_SECRET` y programar el cron.
-8. Todos los pendientes que dependen del cliente están recopilados en
+8. **Edición manual de datos**: página `/datos` (`components/EditorDatos.tsx`) con CRUD
+   genérico por tabla para admin/dirección mientras no llegue A3ERP. Requiere la migración
+   `0009` (políticas write en facturas/líneas/stock/marketing/financiero + RPC
+   `admin_columnas_tabla(text)`). Gating por rol en la página; RLS en cada tabla.
+9. Todos los pendientes que dependen del cliente están recopilados en
    `docs/desbloqueos-cliente.md` (B4 fotos stock, B8 impagos/seguro de crédito, marketing,
    financiero, A3ERP, datos DOT/Fuxsabany para la consolidada holding).

@@ -33,13 +33,16 @@ where id = (
 );
 ```
 
-### 4. Migración 0008 (tabla de alertas + RPC admin)
-Pega el contenido de `supabase/migrations/0008_alertas_correos_enviados.sql` en el SQL Editor.
-Crea:
-- `alertas_correos_enviados` (log de envíos, evita duplicados del cron)
-- `admin_listar_usuarios()` — RPC que alimenta la página `/admin` (lista email, rol y cartera).
 
-### 5. Variables de entorno para el asistente BI
+
+### 4. Migración 0009 (edición manual de datos)
+Pega el contenido de `supabase/migrations/0009_edicion_manual_datos.sql` en el SQL Editor.
+Abre escritura (admin/dirección, y almacén para stock) en las tablas operativas que solo
+tenían lectura (facturas, líneas, stock, marketing, financiero) y crea el RPC
+`admin_columnas_tabla()` que alimenta la página `Edición de datos` (/datos) para generar
+los formularios automáticamente.
+
+> La 0008 ya se aplicó (tabla de alertas + RPC usuarios). La 0009 es la nueva.
 En **Vercel → Settings → Environment Variables**, añade:
 - `ANTHROPIC_API_KEY` = tu clave de Anthropic (o cambia a Google Gemini gratis)
 - `CHAT_MODEL` = `claude-sonnet-4-5` (opcional)
@@ -77,3 +80,4 @@ diario (Vercel Cron o n8n) a `https://tu-app/api/alertas/enviar?empresa=SF` con 
 - `docs/asignar-roles-usuarios.sql` — rellenar emails y ejecutar
 - `docs/asistente-ia.md` — documentación del chat IA
 - `app/admin/page.tsx` — gestión de usuarios (acceso solo admin)
+- `app/datos/page.tsx` — edición manual de datos (CRUD genérico, admin/dirección)
