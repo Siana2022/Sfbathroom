@@ -2,7 +2,9 @@ import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { bloques } from '@/lib/bloques';
 import { getFacturacion } from '@/lib/datos/facturacion';
+import { getKpisPersonalizadosVistos } from '@/lib/datos/kpisVisibles';
 import { decimal, eur, numero, pct } from '@/lib/formato';
+import { FORMATOS } from '@/lib/datos/kpisCatalogo';
 import Kpi from '@/components/Kpi';
 import GraficoBarras, { type Barra } from '@/components/GraficoBarras';
 
@@ -14,6 +16,7 @@ const NOMBRE_MES = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 
 export default async function Home() {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
   const d = await getFacturacion(empresa, ANIO);
+  const kpisExtra = await getKpisPersonalizadosVistos(empresa);
   const delta = d.netaPrevioTotal > 0 ? pct(((d.neta - d.netaPrevioTotal) / d.netaPrevioTotal) * 100) : '—';
 
   const barras: Barra[] = d.series.map((s) => ({
@@ -40,6 +43,27 @@ export default async function Home() {
         <Kpi etiqueta="Precio medio de venta" valor={eur(d.precioMedio)} nota="por unidad" />
         <Kpi etiqueta="Presupuesto anual" valor={eur(d.presupuesto)} nota={`ejercicio ${d.anio}`} />
       </ul>
+
+      {kpisExtra.length > 0 && (
+        <>
+          <h2 style={{ marginBottom: 0 }}>KPIs personalizados</h2>
+          <ul className="grid-kpis">
+            {kpisExtra.map((k) => (
+              <li key={k.id} className="kpi">
+                <span className="kpi-etiqueta">{k.nombre}</span>
+                <strong className="kpi-valor" style={{ color: k.estaBueno === null ? undefined : k.estaBueno ? 'var(--verde)' : 'var(--rojo)' }}>
+                  {k.fmt}
+                </strong>
+                <span className="kpi-nota">
+                  {k.objetivo != null
+                    ? `${k.objetivo_op === 'gte' ? 'Objetivo ≥' : 'Objetivo ≤'} ${FORMATOS[k.formato]?.fmt(k.objetivo) ?? k.objetivo}`
+                    : ' '}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
 
       <div className="card">
         <h2>Evolución mensual de la facturación frente a presupuesto</h2>

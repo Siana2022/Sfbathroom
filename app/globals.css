@@ -469,6 +469,22 @@ ul.tablas { color: var(--muted); font-size: 13px; margin: 8px 0 0; padding-left:
   box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15);
 }
 
+.input-dato {
+  background: var(--panel);
+  border: 1px solid var(--border-2);
+  border-radius: 9px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  padding: 7px 10px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.input-dato:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15);
+}
+
 /* ---------------- Gráfico de barras ---------------- */
 
 .barras { display: flex; align-items: stretch; gap: 8px; height: 220px; margin-top: 14px; }
