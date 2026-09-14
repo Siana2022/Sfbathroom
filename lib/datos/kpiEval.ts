@@ -335,7 +335,6 @@ async function handleMargen(
 
   const lineas = await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, importe, cantidad, articulo_id', filas.map((f) => f.id));
   const tipadas = artIds ? lineas.filter((l) => artIds.has(l.articulo_id ?? '')) : lineas;
-  const facturaIds = filas.map((f) => f.id);
   const artIdsTodas = [...new Set(tipadas.filter((l) => l.articulo_id).map((l) => l.articulo_id!))];
   const articulosMap = new Map<string, number>();
   if (artIdsTodas.length) {

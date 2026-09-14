@@ -16,7 +16,9 @@ const NOMBRE_MES = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 
 export default async function Home() {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
   const d = await getFacturacion(empresa, ANIO);
-  const kpisExtra = await getKpisPersonalizadosVistos(empresa);
+  const MAX_KPI_PORTADA = 8;
+  const kpisExtraTotal = await getKpisPersonalizadosVistos(empresa);
+  const kpisExtra = kpisExtraTotal.slice(0, MAX_KPI_PORTADA);
   const delta = d.netaPrevioTotal > 0 ? pct(((d.neta - d.netaPrevioTotal) / d.netaPrevioTotal) * 100) : '—';
 
   const barras: Barra[] = d.series.map((s) => ({
@@ -46,7 +48,14 @@ export default async function Home() {
 
       {kpisExtra.length > 0 && (
         <>
-          <h2 style={{ marginBottom: 0 }}>KPIs personalizados</h2>
+          <h2 style={{ marginBottom: 0 }}>
+            KPIs personalizados
+            {kpisExtraTotal.length > MAX_KPI_PORTADA && (
+              <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--muted)', marginLeft: 10 }}>
+                mostrando {MAX_KPI_PORTADA} de {kpisExtraTotal.length} — gestionables en /kpis
+              </span>
+            )}
+          </h2>
           <ul className="grid-kpis">
             {kpisExtra.map((k) => (
               <li key={k.id} className="kpi">
