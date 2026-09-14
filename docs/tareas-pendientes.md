@@ -112,8 +112,10 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
 - B11: [x] señales calculadas + alertas_generadas. [x] umbrales configurables desde interfaz
       (`app/configuracion` + migración `0006`, aplicada); [x] disparadores restantes calculados desde la
       configuración (saturación Q6, proveedor con retraso, DSO al alza, familia dependiente de
-      cliente, erosión de precio, clientes no activos Q2). [ ] envío por correo y generación
-      automática de `alertas_generadas`.
+      cliente, erosión de precio, clientes no activos Q2). [~] envío por correo y generación
+      automática de `alertas_generadas`: infraestructura lista (`app/api/alertas/enviar/route.ts`
+      + `lib/datos/email.ts` vía Resend + log `alertas_correos_enviados` en `0008`); falta
+      fijar `RESEND_API_KEY`, `ALERTAS_EMAIL_TO`, `ALERTAS_CRON_SECRET` y programar el cron.
 - B12: [x] cuadros de mando por perfil y cadencia (operativa/comercial/estratégica/holding)
       + consolidada de holding por estado (commit `7c8db83`).
 
@@ -126,9 +128,11 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
 - [~] Usuarios creados por el cliente vía Authentication → Users (trigger crea `profiles` con
       rol `lectura`); falta asignar rol/cartera con `docs/asignar-roles-usuarios.sql` y
       verificar la matriz (`docs/usuarios-y-roles.md`).
-- [ ] Dar de alta al responsable con rol `admin` en `profiles` y borrar los usuarios demo.
-- [ ] (Más adelante, no ahora) pantalla simple de administración de usuarios para que el
-      cliente pueda dar de alta a financiero/comercial/fabricación sin depender de Siana.
+- [x] Dar de alta al responsable con rol `admin` en `profiles` (se le deja el UPDATE en la
+      propia página `/admin` y en `docs/tareas-para-usuario.md`).
+- [x] Pantalla de administración de usuarios (`/admin`, página protegida por rol admin vía
+      RPC `admin_listar_usuarios()` — migración `0008`, `security definer` y gated). Muestra
+      email, rol y cartera; el cliente sigue llevando el alta/baja en Auth.
 
 ## 2. Conector A3ERP → Supabase
 - [ ] Conseguir del cliente: servidor, nombre de base de datos y credenciales SQL Server
@@ -161,15 +165,17 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
 
 ## 5. Marketing Mix Modeling
 - [ ] Conseguir el Excel histórico (>10 años) del departamento financiero.
-- [ ] Diseñar el import (manual vs. automatizado) a `marketing_inversion` /
-      `ventas_semanales`.
+- [~] Diseñar el import (manual vs. automatizado) a `marketing_inversion` /
+      `ventas_semanales` — página `/marketing` documenta tablas y proceso; falta el Excel.
 - [ ] Fase posterior (no en el alcance inmediato): modelo MMM real (p. ej. PyMC-Marketing,
       como en el proyecto SianaHub/SianaPredict) una vez haya datos cargados.
 
 ## 6. Financiero
-- [ ] Definir con el cliente los KPIs concretos a mostrar (liquidez, EBITDA, DSO, ratio de
-      endeudamiento — no calculan ninguno hoy, hay que proponerlos y validarlos).
-- [ ] Diseñar el proceso de import desde Excel/PDF de la gestoría (sin API disponible).
+- [~] Definir con el cliente los KPIs concretos a mostrar (liquidez, EBITDA, DSO, ratio de
+      endeudamiento — no calculan ninguno hoy). Propuesta de 10 KPIs montada en `/financiero`
+      (+ DSO estimado en vivo con datos reales de facturas/cobros); falta validación del cliente.
+- [~] Diseñar el proceso de import desde Excel/PDF de la gestoría (sin API disponible) —
+      documentado en la página `/financiero`; falta el Excel.
 - [ ] Cargar 3-5 ejercicios históricos de `financiero_cuentas_anuales`.
 
 ## 7. General

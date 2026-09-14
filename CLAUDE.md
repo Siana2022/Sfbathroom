@@ -113,14 +113,23 @@ Detalle completo: `docs/asistente-ia.md`. Tools actuales: `ventas_por_mes`,
 
 ## Qué falta (ver `docs/tareas-pendientes.md` para el detalle)
 
-1. Asignar rol/cartera a los usuarios reales creados en Auth (`docs/asignar-roles-usuarios.sql`),
-   verificar la matriz de visibilidad (`docs/usuarios-y-roles.md`) y dar de alta al responsable
-   con `profiles.role = 'admin'`.
+1. Asignar rol/cartera a los usuarios del responsable (rol `admin`) y demás perfiles
+   (`docs/asignar-roles-usuarios.sql`, emails a rellenar). Existe `/admin` (solo admin, vía
+   RPC `admin_listar_usuarios()` de la migración `0008` (security definer + gated)) que lista
+   email/rol/cartera.
 2. Conector A3ERP → Supabase (workflow n8n, pendiente de credenciales de la base de datos SQL
    Server del cliente).
 3. Carga de costes reales de artículo (vía `compras`/`compra_lineas`) para que el margen deje
    de ser cero.
-4. Definir y cargar los KPIs financieros concretos.
-5. Cargar histórico de inversión en marketing (Excel) para arrancar el MMM.
+4. Validar KPIs financieros propuestos (página `/financiero`, incluye DSO en vivo) y cargar
+   cuentas anuales desde Excel de la gestoría.
+5. Cargar histórico de inversión en marketing (Excel) para arrancar el MMM (proceso
+   documentado en `/marketing`).
 6. Auditoría pendiente: H-2 (repair de migraciones), H-3 (esquema privado), H-4
-   (leaked password protection).
+   (leaked password protection — instrucciones en `docs/tareas-para-usuario.md`).
+7. Alertas por correo: infra lista (`app/api/alertas/enviar/route.ts`, `lib/datos/email.ts`
+   Resend, log `alertas_correos_enviados` en `0008`); falta `RESEND_API_KEY`,
+   `ALERTAS_EMAIL_TO`, `ALERTAS_CRON_SECRET` y programar el cron.
+8. Todos los pendientes que dependen del cliente están recopilados en
+   `docs/desbloqueos-cliente.md` (B4 fotos stock, B8 impagos/seguro de crédito, marketing,
+   financiero, A3ERP, datos DOT/Fuxsabany para la consolidada holding).

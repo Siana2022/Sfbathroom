@@ -59,6 +59,9 @@ export default function Nav({ userEmail }: { userEmail?: string }) {
           {m.titulo}
         </Link>
       ))}
+      <Link key="/admin" href="/admin" className={activo('/admin')}>
+        Administración
+      </Link>
 
       {userEmail && (
         <div className="sidebar-usuario">
