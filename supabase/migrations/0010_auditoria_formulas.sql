@@ -28,9 +28,9 @@ abonos_sueltos as (
     f.id as factura_id,
     f.numero_erp,
     f.fecha,
-    coalesce(f.total, 0) as importe,
-    coalesce(f.total, 0) as pendiente,
-    (current_date - (f.fecha + coalesce(cl.plazo_pactado_dias, 30))) as dias_mora
+    coalesce(f.total, 0)::numeric as importe,
+    coalesce(f.total, 0)::numeric as pendiente,
+    (current_date - (f.fecha + coalesce(cl.plazo_pactado_dias, 30)))::int as dias_mora
   from public.facturas f
   left join public.clientes cl on cl.id = f.cliente_id
   where f.tipo_documento = 'abono' and f.factura_anula_id is null
@@ -41,9 +41,9 @@ select
   f.empresa_id,
   f.cliente_id,
   f.fecha,
-  coalesce(f.total, 0) as importe,
-  coalesce(f.total, 0) - coalesce(c.cobrado, 0) - coalesce(ab.abono_total, 0) as pendiente,
-  (current_date - (f.fecha + coalesce(cl.plazo_pactado_dias, 30))) as dias_mora
+  coalesce(f.total, 0)::numeric as importe,
+  (coalesce(f.total, 0) - coalesce(c.cobrado, 0) - coalesce(ab.abono_total, 0))::numeric as pendiente,
+  (current_date - (f.fecha + coalesce(cl.plazo_pactado_dias, 30)))::int as dias_mora
 from public.facturas f
 left join public.clientes cl on cl.id = f.cliente_id
 left join (
@@ -57,7 +57,16 @@ where f.tipo_documento in ('factura', 'nota_cargo')
 
 union all
 
-select * from abonos_sueltos;
+select
+  cliente_id,
+  empresa_id,
+  factura_id,
+  numero_erp,
+  fecha,
+  importe,
+  pendiente,
+  dias_mora
+from abonos_sueltos;
 
 alter view public.v_aging set (security_invoker = true);
 
