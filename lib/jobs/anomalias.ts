@@ -24,15 +24,18 @@ export async function detectarAnomalias(supabase: SupabaseClient, empresaId: str
   const anio = hoy.getFullYear();
   const mesActual = hoy.getMonth(); // 0..11
   const mesCompara = mesActual - 1; // último mes completo, robusto a mitad de mes
+  // Si estamos en enero (mesCompara < 0), comparar enero con diciembre del año previo
+  const mesCompReal = mesCompara < 0 ? 11 : mesCompara;
+  const anioComp = mesCompara < 0 ? anio - 1 : anio;
 
-  const claveMes = (mes: number) => new Date(anio, mes, 1).toISOString().slice(0, 7);
-  const claveMesPrevio = (mes: number) => new Date(anio - 1, mes, 1).toISOString().slice(0, 7);
+  const claveMes = (mes: number) => new Date(anioComp, mes, 1).toISOString().slice(0, 7);
+  const claveMesPrevio = (mes: number) => new Date(anioComp - 1, mes, 1).toISOString().slice(0, 7);
 
-  if (mesCompara >= 0) {
-    const desde = `${claveMes(mesCompara)}-01`;
-    const hasta = `${new Date(anio, mesCompara + 1, 0).toISOString().slice(0, 10)}`;
-    const desdePrev = `${claveMesPrevio(mesCompara)}-01`;
-    const hastaPrev = `${new Date(anio - 1, mesCompara + 1, 0).toISOString().slice(0, 10)}`;
+  {
+    const desde = `${claveMes(mesCompReal)}-01`;
+    const hasta = `${new Date(anioComp, mesCompReal + 1, 0).toISOString().slice(0, 10)}`;
+    const desdePrev = `${claveMesPrevio(mesCompReal)}-01`;
+    const hastaPrev = `${new Date(anioComp - 1, mesCompReal + 1, 0).toISOString().slice(0, 10)}`;
 
     const { data: facturas } = await supabase
       .from('facturas')
@@ -45,31 +48,31 @@ export async function detectarAnomalias(supabase: SupabaseClient, empresaId: str
     const enMes = (clave: string) => filas.filter((f) => f.fecha.slice(0, 7) === clave);
 
     const neta = (fs: { tipo_documento: string; total: number }[]) => fs.reduce((s, f) => s + netaDeDocumento(f.tipo_documento, f.total), 0);
-    const netaMes = neta(enMes(claveMes(mesCompara)));
-    const netaPrev = neta(enMes(claveMesPrevio(mesCompara)));
+    const netaMes = neta(enMes(claveMes(mesCompReal)));
+    const netaPrev = neta(enMes(claveMesPrevio(mesCompReal)));
 
     if (netaPrev > 0 && netaMes < netaPrev * (1 - UMBRAL_CAIDA_MES / 100)) {
       anomalias.push({
         tipo: 'caida_facturacion',
         severidad: netaMes < netaPrev * 0.5 ? 'critico' : 'aviso',
-        mensaje: `Caída de facturación ${(netaPrev - netaMes).toLocaleString('es-ES')} € (${Math.round((1 - netaMes / netaPrev) * 100)} %) en ${claveMes(mesCompara)} frente a ${claveMesPrevio(mesCompara)}.`,
+        mensaje: `Caída de facturación ${(netaPrev - netaMes).toLocaleString('es-ES')} € (${Math.round((1 - netaMes / netaPrev) * 100)} %) en ${claveMes(mesCompReal)} frente a ${claveMesPrevio(mesCompReal)}.`,
         importe: netaPrev - netaMes,
-        referencia: claveMes(mesCompara),
+        referencia: claveMes(mesCompReal),
       });
     }
 
     // ticket medio mensual
     const nF = (fs: { tipo_documento: string }[]) => fs.filter((f) => f.tipo_documento !== 'abono').length;
-    const tMes = nF(enMes(claveMes(mesCompara)));
-    const tPrev = nF(enMes(claveMesPrevio(mesCompara)));
+    const tMes = nF(enMes(claveMes(mesCompReal)));
+    const tPrev = nF(enMes(claveMesPrevio(mesCompReal)));
     const ticketMes = tMes > 0 ? netaMes / tMes : 0;
     const ticketPrev = tPrev > 0 ? netaPrev / tPrev : 0;
     if (ticketPrev > 0 && ticketMes > 0 && ticketMes < ticketPrev * (1 - UMBRAL_CAIDA_TICKET / 100)) {
       anomalias.push({
         tipo: 'caida_ticket',
         severidad: 'aviso',
-        mensaje: `Ticket medio ${Math.round((1 - ticketMes / ticketPrev) * 100)} % menor que en ${claveMesPrevio(mesCompara)} (${Math.round(ticketMes).toLocaleString('es-ES')} € vs ${Math.round(ticketPrev).toLocaleString('es-ES')} €).`,
-        referencia: claveMes(mesCompara),
+        mensaje: `Ticket medio ${Math.round((1 - ticketMes / ticketPrev) * 100)} % menor que en ${claveMesPrevio(mesCompReal)} (${Math.round(ticketMes).toLocaleString('es-ES')} € vs ${Math.round(ticketPrev).toLocaleString('es-ES')} €).`,
+        referencia: claveMes(mesCompReal),
       });
     }
   }

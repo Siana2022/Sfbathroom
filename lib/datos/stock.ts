@@ -100,12 +100,16 @@ export async function getStock(codigoEmpresa: string, filtros?: Filtros): Promis
     }
   }
 
-  bajoPunto.sort((a, b) => a.disponible - b.disponible).slice(0, 15);
-  peorCobertura
+  bajoPunto.sort((a, b) => a.disponible - b.disponible);
+  if (bajoPunto.length > 15) bajoPunto.length = 15;
+
+  const peorCoberturaFiltrado = peorCobertura
     .filter((x) => x.cobertura !== null)
-    .sort((a, b) => (a.cobertura ?? Infinity) - (b.cobertura ?? Infinity))
-    .slice(0, 12);
-  aprovisionamiento.sort((a, b) => b.propuesta - a.propuesta).slice(0, 15);
+    .sort((a, b) => (a.cobertura ?? Infinity) - (b.cobertura ?? Infinity));
+  if (peorCoberturaFiltrado.length > 12) peorCoberturaFiltrado.length = 12;
+
+  aprovisionamiento.sort((a, b) => b.propuesta - a.propuesta);
+  if (aprovisionamiento.length > 15) aprovisionamiento.length = 15;
 
   const desde12m = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
   const { data: consumoRaw } = await supabase
@@ -218,7 +222,8 @@ export async function getStock(codigoEmpresa: string, filtros?: Filtros): Promis
       stockMuerto.push({ articulo: r.articulo, almacen: r.almacen, disponible, valor: disponible * (costeUnit.get(r.articulo_id) ?? 0) });
     }
   }
-  stockMuerto.sort((a, b) => b.valor - a.valor).slice(0, 15);
+  stockMuerto.sort((a, b) => b.valor - a.valor);
+  if (stockMuerto.length > 15) stockMuerto.length = 15;
 
   const carteraArticulo = new Map<string, number>();
   if (pedidosEstados.length) {
@@ -248,8 +253,8 @@ export async function getStock(codigoEmpresa: string, filtros?: Filtros): Promis
     });
   }
   cruceCoberturaCartera
-    .sort((a, b) => Number(b.riesgo) - Number(a.riesgo) || b.carteraPendiente - a.carteraPendiente)
-    .slice(0, 15);
+    .sort((a, b) => Number(b.riesgo) - Number(a.riesgo) || b.carteraPendiente - a.carteraPendiente);
+  if (cruceCoberturaCartera.length > 15) cruceCoberturaCartera.length = 15;
 
   // Predicción de rotura: cobertura actual < plazo de entrega del proveedor
   const { data: artsProv } = await supabase
@@ -279,7 +284,8 @@ export async function getStock(codigoEmpresa: string, filtros?: Filtros): Promis
       fechaEstimada: new Date(Date.now() + cobertura * 86400000).toISOString().slice(0, 10),
     });
   }
-  prediccionRotura.sort((a, b) => (a.coberturaDias ?? Infinity) - (b.coberturaDias ?? Infinity)).slice(0, 15);
+  prediccionRotura.sort((a, b) => (a.coberturaDias ?? Infinity) - (b.coberturaDias ?? Infinity));
+  if (prediccionRotura.length > 15) prediccionRotura.length = 15;
 
   return {
     empresa,
@@ -289,7 +295,7 @@ export async function getStock(codigoEmpresa: string, filtros?: Filtros): Promis
     roturas: roturas.size,
     bajoPuntoPedido: bajoPunto.length,
     bajoPunto,
-    peorCobertura,
+    peorCobertura: peorCoberturaFiltrado,
     aprovisionamiento,
     rotacionMedia,
     rotacionTop,

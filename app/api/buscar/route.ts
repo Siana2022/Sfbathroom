@@ -27,12 +27,13 @@ export async function GET(req: Request) {
     return NextResponse.json({ clientes: [], facturas: [], articulos: [] });
   }
 
+  // Sanear caracteres que podrían romper el filtro PostgREST .or()/.ilike()
+  const safe = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '\\%').replace(/_/g, '\\_');
+  const like = `%${safe}%`;
+
   const supabase = await cliente();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
-
-  const like = `%${q}%`;
-  const cols = 'id, nombre, codigo_erp, empresa_id';
 
   const { data: clientes } = await supabase
     .from('clientes')

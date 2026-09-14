@@ -47,9 +47,14 @@ const DEFAULT_UMBRALES: Record<string, number> = {
   'stock.rotura': 5,
   'stock.bajo_punto_pedido': 8,
   'cobros.vencido_total': 30000,
+  'cobros.dso': 1.1,
   'clientes.fuga': 3,
   'clientes.no_activos': 3,
   'presupuesto.desviacion_mes': -15,
+  'proveedores.retraso': 5,
+  'ventas.erosion_precio': 2,
+  'comerciales.saturacion_importe': 500000,
+  'comerciales.saturacion_clientes': 50,
 };
 
 function umbralDe(map: Map<string, ConfigRow>, clave: string): number {
@@ -72,7 +77,6 @@ export async function getAlertas(codigoEmpresa: string, anio: number): Promise<A
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
 
-  const hoy = new Date();
   const iso = (dias: number) => new Date(Date.now() - dias * 86400000).toISOString().slice(0, 10);
 
   const [stock, cobros, configRaw, generadasRaw, facturasRes, clientesRes, pedidosRes] = await Promise.all([

@@ -42,9 +42,22 @@ export async function getMiDia(codigoEmpresa: string, anio: number): Promise<MiD
     .from('facturas')
     .select('id, cliente_id, fecha, total, tipo_documento')
     .eq('empresa_id', empresa.id)
-    .in('cliente_id', ids)
+    .in('cliente_id', ids.slice(0, 150))
     .gte('fecha', `${anio - 1}-01-01`);
-  const filas = (facturas ?? []) as { id: string; cliente_id: string | null; fecha: string; total: number; tipo_documento: string }[];
+  const filas0 = (facturas ?? []) as { id: string; cliente_id: string | null; fecha: string; total: number; tipo_documento: string }[];
+
+  let filas = filas0;
+  if (ids.length > 150) {
+    for (let i = 150; i < ids.length; i += 150) {
+      const { data: extra } = await supabase
+        .from('facturas')
+        .select('id, cliente_id, fecha, total, tipo_documento')
+        .eq('empresa_id', empresa.id)
+        .in('cliente_id', ids.slice(i, i + 150))
+        .gte('fecha', `${anio - 1}-01-01`);
+      filas = [...filas, ...((extra ?? []) as typeof filas)];
+    }
+  }
 
   const delAnio = filas.filter((f) => f.fecha.slice(0, 4) === String(anio));
   const neta = delAnio.reduce((s, f) => s + netaDeDocumento(f.tipo_documento, f.total), 0);
@@ -70,7 +83,8 @@ export async function getMiDia(codigoEmpresa: string, anio: number): Promise<MiD
     const diasSin = Math.round((hoy * DIA - Date.parse(ultima)) / DIA);
     if (diasSin > 60) enRiesgo.push({ id: c.id, nombre: c.nombre, diasSin, ultimaFactura: ultima });
   }
-  enRiesgo.sort((a, b) => b.diasSin - a.diasSin).slice(0, 8);
+  enRiesgo.sort((a, b) => b.diasSin - a.diasSin);
+  if (enRiesgo.length > 8) enRiesgo.length = 8;
 
   const ultimas = [...delAnio]
     .sort((a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0))

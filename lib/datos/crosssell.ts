@@ -38,7 +38,7 @@ export async function getCrossSell(codigoEmpresa: string, clienteId: string, ani
 
   // familias compradas por cliente (año actual, clientes con >= 2 facturas = "establecidos")
   const familiasPorCliente = new Map<string, Set<string>>();
-  const nFacturasCliente = new Map<string, number>();
+  const facturasUnicasCliente = new Map<string, Set<string>>();
   const idsAnio = filasF.map((f) => f.id);
   for (let i = 0; i < idsAnio.length; i += 150) {
     const lote = idsAnio.slice(i, i + 150);
@@ -50,23 +50,25 @@ export async function getCrossSell(codigoEmpresa: string, clienteId: string, ani
       const s = familiasPorCliente.get(cli) ?? new Set<string>();
       s.add(fam);
       familiasPorCliente.set(cli, s);
-      nFacturasCliente.set(cli, (nFacturasCliente.get(cli) ?? 0) + 1);
+      const factSet = facturasUnicasCliente.get(cli) ?? new Set<string>();
+      factSet.add(l.factura_id);
+      facturasUnicasCliente.set(cli, factSet);
     }
   }
 
-  // co-ocurrencia por pares de familias
+  // co-ocurrencia por pares de familias (client-level, con clientes únicos)
   const parA = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
-  const coOcurrencia = new Map<string, { a: string; b: string; n: number }>();
+  const coOcurrencia = new Map<string, { a: string; b: string; clientes: Set<string> }>();
   const compradoresFamilia = new Map<string, number>();
   for (const [cli, fams] of familiasPorCliente) {
-    if ((nFacturasCliente.get(cli) ?? 0) < 2) continue;
+    if ((facturasUnicasCliente.get(cli)?.size ?? 0) < 2) continue;
     const arr = [...fams];
     for (const f of arr) compradoresFamilia.set(f, (compradoresFamilia.get(f) ?? 0) + 1);
     for (let i = 0; i < arr.length; i++) {
       for (let j = i + 1; j < arr.length; j++) {
         const k = parA(arr[i], arr[j]);
-        const p = coOcurrencia.get(k) ?? { a: arr[i], b: arr[j], n: 0 };
-        p.n += 1;
+        const p = coOcurrencia.get(k) ?? { a: arr[i], b: arr[j], clientes: new Set<string>() };
+        p.clientes.add(cli);
         coOcurrencia.set(k, p);
       }
     }
@@ -76,21 +78,33 @@ export async function getCrossSell(codigoEmpresa: string, clienteId: string, ani
   if (famsCliente.size === 0) return [];
 
   const nombres = new Map(familias.map((f) => [f.id, f.nombre]));
-  const clientesFamiliaBase = [...famsCliente].reduce((s, f) => s + (compradoresFamilia.get(f) ?? 0), 0);
 
-  // afinidad: para cada familia no comprada, % de veces que aparece junto a alguna de las del cliente
-  const afinidad = new Map<string, number>();
+  // afinidad: para cada familia target, cuántos clientes únicos que compran alguna
+  // de las familias del cliente TARGET TAMBIÉN compran la familia target.
+  // Base = compradoresFamilia[target] (denominador por familia, no acumulado).
+  const afinidadTarget = new Map<string, Set<string>>();
   for (const p of coOcurrencia.values()) {
     if (famsCliente.has(p.a)) {
-      if (!famsCliente.has(p.b)) afinidad.set(p.b, (afinidad.get(p.b) ?? 0) + p.n);
+      if (!famsCliente.has(p.b)) {
+        const s = afinidadTarget.get(p.b) ?? new Set<string>();
+        for (const c of p.clientes) s.add(c);
+        afinidadTarget.set(p.b, s);
+      }
     } else if (famsCliente.has(p.b)) {
-      afinidad.set(p.a, (afinidad.get(p.a) ?? 0) + p.n);
+      const s = afinidadTarget.get(p.a) ?? new Set<string>();
+      for (const c of p.clientes) s.add(c);
+      afinidadTarget.set(p.a, s);
     }
   }
 
-  const candidatas = [...afinidad.entries()]
+  const candidatas = [...afinidadTarget.entries()]
     .filter(([f]) => nombres.has(f))
-    .map(([fid, n]) => ({ fid, afinidad: clientesFamiliaBase > 0 ? (n / clientesFamiliaBase) * 100 : 0 }))
+    .map(([fid, clientes]) => ({
+      fid,
+      afinidad: (compradoresFamilia.get(fid) ?? 0) > 0
+        ? (clientes.size / (compradoresFamilia.get(fid) ?? 1)) * 100
+        : 0,
+    }))
     .sort((a, b) => b.afinidad - a.afinidad)
     .slice(0, 5);
 

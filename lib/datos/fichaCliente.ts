@@ -100,14 +100,14 @@ export async function getFichaCliente(codigoEmpresa: string, clienteId: string, 
     const lote = facturasAnioIds.slice(i, i + 150);
     const { data: lineas } = await supabase
       .from('factura_lineas')
-      .select('cantidad, importe_linea, articulo_id')
+      .select('cantidad, importe, articulo_id')
       .in('factura_id', lote);
-    for (const l of (lineas ?? []) as { cantidad: number; importe_linea: number; articulo_id: string | null }[]) {
+    for (const l of (lineas ?? []) as { cantidad: number; importe: number; articulo_id: string | null }[]) {
       unidades += Number(l.cantidad ?? 0);
       if (l.articulo_id) {
         const a = topMap.get(l.articulo_id) ?? { nombre: '', unidades: 0, importe: 0 };
         a.unidades += Number(l.cantidad ?? 0);
-        a.importe += Number(l.importe_linea ?? 0);
+        a.importe += Number(l.importe ?? 0);
         topMap.set(l.articulo_id, a);
       }
     }
