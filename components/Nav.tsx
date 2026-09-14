@@ -32,6 +32,9 @@ export default function Nav({ userEmail }: { userEmail?: string }) {
       <Link key="/" href="/" className={activo('/')}>
         Resumen
       </Link>
+      <Link key="/mi-panel" href="/mi-panel" className={activo('/mi-panel')}>
+        Mi panel
+      </Link>
 
       <p className="nav-group">Cuadro de mando</p>
       {bloques.map((b) => (
