@@ -28,7 +28,14 @@ export async function GET(req: Request) {
   }
 
   // Sanear caracteres que podrían romper el filtro PostgREST .or()/.ilike()
-  const safe = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '\\%').replace(/_/g, '\\_');
+  // (las comas separan condiciones dentro de .or(); el resto son metacaracteres)
+  const safe = q
+    .replace(/,/g, ' ')
+    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/%/g, '\\%')
+    .replace(/_/g, '\\_')
+    .replace(/\s+/g, ' ')
+    .trim();
   const like = `%${safe}%`;
 
   const supabase = await cliente();
