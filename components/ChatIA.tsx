@@ -1,7 +1,70 @@
 'use client';
-import { useState, useRef, useEffect, type FormEvent } from 'react';
+import { useState, useRef, useEffect, type FormEvent, type ReactNode } from 'react';
 
 type Msg = { role: 'user' | 'assistant'; content: string; datos?: unknown };
+
+function escapar(texto: string): string {
+  return texto.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function renderInline(texto: string): ReactNode[] {
+  const huecos = texto.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+  return huecos.map((h, i) => {
+    if (h.startsWith('**') && h.endsWith('**')) return <strong key={i}>{h.slice(2, -2)}</strong>;
+    if (h.startsWith('`') && h.endsWith('`')) return <code key={i} className="chat-code">{h.slice(1, -1)}</code>;
+    return h;
+  });
+}
+
+function renderMarkdown(texto: string): ReactNode[] {
+  const lineas = texto.split(/\r?\n/);
+  const hijos: ReactNode[] = [];
+  let buffer = '';
+  let i = 0;
+  let idx = 0;
+  const pushBuffer = () => {
+    if (!buffer.trim()) return;
+    const paras = buffer.split(/\n{2,}/);
+    for (const p of paras) {
+      if (!p.trim()) continue;
+      hijos.push(<p key={idx++} className="chat-p">{renderInline(p.trim())}</p>);
+    }
+    buffer = '';
+  };
+  while (i < lineas.length) {
+    const l = lineas[i];
+    if (l.trim().startsWith('|')) {
+      const filas: string[] = [l];
+      let j = i + 1;
+      while (j < lineas.length && lineas[j].trim().startsWith('|')) { filas.push(lineas[j]); j++; }
+      if (filas.length >= 2 && /^\s*\|?[\s:|-]+\|?\s*$/.test(filas[1].trim().replace(/\|/g, ''))) {
+        pushBuffer();
+        const cab = filas[0].split('|').map((c) => c.trim()).filter(Boolean);
+        const cuerpo = filas.slice(2).map((f) => f.split('|').map((c) => c.trim()).filter(Boolean));
+        hijos.push(
+          <div key={idx++} style={{ overflowX: 'auto', margin: '6px 0' }}>
+            <table className="tabla">
+              <thead>
+                <tr>{cab.map((c, k) => <th key={k}>{renderInline(c)}</th>)}</tr>
+              </thead>
+              <tbody>
+                {cuerpo.map((r, k) => (
+                  <tr key={k}>{r.map((c, m) => <td key={m}>{renderInline(c)}</td>)}</tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+        i = j;
+        continue;
+      }
+    }
+    buffer += (buffer ? '\n' : '') + l;
+    i++;
+  }
+  pushBuffer();
+  return hijos;
+}
 
 const TABLA_DATOS: Record<string, { campos: string[]; etiquetas: string[] }> = {
   por_mes: { campos: ['etiqueta', 'neta', 'unidades', 'documentos'], etiquetas: ['Mes', 'Netas', 'Unid.', 'Docs'] },
@@ -98,7 +161,7 @@ export default function ChatIA() {
             )}
             {mensajes.map((m, i) => (
               <div key={i} className={m.role === 'user' ? 'chat-msg-user' : 'chat-msg-ia'}>
-                {m.content}
+                {m.role === 'user' ? escapar(m.content) : renderMarkdown(m.content)}
                 {m.datos ? renderTabla(m.datos) : null}
               </div>
             ))}

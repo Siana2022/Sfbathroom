@@ -661,6 +661,17 @@ table.tabla .td-pos { color: var(--verde); }
 
 .chat-msg-ia .tabla { font-size: 12px; }
 
+.chat-msg-ia p { margin: 4px 0; }
+.chat-msg-ia p:first-child { margin-top: 0; }
+.chat-msg-ia p:last-child { margin-bottom: 0; }
+.chat-code {
+  background: var(--wash, #eef1f5);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 .chat-input { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--border); background: var(--panel-alto); }
 
 .chat-input input {
