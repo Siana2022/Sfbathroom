@@ -16,7 +16,7 @@ create view public.v_aging as
 with abonos_por_factura as (
   select
     f.factura_anula_id,
-    sum(f.total) as abono_total
+    sum(abs(f.total)) as abono_total
   from public.facturas f
   where f.tipo_documento = 'abono' and f.factura_anula_id is not null
   group by f.factura_anula_id

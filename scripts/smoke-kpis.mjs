@@ -100,6 +100,37 @@ function fail(msg) { console.error(`  ✗ ${msg}`); errores++; }
   }
 }
 
+// ---------- 6. Abonos vinculados netean correctamente ----------
+{
+  // Buscar una factura con abono vinculado
+  const { data: abonos } = await sb.from('facturas')
+    .select('id, factura_anula_id, total')
+    .eq('tipo_documento', 'abono')
+    .not('factura_anula_id', 'is', null)
+    .limit(5);
+  if (!abonos || abonos.length === 0) {
+    ok('Sin abonos vinculados en demo — skip signo abonos');
+  } else {
+    let signoOk = 0;
+    let signoFail = 0;
+    for (const a of abonos) {
+      const { data: aging } = await sb.from('v_aging')
+        .select('pendiente, importe')
+        .eq('factura_id', a.factura_anula_id)
+        .single();
+      if (!aging) continue;
+      const abonoAbs = Math.abs(Number(a.total));
+      const esperado = Number(aging.importe) - abonoAbs;
+      const real = Number(aging.pendiente);
+      // Tolerancia de 1€ por redondeo
+      if (Math.abs(real - esperado) <= 1) signoOk++;
+      else { signoFail++; console.error(`    factura ${a.factura_anula_id}: pendiente=${real} esperado=${esperado}`); }
+    }
+    if (signoFail === 0) ok(`${signoOk} abono(s) vinculado(s) netean correctamente (pendiente = importe − |abono|)`);
+    else fail(`${signoFail} abono(s) vinculado(s) con pendiente inflado`);
+  }
+}
+
 // ---------- Resultado ----------
 console.log('');
 if (errores === 0) {
