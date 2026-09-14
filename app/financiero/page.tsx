@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { getCobros } from '@/lib/datos/cobros';
+import { getTesoreria } from '@/lib/datos/tesoreria';
 import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
 import { decimal, eur, numero, pct } from '@/lib/formato';
@@ -10,7 +11,7 @@ export default async function FinancieroPage() {
   const cookieStore = cookies();
   const empresa = cookieStore.get('sfb_empresa')?.value ?? 'SF';
   const anio = new Date().getFullYear();
-  const cobros = await getCobros(empresa, anio);
+  const [cobros, tesoreria] = await Promise.all([getCobros(empresa, anio), getTesoreria(empresa)]);
 
   return (
     <div>
@@ -21,6 +22,47 @@ export default async function FinancieroPage() {
         desde Excel de la gestoría, cierre mensual, 3-5 ejercicios históricos. Los KPIs
         de estructura dependen de esa carga; hoy se estiman los de cobro (DSO) con datos reales.
       </p>
+
+      <div className="card">
+        <h2>Proyección de cobros (próximas 8 semanas)</h2>
+        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
+          Pendientes por vencer agrupados por semana ISO según el plazo pactado del cliente.
+          Las facturas ya vencidas se consideran cobro pendiente de hoy.
+        </p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+          {tesoreria.pisos.map((s) => (
+            <div key={s.inicio} className="kpi" style={{ flex: 1, minWidth: 120 }}>
+              <span className="kpi-etiqueta">{s.etiqueta}</span>
+              <strong className="kpi-valor">{eur(s.importe)}</strong>
+              <span className="kpi-nota">{numero(s.facturas)} facturas</span>
+            </div>
+          ))}
+        </div>
+        <table className="tabla">
+          <thead>
+            <tr>
+              <th>Factura</th>
+              <th>Cliente</th>
+              <th>Vencimiento</th>
+              <th className="td-num">Pendiente</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tesoreria.proximas.length === 0 ? (
+              <tr><td colSpan={4} style={{ color: 'var(--muted)' }}>Sin pendientes por vencer; todo el saldo está vencido o es cero.</td></tr>
+            ) : (
+              tesoreria.proximas.map((p) => (
+                <tr key={`${p.factura}-${p.fechaVencimiento}`}>
+                  <td>{p.factura ?? '—'}</td>
+                  <td>{p.cliente}</td>
+                  <td>{p.fechaVencimiento}</td>
+                  <td className="td-num">{eur(p.importe)}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
 
       <div className="card">
         <h2>DSO — Días de venta pendiente de cobro</h2>
