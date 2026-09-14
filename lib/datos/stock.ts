@@ -18,6 +18,7 @@ export type StockData = {
   ventaPerdida: { articulo: string; unidades: number; importe: number }[];
   stockMuerto: { articulo: string; almacen: string; disponible: number; valor: number }[];
   cruceCoberturaCartera: { articulo: string; disponible: number; cubiertoDias: number | null; carteraPendiente: number; riesgo: boolean }[];
+  prediccionRotura: { articulo: string; almacen: string; disponible: number; coberturaDias: number | null; plazoProveedor: number | null; proveedor: string | null; enTransito: number; fechaEstimada: string | null }[];
 };
 
 type FilaCobertura = {
@@ -250,6 +251,36 @@ export async function getStock(codigoEmpresa: string, filtros?: Filtros): Promis
     .sort((a, b) => Number(b.riesgo) - Number(a.riesgo) || b.carteraPendiente - a.carteraPendiente)
     .slice(0, 15);
 
+  // Predicción de rotura: cobertura actual < plazo de entrega del proveedor
+  const { data: artsProv } = await supabase
+    .from('articulos')
+    .select('id, proveedor_id')
+    .eq('empresa_id', empresa.id);
+  const proveedorDeArticulo = new Map<string, string | null>((artsProv ?? [] as { id: string; proveedor_id: string | null }[]).map((a) => [a.id, a.proveedor_id]));
+  const { data: provs } = await supabase.from('proveedores').select('id, nombre, plazo_entrega_dias');
+  const provInfo = new Map((provs ?? [] as { id: string; nombre: string; plazo_entrega_dias: number | null }[]).map((p) => [p.id, p]));
+  const prediccionRotura: StockData['prediccionRotura'] = [];
+  for (const r of rows) {
+    const cobertura = r.cobertura_dias != null ? Number(r.cobertura_dias) : null;
+    if (cobertura === null) continue;
+    const provId = proveedorDeArticulo.get(r.articulo_id) ?? null;
+    const prov = provId ? provInfo.get(provId) : undefined;
+    const plazo = prov?.plazo_entrega_dias != null ? Number(prov.plazo_entrega_dias) : null;
+    if (plazo === null) continue;
+    if (cobertura > plazo) continue;
+    prediccionRotura.push({
+      articulo: r.articulo,
+      almacen: r.almacen,
+      disponible: Number(r.stock_disponible ?? 0),
+      coberturaDias: cobertura,
+      plazoProveedor: plazo,
+      proveedor: prov?.nombre ?? null,
+      enTransito: Number(r.en_transito ?? 0),
+      fechaEstimada: new Date(Date.now() + cobertura * 86400000).toISOString().slice(0, 10),
+    });
+  }
+  prediccionRotura.sort((a, b) => (a.coberturaDias ?? Infinity) - (b.coberturaDias ?? Infinity)).slice(0, 15);
+
   return {
     empresa,
     valorStock,
@@ -266,5 +297,6 @@ export async function getStock(codigoEmpresa: string, filtros?: Filtros): Promis
     ventaPerdida,
     stockMuerto,
     cruceCoberturaCartera,
+    prediccionRotura,
   };
 }

@@ -256,6 +256,45 @@ export default async function StockPage({ searchParams }: { searchParams: Search
           </table>
         )}
       </div>
+
+      <div className="card">
+        <h2>Predicción de rotura de stock</h2>
+        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
+          Artículos cuya cobertura (días de stock al consumo medio) es menor o igual que el
+          plazo de entrega del proveedor: probablemente se agote antes de que llegue la
+          reposición. No incluye tránsito.
+        </p>
+        {d.prediccionRotura.length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>Sin artículos en riesgo: cubren el plazo de su proveedor.</p>
+        ) : (
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Artículo</th>
+                <th>Almacén</th>
+                <th className="td-num">Stock</th>
+                <th className="td-num">Cobertura (días)</th>
+                <th className="td-num">Plazo proveedor</th>
+                <th>Proveedor</th>
+                <th>Rotura prevista</th>
+              </tr>
+            </thead>
+            <tbody>
+              {d.prediccionRotura.map((r, i) => (
+                <tr key={`${r.articulo}-${r.almacen}-${i}`}>
+                  <td>{r.articulo}</td>
+                  <td>{r.almacen}</td>
+                  <td className="td-num">{numero(r.disponible)}</td>
+                  <td className="td-num td-pos">{r.coberturaDias}</td>
+                  <td className="td-num">{r.plazoProveedor}</td>
+                  <td>{r.proveedor ?? '—'}</td>
+                  <td>{r.fechaEstimada}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }
