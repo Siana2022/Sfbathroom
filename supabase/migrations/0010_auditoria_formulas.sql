@@ -61,6 +61,8 @@ select * from abonos_sueltos;
 
 alter view public.v_aging set (security_invoker = true);
 
+grant select on public.v_aging to anon, authenticated;
+
 -- ========== v_saldo_clientes ==========
 create view public.v_saldo_clientes as
 select
@@ -73,3 +75,5 @@ from public.v_aging
 group by empresa_id, cliente_id;
 
 alter view public.v_saldo_clientes set (security_invoker = true);
+
+grant select on public.v_saldo_clientes to anon, authenticated;
