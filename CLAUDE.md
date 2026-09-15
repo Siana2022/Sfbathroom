@@ -137,3 +137,38 @@ Detalle completo: `docs/asistente-ia.md`. Tools actuales: `ventas_por_mes`,
 9. Todos los pendientes que dependen del cliente están recopilados en
    `docs/desbloqueos-cliente.md` (B4 fotos stock, B8 impagos/seguro de crédito, marketing,
    financiero, A3ERP, datos DOT/Fuxsabany para la consolidada holding).
+
+## Última sesión (15 sep 2026) · optimización de rendimiento P1–P5
+
+Plan de rendimiento cerrado con el cliente (spec P1–P5). Estado:
+
+- **P1 ✓ aplicado**: `vercel.json` con `"regions": ["fra1"]` (Frankfurt, cerca de Supabase
+  `eu-central-1`). `vercel.json` también define los crons `resumen-diario` (0 7 * * *) y
+  `informe-semanal` (0 6 * * 1).
+- **P4 ✓**: consultas en paralelo con `Promise.all` en `getFacturacion`, `getVariacion`,
+  `getMargen`, `getConcentracion`, `getRiesgoProveedorList` (dentro de `concentracion.ts`) y
+  portada (`app/page.tsx` paraleliza `getFacturacion` + `getKpisPersonalizadosVistos` +
+  `getResumenHoy`).
+- **P2 ✓**: caché en memoria `lib/perf/memo.ts` (Map con TTL 15 min, clave prefijada por uid
+  → NO filtra entre roles con RLS). Aplicado en portada a facturación y KPIs. Importante: no
+  usar `unstable_cache` con `cookies()` (las funciones de `lib/datos/*` leen sesión) — la
+  clave de caché no incluye el header `Authorization`, por eso memo por uid es la vía segura.
+- **P3 ✓ (código) / ⚠ pendiente aplicar**: migración `0018_perf_facturacion_mensual.sql` crea
+  la vista `v_perf_facturacion_mensual` (`security_invoker = true`): neta, nº facturas y
+  unidades por (empresa, ejercicio, mes). `getFacturacion` la usa solo sin filtros con
+  fallback si la vista no existe (no rompe prod). **El cliente debe aplicar la 0018 en el SQL
+  editor de Supabase.**
+- **P5 ✓**: KPIs de portada limitados a 8 (`MAX_KPI_PORTADA` en `app/page.tsx`) y evaluados en
+  paralelo.
+
+Pendiente para la próxima sesión:
+- Verificar que el cliente aplicó la migración `0018` y validar números tras el nightly job.
+- Env vars Vercel que faltan: `JOBS_CRON_SECRET` (+ configurar Cron Secret), `VAPID_PUBLIC_KEY`,
+  `VAPID_PRIVATE_KEY`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`. Cliente solo añadió
+  `SUPABASE_SERVICE_ROLE_KEY`. Migraciones historias 0001–0017 ya aplicadas por el cliente.
+- Retirar `export const dynamic = 'force-dynamic'` donde toque (decisión pendiente tras P2).
+- Bugs previos cerrados y pusheados: export `dynamicForce` inválido en `mi-panel`,
+  auditoría de cálculo (`fichaCliente`, `miDia`, `crosssell`, `buscar`, `alertas`, `stock`,
+  `anomalias`), y saneo de búsqueda (`lib/buscar.ts` — `sanearTermino(q)` usado por
+  `/api/buscar` y `/buscar`; causa del 500 por fallbacks `?? ''` y comas en la consulta).
+- Comandos de verificación antes de push: `npx tsc --noEmit` y `CI=true npm run build`.
