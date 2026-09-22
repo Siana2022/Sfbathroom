@@ -7,7 +7,6 @@ import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
 import Filtros from '@/components/Filtros';
 
-export const dynamic = 'force-dynamic';
 
 const ANIO = 2026;
 

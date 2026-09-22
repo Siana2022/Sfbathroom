@@ -2,7 +2,6 @@ import { getConfiguracion } from '@/lib/datos/configuracion';
 import EditorUmbrales from '@/components/EditorUmbrales';
 import PushSuscripcion from '@/components/PushSuscripcion';
 
-export const dynamic = 'force-dynamic';
 
 export default async function ConfiguracionPage() {
   const d = await getConfiguracion();

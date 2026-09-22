@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPrefs, setPrefs } from '@/lib/datos/preferencias';
 
-export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {

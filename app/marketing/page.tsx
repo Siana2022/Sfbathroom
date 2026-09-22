@@ -2,7 +2,6 @@ import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 
-export const dynamic = 'force-dynamic';
 
 const ANIO = 2026;
 

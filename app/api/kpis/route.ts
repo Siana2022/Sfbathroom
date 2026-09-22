@@ -4,7 +4,6 @@ import { createServerClient } from '@supabase/ssr';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { validarConfig, type KpiConfig } from '@/lib/datos/kpisCatalogo';
 
-export const dynamic = 'force-dynamic';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://dgbxualxhrbbqglvxtxq.supabase.co';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? 'sb_publishable_0GvTeBiMy4pbE6hZGn5eaw_2xa3W-bi';

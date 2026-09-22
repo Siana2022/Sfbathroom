@@ -11,7 +11,6 @@ import { FORMATOS } from '@/lib/datos/kpisCatalogo';
 import Kpi from '@/components/Kpi';
 import GraficoBarras, { type Barra } from '@/components/GraficoBarras';
 
-export const dynamic = 'force-dynamic';
 
 const ANIO = 2026;
 const NOMBRE_MES = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];

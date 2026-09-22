@@ -5,7 +5,6 @@ import { parseFiltros, getOpcionesFiltros, type SearchParams } from '@/lib/datos
 import { decimal, eur } from '@/lib/formato';
 import Filtros from '@/components/Filtros';
 
-export const dynamic = 'force-dynamic';
 
 const ANIO = 2026;
 const POR_PAGINA = 50;

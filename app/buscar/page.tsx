@@ -6,7 +6,6 @@ import { sanearTermino } from '@/lib/buscar';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://dgbxualxhrbbqglvxtxq.supabase.co';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? 'sb_publishable_0GvTeBiMy4pbE6hZGn5eaw_2xa3W-bi';
 
-export const dynamic = 'force-dynamic';
 
 async function buscar(q: string) {
   if (!q || q.length < 2) return null;

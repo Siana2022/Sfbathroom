@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation';
 import { getDocumento } from '@/lib/datos/documentos';
 import { decimal, eur, eur2, numero } from '@/lib/formato';
 
-export const dynamic = 'force-dynamic';
 
 const ESTADO_LABEL: Record<string, string> = {
   captado: 'Captado',

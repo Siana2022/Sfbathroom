@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { getAlertas } from '@/lib/datos/alertas';
 import { enviarEmail } from '@/lib/datos/email';
 
-export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 /**

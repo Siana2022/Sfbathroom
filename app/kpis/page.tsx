@@ -5,7 +5,6 @@ import { getKpisPersonalizadosVistos } from '@/lib/datos/kpisVisibles';
 import ConstructorKpi from '@/components/kpis/ConstructorKpi';
 import KpiCard from '@/components/kpis/KpiCard';
 
-export const dynamic = 'force-dynamic';
 
 export default async function KpisPage() {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';

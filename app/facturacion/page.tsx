@@ -11,7 +11,6 @@ import GraficoBarras, { type Barra } from '@/components/GraficoBarras';
 import DescargarExcel from '@/components/DescargarExcel';
 import Filtros from '@/components/Filtros';
 
-export const dynamic = 'force-dynamic';
 
 const ANIO = 2026;
 

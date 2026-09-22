@@ -5,7 +5,6 @@ import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
 import { decimal, eur, numero, pct } from '@/lib/formato';
 
-export const dynamic = 'force-dynamic';
 
 export default async function FinancieroPage() {
   const cookieStore = cookies();

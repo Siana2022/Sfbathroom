@@ -4,7 +4,6 @@ import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { bloques } from '@/lib/bloques';
 
-export const dynamic = 'force-dynamic';
 
 const VISTAS = [
   {

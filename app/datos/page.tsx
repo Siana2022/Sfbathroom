@@ -4,7 +4,6 @@ import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { TABLAS_EDITABLES } from '@/lib/datos/tablasEditables';
 import EditorDatos from '@/components/EditorDatos';
 
-export const dynamic = 'force-dynamic';
 
 export default async function DatosPage() {
   const cookieStore = cookies();

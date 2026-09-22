@@ -7,7 +7,6 @@ import { decimal, eur, numero, pct } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import GraficoBarras from '@/components/GraficoBarras';
 
-export const dynamic = 'force-dynamic';
 
 const ANIO = 2026;
 

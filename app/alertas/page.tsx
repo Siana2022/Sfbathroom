@@ -5,7 +5,6 @@ import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
 import GestionAlerta from '@/components/GestionAlerta';
 
-export const dynamic = 'force-dynamic';
 
 const ANIO = 2026;
 
