@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
 import { netaDeDocumento } from '@/lib/datos/neta';
+import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 
 export type FilaDiaria = { fecha: string; neta: number; facturas: number };
 export type FilaSemanal = { semana: string; neta: number; facturas: number };
@@ -42,14 +43,17 @@ export async function getVistasTemporales(codigoEmpresa: string, anio: number, f
 
   const idsFiltrados = await getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, desdeIso, hoyIso);
 
-  const { data: filas } = await supabase
-    .from('facturas')
-    .select('id, fecha, tipo_documento, total')
-    .eq('empresa_id', empresa.id)
-    .in('tipo_documento', [...TIPOS_NETA])
-    .gte('fecha', desdeIso)
-    .lte('fecha', hoyIso);
-  const facturas = filtrarPorIds((filas ?? []) as { id: string; fecha: string; tipo_documento: string; total: number }[], idsFiltrados);
+  const filas = await todasLasFilas<{ id: string; fecha: string; tipo_documento: string; total: number }>((desde) =>
+    supabase
+      .from('facturas')
+      .select('id, fecha, tipo_documento, total')
+      .eq('empresa_id', empresa.id)
+      .in('tipo_documento', [...TIPOS_NETA])
+      .gte('fecha', desdeIso)
+      .lte('fecha', hoyIso)
+      .range(desde, desde + TAMANO_PAGINA - 1)
+  );
+  const facturas = filtrarPorIds(filas, idsFiltrados);
 
   const importes = facturas.map((f) => netaDeDocumento(f.tipo_documento, f.total));
 

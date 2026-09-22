@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import type { Filtros } from '@/lib/datos/filtros';
 import { netaDeDocumento } from '@/lib/datos/neta';
+import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 
 export type AgingBucket = { label: string; min: number; max: number | null; importe: number };
 
@@ -68,9 +69,8 @@ export async function getCobros(codigoEmpresa: string, anio: number, filtros?: F
       .eq('empresa_id', empresa.id)
       .gte('fecha', hace12m);
     if (clienteId) q = q.eq('cliente_id', clienteId);
-    const { data } = await q;
-    for (const f of data ?? []) {
-      const row = f as { total: number; tipo_documento: string; fecha: string };
+    const data = await todasLasFilas<FilaFactura>((desde) => q.range(desde, desde + TAMANO_PAGINA - 1));
+    for (const row of data) {
       neta12m += netaDeDocumento(row.tipo_documento, row.total);
     }
   }
@@ -101,7 +101,8 @@ export async function getCobros(codigoEmpresa: string, anio: number, filtros?: F
 
   const dso = neta12m > 0 ? saldoTotal / (neta12m / 365) : null;
   const dsoDesvioDias = dso !== null ? Math.max(0, dso - DIAS_PACTADOS) : 0;
-  const dsoDesvioEuros = (saldoTotal / 365) * dsoDesvioDias;
+  // Desvío en euros: días de exceso × venta diaria (neta12m/365), no × saldo.
+  const dsoDesvioEuros = dsoDesvioDias > 0 ? (neta12m / 365) * dsoDesvioDias : 0;
 
   const hoy = Math.floor(Date.now() / DIA_MS);
   const hoyMenosRepaso = hoy - DIAS_REPASO;
@@ -113,8 +114,7 @@ export async function getCobros(codigoEmpresa: string, anio: number, filtros?: F
     .in('tipo_documento', ['factura', 'nota_cargo', 'abono'])
     .gte('fecha', new Date((hoy - 400) * DIA_MS).toISOString().slice(0, 10));
   if (clienteId) facturasQuery = facturasQuery.eq('cliente_id', clienteId);
-  const { data: facturasRaw } = await facturasQuery;
-  const facturas = (facturasRaw ?? []) as unknown as FilaFactura[];
+  const facturas = await todasLasFilas<FilaFactura>((desde) => facturasQuery.range(desde, desde + TAMANO_PAGINA - 1));
 
   let cobrosQuery = supabase
     .from('cobros')
@@ -130,8 +130,7 @@ export async function getCobros(codigoEmpresa: string, anio: number, filtros?: F
     .eq('empresa_id', empresa.id)
     .in('estado', ['captado', 'aceptado', 'parcial']);
   if (clienteId) pedidosQuery = pedidosQuery.eq('cliente_id', clienteId);
-  const { data: pedidosRaw } = await pedidosQuery;
-  const pedidos = (pedidosRaw ?? []) as unknown as FilaPedido[];
+  const pedidos = await todasLasFilas<FilaPedido>((desde) => pedidosQuery.range(desde, desde + TAMANO_PAGINA - 1));
 
   let clisQuery = supabase.from('clientes').select('id, nombre, limite_credito').eq('empresa_id', empresa.id);
   if (clienteId) clisQuery = clisQuery.eq('id', clienteId);

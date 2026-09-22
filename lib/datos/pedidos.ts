@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { filtrarPorIds, getPedidoIdsFiltrados, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
+import { enLotes, todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 
 export type PedidosData = {
   empresa: { id: string; codigo: string; nombre: string };
@@ -57,13 +58,16 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
 
   const idsFiltrados = await getPedidoIdsFiltrados(supabase, empresa.id, filtros ?? {}, `${anio}-01-01`, `${anio}-12-31`);
 
-  const { data: filas } = await supabase
-    .from('pedidos')
-    .select('id, cliente_id, estado, fecha_entrada, fecha_solicitada, fecha_entrega_real, motivo_anulacion')
-    .eq('empresa_id', empresa.id)
-    .gte('fecha_entrada', `${anio}-01-01`)
-    .lte('fecha_entrada', `${anio}-12-31`);
-  const pedidos = filtrarPorIds((filas ?? []) as FilaPedido[], idsFiltrados);
+  const filas = await todasLasFilas<FilaPedido>((desde) =>
+    supabase
+      .from('pedidos')
+      .select('id, cliente_id, estado, fecha_entrada, fecha_solicitada, fecha_entrega_real, motivo_anulacion')
+      .eq('empresa_id', empresa.id)
+      .gte('fecha_entrada', `${anio}-01-01`)
+      .lte('fecha_entrada', `${anio}-12-31`)
+      .range(desde, desde + TAMANO_PAGINA - 1)
+  );
+  const pedidos = filtrarPorIds(filas, idsFiltrados);
 
   const porId = new Map(pedidos.map((p) => [p.id, p]));
   const estadoImporte = new Map<string, number>();
@@ -74,11 +78,15 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
   let importeAnulado = 0;
 
   if (pedidos.length) {
-    const { data: lineas } = await supabase
-      .from('pedido_lineas')
-      .select('pedido_id, cantidad, cantidad_servida, precio_unitario, descuento_pct')
-      .in('pedido_id', pedidos.map((p) => p.id));
-    for (const l of (lineas ?? []) as FilaLinea[]) {
+    const lineas = await enLotes<FilaLinea>(
+      (lote) =>
+        supabase
+          .from('pedido_lineas')
+          .select('pedido_id, cantidad, cantidad_servida, precio_unitario, descuento_pct')
+          .in('pedido_id', lote),
+      pedidos.map((p) => p.id),
+    );
+    for (const l of lineas) {
       const p = porId.get(l.pedido_id);
       if (!p) continue;
       const imp = importeLinea(l, false);
@@ -154,12 +162,12 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
 
   const modificados: { tipo: string; count: number }[] = [];
   if (pedidos.length) {
-    const { data: mods } = await supabase
-      .from('pedido_modificaciones')
-      .select('tipo')
-      .in('pedido_id', pedidos.map((p) => p.id));
+    const mods = await enLotes<FilaModificacion>(
+      (lote) => supabase.from('pedido_modificaciones').select('tipo').in('pedido_id', lote),
+      pedidos.map((p) => p.id),
+    );
     const counts = new Map<string, number>();
-    for (const m of (mods ?? []) as FilaModificacion[]) counts.set(m.tipo, (counts.get(m.tipo) ?? 0) + 1);
+    for (const m of mods) counts.set(m.tipo, (counts.get(m.tipo) ?? 0) + 1);
     for (const [tipo, count] of counts.entries()) modificados.push({ tipo, count });
     modificados.sort((a, b) => b.count - a.count);
   }
@@ -225,14 +233,17 @@ async function getFacturacionProxy(
   filtros?: Filtros,
 ): Promise<{ neta: number }> {
   const idsFiltrados = await getFacturaIdsFiltradas(supabase, empresaId, filtros ?? {}, `${anio}-01-01`, `${anio}-12-31`);
-  const { data } = await supabase
-    .from('facturas')
-    .select('id, total')
-    .eq('empresa_id', empresaId)
-    .gte('fecha', `${anio}-01-01`)
-    .lte('fecha', `${anio}-12-31`);
+  const data = await todasLasFilas<{ id: string; total: number }>((desde) =>
+    supabase
+      .from('facturas')
+      .select('id, total')
+      .eq('empresa_id', empresaId)
+      .gte('fecha', `${anio}-01-01`)
+      .lte('fecha', `${anio}-12-31`)
+      .range(desde, desde + TAMANO_PAGINA - 1)
+  );
   let neta = 0;
-  for (const f of (data ?? []) as { id: string; total: number }[]) {
+  for (const f of data) {
     if (idsFiltrados && !idsFiltrados.has(f.id)) continue;
     neta += Number(f.total ?? 0);
   }

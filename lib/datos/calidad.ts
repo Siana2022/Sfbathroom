@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
 import { lineasPorFacturas } from '@/lib/datos/lineas';
+import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 
 export type CalidadData = {
   empresa: { id: string; codigo: string; nombre: string };
@@ -40,13 +41,16 @@ export async function getCalidad(codigoEmpresa: string, anio: number, filtros?: 
   let importeDevoluciones = 0;
   const idsAbonos: string[] = [];
   {
-    const { data: filas } = await supabase
-      .from('facturas')
-      .select('id, tipo_documento, total')
-      .eq('empresa_id', empresa.id)
-      .gte('fecha', `${anio}-01-01`)
-      .lte('fecha', `${anio}-12-31`);
-    const facturas = filtrarPorIds((filas ?? []) as { id: string; tipo_documento: string; total: number }[], idsFiltrados);
+    const filas = await todasLasFilas<{ id: string; tipo_documento: string; total: number }>((desde) =>
+      supabase
+        .from('facturas')
+        .select('id, tipo_documento, total')
+        .eq('empresa_id', empresa.id)
+        .gte('fecha', `${anio}-01-01`)
+        .lte('fecha', `${anio}-12-31`)
+        .range(desde, desde + TAMANO_PAGINA - 1)
+    );
+    const facturas = filtrarPorIds(filas, idsFiltrados);
     for (const f of facturas) {
       const total = Number(f.total ?? 0);
       if (f.tipo_documento === 'abono') {

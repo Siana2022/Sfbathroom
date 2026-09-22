@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
 import { lineasPorFacturas } from '@/lib/datos/lineas';
+import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 
 export type ClientesData = {
   empresa: { id: string; codigo: string; nombre: string };
@@ -42,13 +43,16 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
 
   const idsFiltrados = await getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, iso(730), `${anio}-12-31`);
 
-  const { data: filas } = await supabase
-    .from('facturas')
-    .select('id, cliente_id, fecha, total')
-    .eq('empresa_id', empresa.id)
-    .gte('fecha', iso(730))
-    .lte('fecha', `${anio}-12-31`);
-  const facturas = filtrarPorIds((filas ?? []) as FilaFactura[], idsFiltrados);
+  const filas = await todasLasFilas<FilaFactura>((desde) =>
+    supabase
+      .from('facturas')
+      .select('id, cliente_id, fecha, total')
+      .eq('empresa_id', empresa.id)
+      .gte('fecha', iso(730))
+      .lte('fecha', `${anio}-12-31`)
+      .range(desde, desde + TAMANO_PAGINA - 1)
+  );
+  const facturas = filtrarPorIds(filas, idsFiltrados);
 
   const activos = new Set<string>();
   const activosPrevio = new Set<string>();
@@ -76,12 +80,14 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
     fechasCliente.set(f.cliente_id, s);
   }
 
-  const { data: pedidosRaw } = await supabase
-    .from('pedidos')
-    .select('cliente_id, fecha_entrada')
-    .eq('empresa_id', empresa.id)
-    .gte('fecha_entrada', iso(365));
-  const pedidos = (pedidosRaw ?? []) as FilaPedido[];
+  const pedidos = await todasLasFilas<FilaPedido>((desde) =>
+    supabase
+      .from('pedidos')
+      .select('cliente_id, fecha_entrada')
+      .eq('empresa_id', empresa.id)
+      .gte('fecha_entrada', iso(365))
+      .range(desde, desde + TAMANO_PAGINA - 1)
+  );
   const activos12m = new Set(pedidos.map((p) => p.cliente_id).filter(Boolean));
   const ultimoPedido = new Map<string, string>();
   for (const p of pedidos) {

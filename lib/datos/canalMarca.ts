@@ -3,6 +3,7 @@ import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getRol, puedeVerMargenes } from '@/lib/datos/role';
 import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
 import { lineasPorFacturas } from '@/lib/datos/lineas';
+import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 
 export type Segmento = {
   marca: string;
@@ -59,14 +60,17 @@ async function getSegmentos(
 ) {
   const idsFiltrados = await getFacturaIdsFiltradas(supabase, empresaId, filtros ?? {}, `${anioPrevio}-01-01`, `${anio}-12-31`);
 
-  const { data: facturasRaw } = await supabase
-    .from('facturas')
-    .select('id, cliente_id, fecha')
-    .eq('empresa_id', empresaId)
-    .eq('tipo_documento', 'factura')
-    .gte('fecha', `${anioPrevio}-01-01`)
-    .lte('fecha', `${anio}-12-31`);
-  const facturas = filtrarPorIds((facturasRaw ?? []) as FilaFactura[], idsFiltrados);
+  const facturasRaw = await todasLasFilas<FilaFactura>((desde) =>
+    supabase
+      .from('facturas')
+      .select('id, cliente_id, fecha')
+      .eq('empresa_id', empresaId)
+      .eq('tipo_documento', 'factura')
+      .gte('fecha', `${anioPrevio}-01-01`)
+      .lte('fecha', `${anio}-12-31`)
+      .range(desde, desde + TAMANO_PAGINA - 1)
+  );
+  const facturas = filtrarPorIds(facturasRaw, idsFiltrados);
   const ids = facturas.map((f) => f.id);
 
   const lineas = await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, articulo_id, cantidad, importe, coste_unitario', ids);

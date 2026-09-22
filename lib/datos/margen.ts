@@ -3,7 +3,7 @@ import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getRol, puedeVerMargenes } from '@/lib/datos/role';
 import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
 import { lineasPorFacturas } from '@/lib/datos/lineas';
-import { signoDocumento } from '@/lib/datos/neta';
+import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 
 export type MargenData = {
   empresa: { id: string; codigo: string; nombre: string };
@@ -82,13 +82,16 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
 
   const [idsFiltrados, facturasRes, articulosRes, familiasRes, marcasRes, canalesRes, clientesRes, comercialesRes, costeLlegadaRes, lotesRes] = await Promise.all([
     getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anio}-01-01`, `${anio}-12-31`),
-    supabase
-      .from('facturas')
-      .select('id, cliente_id, comercial_id, fecha, tipo_documento, total, descuento_pie, rappel_devengado')
-      .eq('empresa_id', empresa.id)
-      .in('tipo_documento', ['factura', 'abono', 'nota_cargo'])
-      .gte('fecha', `${anio}-01-01`)
-      .lte('fecha', `${anio}-12-31`),
+    todasLasFilas<FilaFactura>((desde) =>
+      supabase
+        .from('facturas')
+        .select('id, cliente_id, comercial_id, fecha, tipo_documento, total, descuento_pie, rappel_devengado')
+        .eq('empresa_id', empresa.id)
+        .in('tipo_documento', ['factura', 'abono', 'nota_cargo'])
+        .gte('fecha', `${anio}-01-01`)
+        .lte('fecha', `${anio}-12-31`)
+        .range(desde, desde + TAMANO_PAGINA - 1)
+    ),
     supabase
       .from('articulos')
       .select('id, nombre, familia_id, marca_id, marca_blanca_cliente_id, coste_unitario, precio_tarifa')
@@ -106,7 +109,7 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
       .order('fecha_compra', { ascending: false }),
   ]);
 
-  const facturas = filtrarPorIds((facturasRes.data ?? []) as unknown as FilaFactura[], idsFiltrados);
+  const facturas = filtrarPorIds(facturasRes, idsFiltrados);
   const ids = facturas.map((f) => f.id);
 
   const filasLineas = await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, articulo_id, cantidad, importe, coste_unitario', ids);

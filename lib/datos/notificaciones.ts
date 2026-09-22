@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/serviceRole';
+import { createClient } from '@/lib/supabase/server';
 import { enviarEmail, type EmailDatos } from '@/lib/datos/email';
 
 type Canal = 'email' | 'inapp';
@@ -73,9 +74,11 @@ export async function enviarNotificacion(payload: NotifPayload): Promise<{ inapp
 
 /**
  * Marca notificaciones del usuario como leídas.
+ * Usa el cliente de sesión: la RLS garantiza que solo el usuario dueño de la
+ * notificación puede modificarla (no service_role).
  */
 export async function marcarLeidas(usuarioId: string, ids?: string[]) {
-  const supabase = createServiceClient();
+  const supabase = createClient();
   let q = supabase.from('notificaciones').update({ leida: true }).eq('usuario_id', usuarioId).eq('leida', false);
   if (ids?.length) q = q.in('id', ids);
   await q;
@@ -83,9 +86,10 @@ export async function marcarLeidas(usuarioId: string, ids?: string[]) {
 
 /**
  * Cuenta notificaciones no leídas de un usuario.
+ * Cliente de sesión con RLS (mismo razonamiento que marcarLeidas).
  */
 export async function contarNoLeidas(usuarioId: string): Promise<number> {
-  const supabase = createServiceClient();
+  const supabase = createClient();
   const { count } = await supabase
     .from('notificaciones')
     .select('id', { count: 'exact', head: true })

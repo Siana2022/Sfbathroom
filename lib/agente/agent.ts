@@ -1,5 +1,5 @@
 import { HERRAMIENTAS, ejecutar } from '@/lib/agente/tools';
-import { callLLM, defaultModel, type LLMTool, type LLMMessage } from '@/lib/agente/llm';
+import { callLLM, type LLMTool, type LLMMessage } from '@/lib/agente/llm';
 
 const MAX_ITERACIONES = 6;
 

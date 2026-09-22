@@ -5,6 +5,7 @@ import { getRol, puedeVerMargenes } from '@/lib/datos/role';
 import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
 import { netaDeDocumento } from '@/lib/datos/neta';
 import { lineasPorFacturas } from '@/lib/datos/lineas';
+import { enLotes, todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 
 export type ComercialRow = {
   id: string;
@@ -52,34 +53,43 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
   const idsComunes = await getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anioPrevio}-01-01`, `${anio}-12-31`);
 
   const [filasRes, filasPreviasRes, pedidosRes, presupuestoRes, config] = await Promise.all([
-    supabase
-      .from('facturas')
-      .select('id, comercial_id, cliente_id, total, tipo_documento, descuento_pie, fecha')
-      .eq('empresa_id', empresa.id)
-      .in('tipo_documento', ['factura', 'abono', 'nota_cargo'])
-      .gte('fecha', `${anio}-01-01`)
-      .lte('fecha', `${anio}-12-31`),
-    supabase
-      .from('facturas')
-      .select('id, comercial_id, cliente_id')
-      .eq('empresa_id', empresa.id)
-      .eq('tipo_documento', 'factura')
-      .gte('fecha', `${anioPrevio}-01-01`)
-      .lte('fecha', `${anioPrevio}-12-31`),
-    supabase
-      .from('pedidos')
-      .select('comercial_id')
-      .eq('empresa_id', empresa.id)
-      .gte('fecha_entrada', `${anio}-01-01`)
-      .lte('fecha_entrada', `${anio}-12-31`),
+    todasLasFilas<Fila>((desde) =>
+      supabase
+        .from('facturas')
+        .select('id, comercial_id, cliente_id, total, tipo_documento, descuento_pie, fecha')
+        .eq('empresa_id', empresa.id)
+        .in('tipo_documento', ['factura', 'abono', 'nota_cargo'])
+        .gte('fecha', `${anio}-01-01`)
+        .lte('fecha', `${anio}-12-31`)
+        .range(desde, desde + TAMANO_PAGINA - 1)
+    ),
+    todasLasFilas<{ id: string; comercial_id: string | null; cliente_id: string | null }>((desde) =>
+      supabase
+        .from('facturas')
+        .select('id, comercial_id, cliente_id')
+        .eq('empresa_id', empresa.id)
+        .eq('tipo_documento', 'factura')
+        .gte('fecha', `${anioPrevio}-01-01`)
+        .lte('fecha', `${anioPrevio}-12-31`)
+        .range(desde, desde + TAMANO_PAGINA - 1)
+    ),
+    todasLasFilas<FilaPedido>((desde) =>
+      supabase
+        .from('pedidos')
+        .select('comercial_id')
+        .eq('empresa_id', empresa.id)
+        .gte('fecha_entrada', `${anio}-01-01`)
+        .lte('fecha_entrada', `${anio}-12-31`)
+        .range(desde, desde + TAMANO_PAGINA - 1)
+    ),
     supabase.from('presupuesto').select('comercial_id, importe').eq('empresa_id', empresa.id).eq('ejercicio', anio),
     getConfiguracionUmbrales(),
   ]);
 
-  const filas = filtrarPorIds((filasRes.data ?? []) as Fila[], idsComunes);
-  const filasPrevias = filtrarPorIds((filasPreviasRes.data ?? []) as { id: string; comercial_id: string | null; cliente_id: string | null }[], idsComunes);
+  const filas = filtrarPorIds(filasRes, idsComunes);
+  const filasPrevias = filtrarPorIds(filasPreviasRes, idsComunes);
   const pedidosPorComercial = new Map<string, number>();
-  for (const p of (pedidosRes.data ?? []) as FilaPedido[]) {
+  for (const p of pedidosRes) {
     if (p.comercial_id) pedidosPorComercial.set(p.comercial_id, (pedidosPorComercial.get(p.comercial_id) ?? 0) + 1);
   }
 
@@ -103,8 +113,11 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
   if (lineas.length) {
     const artIds = [...new Set(lineas.map((l) => l.articulo_id).filter(Boolean))] as string[];
     if (artIds.length) {
-      const { data: articulosRaw } = await supabase.from('articulos').select('id, coste_unitario').in('id', artIds);
-      for (const a of (articulosRaw ?? []) as FilaArticulo[]) articuloCoste.set(a.id, a.coste_unitario);
+      const articulosRaw = await enLotes<FilaArticulo>(
+        (lote) => supabase.from('articulos').select('id, coste_unitario').in('id', lote),
+        artIds,
+      );
+      for (const a of articulosRaw) articuloCoste.set(a.id, a.coste_unitario);
     }
   }
 

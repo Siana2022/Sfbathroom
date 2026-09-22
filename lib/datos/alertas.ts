@@ -4,6 +4,7 @@ import { getStock } from '@/lib/datos/stock';
 import { getCobros } from '@/lib/datos/cobros';
 import { getConcentracion } from '@/lib/datos/concentracion';
 import { getMargen } from '@/lib/datos/margen';
+import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 
 export type Alerta = {
   id: string;
@@ -84,15 +85,25 @@ export async function getAlertas(codigoEmpresa: string, anio: number): Promise<A
     getCobros(codigoEmpresa, anio),
     supabase.from('alertas_config').select('id, modulo, nombre, activo, umbral, unidad, config').order('modulo'),
     supabase.from('alertas_generadas').select('id, referencia, importe, mensaje, leida, tipo, severidad, estado, asignada_a, fecha_estado, fecha').eq('empresa_id', empresa.id).order('fecha', { ascending: false }).limit(15),
-    supabase
-      .from('facturas')
-      .select('cliente_id')
-      .eq('empresa_id', empresa.id)
-      .eq('tipo_documento', 'factura')
-      .gte('fecha', `${anio}-01-01`)
-      .lte('fecha', `${anio}-12-31`),
+    todasLasFilas<{ cliente_id: string | null }>((desde) =>
+      supabase
+        .from('facturas')
+        .select('cliente_id')
+        .eq('empresa_id', empresa.id)
+        .eq('tipo_documento', 'factura')
+        .gte('fecha', `${anio}-01-01`)
+        .lte('fecha', `${anio}-12-31`)
+        .range(desde, desde + TAMANO_PAGINA - 1)
+    ),
     supabase.from('clientes').select('id, estado').eq('empresa_id', empresa.id).eq('estado', 'activo'),
-    supabase.from('pedidos').select('cliente_id').eq('empresa_id', empresa.id).gte('fecha_entrada', iso(365)),
+    todasLasFilas<{ cliente_id: string | null }>((desde) =>
+      supabase
+        .from('pedidos')
+        .select('cliente_id')
+        .eq('empresa_id', empresa.id)
+        .gte('fecha_entrada', iso(365))
+        .range(desde, desde + TAMANO_PAGINA - 1)
+    ),
   ]);
 
   const config = (configRaw.data ?? []) as ConfigRow[];
@@ -100,15 +111,15 @@ export async function getAlertas(codigoEmpresa: string, anio: number): Promise<A
   const generadas = (generadasRaw.data ?? []) as AlertaGenerada[];
 
   const activosAnio = new Set<string>();
-  for (const f of facturasRes.data ?? []) {
-    const id = (f as { cliente_id: string | null }).cliente_id;
+  for (const f of facturasRes) {
+    const id = f.cliente_id;
     if (id) activosAnio.add(id);
   }
   const fuga = ((clientesRes.data ?? []) as { id: string }[]).filter((c) => !activosAnio.has(c.id)).length;
 
   const activos12m = new Set<string>();
-  for (const p of pedidosRes.data ?? []) {
-    const id = (p as { cliente_id: string | null }).cliente_id;
+  for (const p of pedidosRes) {
+    const id = p.cliente_id;
     if (id) activos12m.add(id);
   }
   const noActivos = ((clientesRes.data ?? []) as { id: string }[]).filter((c) => !activos12m.has(c.id)).length;
@@ -119,7 +130,8 @@ export async function getAlertas(codigoEmpresa: string, anio: number): Promise<A
   const stockRoturas = stock.roturas;
   const vencido = cobros.vencido;
   const umbralRetraso = umbralDe(configMap, 'proveedores.retraso');
-  const proveedoresConRetraso = concentracion.riesgoProveedor.filter((p) => p.plazoReal !== null && p.plazoReal > umbralRetraso).length;
+  // Solo cuentan los proveedores cuyo plazo REAL excede el pactado en más del umbral.
+  const proveedoresConRetraso = concentracion.riesgoProveedor.filter((p) => p.plazoReal !== null && p.plazoReal - p.plazo > umbralRetraso).length;
   const familiasDependientes = concentracion.riesgo.length;
   const umbralDso = umbralDe(configMap, 'cobros.dso');
   const clientesDsoAlAlza = cobros.porCliente.filter((c) => {
@@ -140,16 +152,19 @@ export async function getAlertas(codigoEmpresa: string, anio: number): Promise<A
   const mesActual = Number(new Date().toISOString().slice(5, 7));
   const trimActual = Math.floor((mesActual - 1) / 3) + 1;
   {
-    const { data: netaRes } = await supabase
-      .from('facturas')
-      .select('total, fecha')
-      .eq('empresa_id', empresa.id)
-      .gte('fecha', `${anio}-01-01`)
-      .lte('fecha', `${anio}-12-31`);
-    for (const f of netaRes ?? []) {
-      const total = Number((f as { total: number }).total ?? 0);
+    const netaRes = await todasLasFilas<{ total: number; fecha: string }>((desde) =>
+      supabase
+        .from('facturas')
+        .select('total, fecha')
+        .eq('empresa_id', empresa.id)
+        .gte('fecha', `${anio}-01-01`)
+        .lte('fecha', `${anio}-12-31`)
+        .range(desde, desde + TAMANO_PAGINA - 1)
+    );
+    for (const f of netaRes) {
+      const total = Number(f.total ?? 0);
       neta += total;
-      const fecha = (f as { fecha: string }).fecha;
+      const fecha = f.fecha;
       const trim = Math.floor((Number(fecha.slice(5, 7)) - 1) / 3) + 1;
       if (trim === trimActual) trimNeta += total;
     }

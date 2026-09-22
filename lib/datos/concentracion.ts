@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
 import { lineasPorFacturas } from '@/lib/datos/lineas';
-import { signoDocumento } from '@/lib/datos/neta';
+import { enLotes, todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 
 export type ConcentracionData = {
   empresa: { id: string; codigo: string; nombre: string };
@@ -56,15 +56,18 @@ const NOMBRE_PAIS: Record<string, string> = {
 const DIA_MS = 86400000;
 
 async function getRiesgoProveedorList(supabase: ReturnType<typeof createClient>, empresaId: string): Promise<ConcentracionData['riesgoProveedor']> {
-  const [provRes, comprasRes] = await Promise.all([
+  const [provRes, compras] = await Promise.all([
     supabase.from('proveedores').select('id, nombre, pais, plazo_entrega_dias, activo'),
-    supabase
-      .from('compras')
-      .select('id, proveedor_id, fecha, fecha_estimada_llegada, fecha_llegada')
-      .eq('empresa_id', empresaId),
+    todasLasFilas<{ id: string; proveedor_id: string | null; fecha: string; fecha_estimada_llegada: string | null; fecha_llegada: string | null }>(
+      (desde) =>
+        supabase
+          .from('compras')
+          .select('id, proveedor_id, fecha, fecha_estimada_llegada, fecha_llegada')
+          .eq('empresa_id', empresaId)
+          .range(desde, desde + TAMANO_PAGINA - 1)
+    ),
   ]);
   const proveedores = (provRes.data ?? []) as { id: string; nombre: string; pais: string; plazo_entrega_dias: number; activo: boolean }[];
-  const compras = (comprasRes.data ?? []) as { id: string; proveedor_id: string | null; fecha: string; fecha_estimada_llegada: string | null; fecha_llegada: string | null }[];
   const proveedorDeCompra = new Map<string, string | null>(compras.map((c) => [c.id, c.proveedor_id]));
   let plazoRealSum = 0;
   let plazoRealN = 0;
@@ -84,18 +87,20 @@ async function getRiesgoProveedorList(supabase: ReturnType<typeof createClient>,
 
   const volumen = new Map<string, number>();
   const [lineasP, artRes] = await Promise.all([
-    compras.length
-      ? supabase
+    enLotes<{ compra_id: string; cantidad: number; coste_unitario_compra: number }>(
+      (lote) =>
+        supabase
           .from('compra_lineas')
           .select('compra_id, cantidad, coste_unitario_compra')
-          .in('compra_id', compras.map((c) => c.id))
-      : Promise.resolve({ data: [] as unknown[] }),
+          .in('compra_id', lote),
+      compras.map((c) => c.id),
+    ),
     supabase
       .from('articulos')
       .select('proveedor_id, familia_id')
       .eq('empresa_id', empresaId),
   ]);
-  for (const l of (lineasP.data ?? []) as { compra_id: string; cantidad: number; coste_unitario_compra: number }[]) {
+  for (const l of lineasP) {
     const prov = proveedorDeCompra.get(l.compra_id);
     if (!prov) continue;
     const importe = Number(l.cantidad ?? 0) * Number(l.coste_unitario_compra ?? 0);
@@ -156,18 +161,21 @@ export async function getConcentracion(codigoEmpresa: string, anio: number, filt
 
   const [idsFiltrados, filasRes, clisRes, articulosRes, familiasRes, riesgoProveedor] = await Promise.all([
     getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anio}-01-01`, `${anio}-12-31`),
-    supabase
-      .from('facturas')
-      .select('id, cliente_id, fecha, total, tipo_documento')
-      .eq('empresa_id', empresa.id)
-      .gte('fecha', `${anio}-01-01`)
-      .lte('fecha', `${anio}-12-31`),
+    todasLasFilas<Fila>((desde) =>
+      supabase
+        .from('facturas')
+        .select('id, cliente_id, fecha, total, tipo_documento')
+        .eq('empresa_id', empresa.id)
+        .gte('fecha', `${anio}-01-01`)
+        .lte('fecha', `${anio}-12-31`)
+        .range(desde, desde + TAMANO_PAGINA - 1)
+    ),
     supabase.from('clientes').select('id, nombre, pais_facturacion').eq('empresa_id', empresa.id),
     supabase.from('articulos').select('id, nombre, familia_id').eq('empresa_id', empresa.id),
     supabase.from('familias_articulo').select('id, nombre').eq('empresa_id', empresa.id),
     getRiesgoProveedorList(supabase, empresa.id),
   ]);
-  const filas = filtrarPorIds((filasRes.data ?? []) as Fila[], idsFiltrados);
+  const filas = filtrarPorIds(filasRes, idsFiltrados);
 
   const porCliente = new Map<string, number>();
   let netaTotal = 0;
@@ -208,6 +216,7 @@ export async function getConcentracion(codigoEmpresa: string, anio: number, filt
   }).slice(0, 15);
 
   const articulos = (articulosRes.data ?? []) as FilaArticulo[];
+  const articuloPorId = new Map(articulos.map((a) => [a.id, a]));
   const familiaDeArticulo = new Map(articulos.map((a) => [a.id, a.familia_id]));
 
   const familias = (familiasRes.data ?? []) as FilaFamilia[];
@@ -226,7 +235,7 @@ export async function getConcentracion(codigoEmpresa: string, anio: number, filt
       const importe = sign * Number(l.importe ?? 0);
       if (importe === 0) continue;
       if (l.articulo_id) {
-        const a = articulos.find((x) => x.id === l.articulo_id);
+        const a = articuloPorId.get(l.articulo_id);
         const nombre = a?.nombre;
         if (a && nombre) {
           const cur = porArticulo.get(a.id) ?? { nombre, neta: 0 };

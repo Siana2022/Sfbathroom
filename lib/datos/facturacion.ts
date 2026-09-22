@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
 import { lineasPorFacturas } from '@/lib/datos/lineas';
+import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 
 export type EmpresaSel = { id: string; codigo: string; nombre: string };
 
@@ -61,14 +62,17 @@ export async function getVariacion(codigoEmpresa: string, anio: number, filtros?
 
   const [idsFiltrados, filasRes] = await Promise.all([
     getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anioPrevio}-01-01`, `${anio}-12-31`),
-    supabase
-      .from('facturas')
-      .select('id, cliente_id, fecha, tipo_documento')
-      .eq('empresa_id', empresa.id)
-      .gte('fecha', `${anioPrevio}-01-01`)
-      .lte('fecha', `${anio}-12-31`),
+    todasLasFilas<FilaFacturaVariacion>((desde) =>
+      supabase
+        .from('facturas')
+        .select('id, cliente_id, fecha, tipo_documento')
+        .eq('empresa_id', empresa.id)
+        .gte('fecha', `${anioPrevio}-01-01`)
+        .lte('fecha', `${anio}-12-31`)
+        .range(desde, desde + TAMANO_PAGINA - 1)
+    ),
   ]);
-  const facturas = filtrarPorIds((filasRes.data ?? []) as FilaFacturaVariacion[], idsFiltrados);
+  const facturas = filtrarPorIds(filasRes, idsFiltrados);
 
   const infoPorId = new Map<string, { anio: number; tipo: string }>();
   const clientePorId = new Map<string, string | null>();
@@ -167,12 +171,15 @@ export async function getFacturacion(codigoEmpresa: string, anio: number, filtro
   const conFiltros = Boolean(filtros && (filtros.cliente || filtros.comercial || filtros.familia || filtros.marca));
 
   const idsFiltrados = getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anioPrevio}-01-01`, `${anio}-12-31`);
-  const facturasP = supabase
-    .from('facturas')
-    .select('id, cliente_id, fecha, tipo_documento, total')
-    .eq('empresa_id', empresa.id)
-    .gte('fecha', `${anioPrevio}-01-01`)
-    .lte('fecha', `${anio}-12-31`);
+  const facturasP = todasLasFilas<FilaFactura>((desde) =>
+    supabase
+      .from('facturas')
+      .select('id, cliente_id, fecha, tipo_documento, total')
+      .eq('empresa_id', empresa.id)
+      .gte('fecha', `${anioPrevio}-01-01`)
+      .lte('fecha', `${anio}-12-31`)
+      .range(desde, desde + TAMANO_PAGINA - 1)
+  );
   const presupuestoP = filtros?.marca
     ? Promise.resolve({ data: [] as unknown[] })
     : (() => {
@@ -195,7 +202,7 @@ export async function getFacturacion(codigoEmpresa: string, anio: number, filtro
         .in('ejercicio', [anio, anioPrevio]);
 
   const [idsFiltradosRes, filasRes, presupuestoRes, vistaRes] = await Promise.all([idsFiltrados, facturasP, presupuestoP, vistaP]);
-  const facturas = filtrarPorIds((filasRes.data ?? []) as FilaFactura[], idsFiltradosRes);
+  const facturas = filtrarPorIds(filasRes, idsFiltradosRes);
 
   const curs = { neta: 0, unidades: 0, facturas: 0, abonosYNotas: 0 };
   const prev = { neta: 0, unidades: 0, facturas: 0 };

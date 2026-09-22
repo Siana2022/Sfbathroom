@@ -1,6 +1,16 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getArticuloIdsFiltrados, type Filtros } from '@/lib/datos/filtros';
+import { enLotes } from '@/lib/datos/query';
+
+type FilaPedidoLinea = {
+  pedido_id: string;
+  articulo_id: string | null;
+  cantidad: number;
+  cantidad_servida: number;
+  precio_unitario: number;
+  descuento_pct: number;
+};
 
 export type StockData = {
   empresa: { id: string; codigo: string; nombre: string };
@@ -158,19 +168,17 @@ export async function getStock(codigoEmpresa: string, filtros?: Filtros): Promis
   let fillDen = 0;
   let estimationLost = 0;
   const ventaPerdidaRaw = new Map<string, { unidades: number; importe: number; nombre: string }>();
-  if (pedidosEstados.length) {
-    const { data: lineasS } = await supabase
-      .from('pedido_lineas')
-      .select('pedido_id, articulo_id, cantidad, cantidad_servida, precio_unitario, descuento_pct')
-      .in('pedido_id', pedidosEstados.map((p) => p.id));
-    for (const l of (lineasS ?? []) as {
-      pedido_id: string;
-      articulo_id: string | null;
-      cantidad: number;
-      cantidad_servida: number;
-      precio_unitario: number;
-      descuento_pct: number;
-    }[]) {
+  const pedidoIds = pedidosEstados.map((p) => p.id);
+  if (pedidoIds.length) {
+    const lineasS = await enLotes<FilaPedidoLinea>(
+      (lote) =>
+        supabase
+          .from('pedido_lineas')
+          .select('pedido_id, articulo_id, cantidad, cantidad_servida, precio_unitario, descuento_pct')
+          .in('pedido_id', lote),
+      pedidoIds,
+    );
+    for (const l of lineasS) {
       const estado = porIdServ.get(l.pedido_id);
       if (!estado || estado === 'anulado') continue;
       const cant = Number(l.cantidad ?? 0);
@@ -226,13 +234,17 @@ export async function getStock(codigoEmpresa: string, filtros?: Filtros): Promis
   if (stockMuerto.length > 15) stockMuerto.length = 15;
 
   const carteraArticulo = new Map<string, number>();
-  if (pedidosEstados.length) {
-    const { data: lineasC } = await supabase
-      .from('pedido_lineas')
-      .select('pedido_id, articulo_id, cantidad, cantidad_servida, precio_unitario, descuento_pct')
-      .in('pedido_id', pedidosEstados.map((p) => p.id));
+  if (pedidoIds.length) {
+    const lineasC = await enLotes<FilaPedidoLinea>(
+      (lote) =>
+        supabase
+          .from('pedido_lineas')
+          .select('pedido_id, articulo_id, cantidad, cantidad_servida, precio_unitario, descuento_pct')
+          .in('pedido_id', lote),
+      pedidoIds,
+    );
     const carteraSet = new Set(['captado', 'aceptado', 'parcial']);
-    for (const l of (lineasC ?? []) as { pedido_id: string; articulo_id: string | null; cantidad: number; cantidad_servida: number }[]) {
+    for (const l of lineasC) {
       const estado = porIdServ.get(l.pedido_id);
       if (!estado || !carteraSet.has(estado) || !l.articulo_id) continue;
       const pend = Math.max(0, Number(l.cantidad ?? 0) - Number(l.cantidad_servida ?? 0));

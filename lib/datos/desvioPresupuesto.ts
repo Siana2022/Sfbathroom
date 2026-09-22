@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
 import { lineasPorFacturas } from '@/lib/datos/lineas';
+import { enLotes, todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 
 export type FilaDesvio = {
   nombre: string;
@@ -20,7 +21,7 @@ export type DesvioPresupuesto = {
   porFamilia: FilaDesvio[];
 };
 
-type FilaFactura = { id: string; cliente_id: string | null; comercial_id: string | null; total: number };
+type FilaFactura = { id: string; cliente_id: string | null; comercial_id: string | null; total: number; tipo_documento: string };
 type FilaLinea = { factura_id: string; articulo_id: string | null; importe: number };
 type FilaArticulo = { id: string; familia_id: string | null };
 
@@ -29,13 +30,16 @@ export async function getDesvioPresupuesto(codigoEmpresa: string, anio: number, 
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
   const idsFiltrados = await getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anio}-01-01`, `${anio}-12-31`);
 
-  const { data: filasRaw } = await supabase
-    .from('facturas')
-    .select('id, cliente_id, comercial_id, total')
-    .eq('empresa_id', empresa.id)
-    .gte('fecha', `${anio}-01-01`)
-    .lte('fecha', `${anio}-12-31`);
-  const facturas = filtrarPorIds((filasRaw ?? []) as FilaFactura[], idsFiltrados);
+  const filasRaw = await todasLasFilas<FilaFactura>((desde) =>
+    supabase
+      .from('facturas')
+      .select('id, cliente_id, comercial_id, total, tipo_documento')
+      .eq('empresa_id', empresa.id)
+      .gte('fecha', `${anio}-01-01`)
+      .lte('fecha', `${anio}-12-31`)
+      .range(desde, desde + TAMANO_PAGINA - 1)
+  );
+  const facturas = filtrarPorIds(filasRaw, idsFiltrados);
   const ids = facturas.map((f) => f.id);
 
   const netaCliente = new Map<string, number>();
@@ -45,6 +49,7 @@ export async function getDesvioPresupuesto(codigoEmpresa: string, anio: number, 
     if (f.cliente_id) netaCliente.set(f.cliente_id, (netaCliente.get(f.cliente_id) ?? 0) + total);
     if (f.comercial_id) netaComercial.set(f.comercial_id, (netaComercial.get(f.comercial_id) ?? 0) + total);
   }
+  const tipoFactura = new Map(facturas.map((f) => [f.id, f.tipo_documento]));
 
   const netaFamilia = new Map<string, number>();
   if (ids.length) {
@@ -52,13 +57,17 @@ export async function getDesvioPresupuesto(codigoEmpresa: string, anio: number, 
     const artIds = [...new Set(lineas.map((l) => l.articulo_id).filter(Boolean))] as string[];
     const familiaDeArticulo = new Map<string, string | null>();
     if (artIds.length) {
-      const { data: articulosRaw } = await supabase.from('articulos').select('id, familia_id').in('id', artIds);
-      for (const a of (articulosRaw ?? []) as FilaArticulo[]) familiaDeArticulo.set(a.id, a.familia_id);
+      const articulosRaw = await enLotes<FilaArticulo>(
+        (lote) => supabase.from('articulos').select('id, familia_id').in('id', lote),
+        artIds,
+      );
+      for (const a of articulosRaw) familiaDeArticulo.set(a.id, a.familia_id);
     }
     for (const l of lineas) {
       const fam = l.articulo_id ? familiaDeArticulo.get(l.articulo_id) : null;
       if (!fam) continue;
-      netaFamilia.set(fam, (netaFamilia.get(fam) ?? 0) + Number(l.importe ?? 0));
+      const signo = tipoFactura.get(l.factura_id) === 'abono' ? -1 : 1;
+      netaFamilia.set(fam, (netaFamilia.get(fam) ?? 0) + signo * Number(l.importe ?? 0));
     }
   }
 

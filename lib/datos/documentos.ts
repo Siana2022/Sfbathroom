@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
+import { lineasPorFacturas } from '@/lib/datos/lineas';
+import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 
 export const TIPO_LABEL: Record<string, string> = {
   factura: 'Factura',
@@ -87,26 +89,27 @@ export async function getDocumentos(
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
   const idsFiltrados = await getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anio}-01-01`, `${anio}-12-31`);
 
-  const { data: filasRaw } = await supabase
-    .from('facturas')
-    .select('id, numero_erp, fecha, tipo_documento, total, cliente_id, comercial_id')
-    .eq('empresa_id', empresa.id)
-    .gte('fecha', `${anio}-01-01`)
-    .lte('fecha', `${anio}-12-31`);
-  const facturas = ((filasRaw ?? []) as Partial<FilaFactura>[]).filter((f) => (idsFiltrados ? idsFiltrados.has(f.id!) : true));
+  const filasRaw = await todasLasFilas<Partial<FilaFactura>>((desde) =>
+    supabase
+      .from('facturas')
+      .select('id, numero_erp, fecha, tipo_documento, total, cliente_id, comercial_id')
+      .eq('empresa_id', empresa.id)
+      .gte('fecha', `${anio}-01-01`)
+      .lte('fecha', `${anio}-12-31`)
+      .range(desde, desde + TAMANO_PAGINA - 1)
+  );
+  const facturas = filasRaw.filter((f) => (idsFiltrados ? idsFiltrados.has(f.id!) : true));
 
   const ids = facturas.map((f) => f.id!);
-  const [cliRes, comRes, linRes] = await Promise.all([
+  const [cliRes, comRes, lineasDoc] = await Promise.all([
     supabase.from('clientes').select('id, nombre').eq('empresa_id', empresa.id),
     supabase.from('comerciales').select('id, nombre'),
-    ids.length
-      ? supabase.from('factura_lineas').select('factura_id, id').in('factura_id', ids)
-      : Promise.resolve({ data: [] }),
+    ids.length ? lineasPorFacturas<{ factura_id: string }>(supabase, 'factura_id', ids) : Promise.resolve([]),
   ]);
   const clienteNombre = new Map((cliRes.data ?? []).map((c) => [c.id, (c as { nombre: string }).nombre]));
   const comercialNombre = new Map((comRes.data ?? []).map((c) => [c.id, (c as { nombre: string }).nombre]));
   const lineasPorFactura = new Map<string, number>();
-  for (const l of (linRes.data ?? []) as { factura_id: string }[]) {
+  for (const l of lineasDoc) {
     lineasPorFactura.set(l.factura_id, (lineasPorFactura.get(l.factura_id) ?? 0) + 1);
   }
 

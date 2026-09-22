@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getFacturaIdsFiltradas, filtrarPorIds } from '@/lib/datos/filtros';
 import { lineasPorFacturas } from '@/lib/datos/lineas';
+import { enLotes, todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 import { netaDeDocumento } from '@/lib/datos/neta';
 import { METRICAS, type KpiConfig, type MetricaClave } from '@/lib/datos/kpisCatalogo';
 
@@ -100,14 +101,17 @@ async function resolverIds(
 
   const ids: Set<string> = new Set();
   for (const lote of trocear([...clientesExtra])) {
-    const { data } = await supabase
-      .from('facturas')
-      .select('id')
-      .eq('empresa_id', empId)
-      .gte('fecha', desde)
-      .lte('fecha', hasta)
-      .in('cliente_id', [...lote]);
-    for (const r of (data ?? []) as { id: string }[]) ids.add(r.id);
+    const filas = await todasLasFilas<{ id: string }>((desde2) =>
+      supabase
+        .from('facturas')
+        .select('id')
+        .eq('empresa_id', empId)
+        .gte('fecha', desde)
+        .lte('fecha', hasta)
+        .in('cliente_id', [...lote])
+        .range(desde2, desde2 + TAMANO_PAGINA - 1)
+    );
+    for (const r of filas) ids.add(r.id);
   }
   return ids;
 }
@@ -132,13 +136,16 @@ async function filasFacturas<T extends { id: string } = FilaFactura>(
   ids: Set<string> | null,
   columnas: string,
 ): Promise<T[]> {
-  const { data } = await supabase
-    .from('facturas')
-    .select(columnas)
-    .eq('empresa_id', empId)
-    .gte('fecha', desde)
-    .lte('fecha', hasta);
-  return filtrarPorIds((data ?? []) as unknown as T[], ids);
+  const data = await todasLasFilas<T>((desde2) =>
+    supabase
+      .from('facturas')
+      .select(columnas)
+      .eq('empresa_id', empId)
+      .gte('fecha', desde)
+      .lte('fecha', hasta)
+      .range(desde2, desde2 + TAMANO_PAGINA - 1)
+  );
+  return filtrarPorIds(data, ids);
 }
 
 /**
@@ -266,23 +273,29 @@ async function handleDso(
   let neta12m = 0;
   if (clientes) {
     for (const lote of trocear([...clientes])) {
-      const { data } = await supabase
+      const filas = await todasLasFilas<{ tipo_documento: string; total: number }>((desde2) =>
+        supabase
+          .from('facturas')
+          .select('tipo_documento, total')
+          .eq('empresa_id', empId)
+          .gte('fecha', desde)
+          .lte('fecha', hasta)
+          .in('cliente_id', [...lote])
+          .range(desde2, desde2 + TAMANO_PAGINA - 1)
+      );
+      neta12m += filas.reduce((s: number, f: { tipo_documento: string; total: number }) => s + netaDeDocumento(f.tipo_documento, f.total), 0);
+    }
+  } else {
+    const filas = await todasLasFilas<{ tipo_documento: string; total: number }>((desde2) =>
+      supabase
         .from('facturas')
         .select('tipo_documento, total')
         .eq('empresa_id', empId)
         .gte('fecha', desde)
         .lte('fecha', hasta)
-        .in('cliente_id', [...lote]);
-      neta12m += (data ?? []).reduce((s: number, f: { tipo_documento: string; total: number }) => s + netaDeDocumento(f.tipo_documento, f.total), 0);
-    }
-  } else {
-    const { data } = await supabase
-      .from('facturas')
-      .select('tipo_documento, total')
-      .eq('empresa_id', empId)
-      .gte('fecha', desde)
-      .lte('fecha', hasta);
-    neta12m = (data ?? []).reduce((s: number, f: { tipo_documento: string; total: number }) => s + netaDeDocumento(f.tipo_documento, f.total), 0);
+        .range(desde2, desde2 + TAMANO_PAGINA - 1)
+    );
+    neta12m = filas.reduce((s: number, f: { tipo_documento: string; total: number }) => s + netaDeDocumento(f.tipo_documento, f.total), 0);
   }
 
   return neta12m > 0 ? saldo / (neta12m / 365) : 0;
@@ -338,8 +351,11 @@ async function handleMargen(
   const artIdsTodas = [...new Set(tipadas.filter((l) => l.articulo_id).map((l) => l.articulo_id!))];
   const articulosMap = new Map<string, number>();
   if (artIdsTodas.length) {
-    const { data: arts } = await supabase.from('articulos').select('id, coste_unitario').in('id', artIdsTodas);
-    for (const a of (arts ?? []) as FilaArticulo[]) articulosMap.set(a.id, Number(a.coste_unitario ?? 0));
+    const arts = await enLotes<FilaArticulo>(
+      (lote) => supabase.from('articulos').select('id, coste_unitario').in('id', lote),
+      artIdsTodas,
+    );
+    for (const a of arts) articulosMap.set(a.id, Number(a.coste_unitario ?? 0));
   }
 
   const tipoMap = new Map(filas.map((f) => [f.id, f.tipo_documento]));

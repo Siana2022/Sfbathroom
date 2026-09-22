@@ -1,9 +1,10 @@
 import { createClient } from '@/lib/supabase/server';
+import { lineasPorFacturas } from '@/lib/datos/lineas';
+import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 
 const MESES = ['', 'ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
 type FilaFactura = { id: string; fecha: string; tipo_documento: string; total: number; cliente_id: string | null };
-type FilaLinea = { factura_id: string; cantidad: number };
 
 export type HerramientaMeta = {
   nombre: string;
@@ -60,8 +61,8 @@ const str = (v?: string) => v?.trim() || undefined;
 
 async function unidadesDeFactuas(supabase: ReturnType<typeof createClient>, ids: string[]): Promise<number> {
   if (!ids.length) return 0;
-  const { data } = await supabase.from('factura_lineas').select('cantidad').in('factura_id', ids);
-  return ((data ?? []) as FilaLinea[]).reduce((acc, l) => acc + Number(l.cantidad ?? 0), 0);
+  const lineas = await lineasPorFacturas<{ cantidad: number }>(supabase, 'cantidad', ids);
+  return lineas.reduce((acc, l) => acc + Number(l.cantidad ?? 0), 0);
 }
 
 export const toolExecutor = {
@@ -69,13 +70,15 @@ export const toolExecutor = {
     const supabase = createClient();
     const empresaId = await empresaDe(codigoEmpresa);
     const ejercicio = 2026;
-    const { data: filas } = await supabase
-      .from('facturas')
-      .select('id, fecha, tipo_documento, total')
-      .eq('empresa_id', empresaId)
-      .gte('fecha', `${ejercicio}-01-01`)
-      .lte('fecha', `${ejercicio}-12-31`);
-    const docs = (filas ?? []) as FilaFactura[];
+    const docs = await todasLasFilas<FilaFactura>((desde) =>
+      supabase
+        .from('facturas')
+        .select('id, fecha, tipo_documento, total')
+        .eq('empresa_id', empresaId)
+        .gte('fecha', `${ejercicio}-01-01`)
+        .lte('fecha', `${ejercicio}-12-31`)
+        .range(desde, desde + TAMANO_PAGINA - 1)
+    );
     const porMes = new Map<number, { neta: number; documentos: number; abonosYNotas: number }>();
     const idsPorMes = new Map<number, string[]>();
     for (const f of docs) {
@@ -107,12 +110,16 @@ export const toolExecutor = {
     const mes = Math.min(12, Math.max(1, Number(args.mes ?? 6) || 12));
     const anio = Number(args.ejercicio ?? 2026) || 2026;
     const finMes = `${String(mes).padStart(2, '0')}-${String(new Date(anio, mes, 0).getDate()).padStart(2, '0')}`;
-    const [{ data: cur }, { data: prev }] = await Promise.all([
-      supabase.from('facturas').select('total').eq('empresa_id', empresaId).gte('fecha', `${anio}-01-01`).lte('fecha', `${anio}-${finMes}`),
-      supabase.from('facturas').select('total').eq('empresa_id', empresaId).gte('fecha', `${anio - 1}-01-01`).lte('fecha', `${anio - 1}-${finMes}`),
+    const [cur, prev] = await Promise.all([
+      todasLasFilas<FilaFactura>((desde) =>
+        supabase.from('facturas').select('total').eq('empresa_id', empresaId).gte('fecha', `${anio}-01-01`).lte('fecha', `${anio}-${finMes}`).range(desde, desde + TAMANO_PAGINA - 1)
+      ),
+      todasLasFilas<FilaFactura>((desde) =>
+        supabase.from('facturas').select('total').eq('empresa_id', empresaId).gte('fecha', `${anio - 1}-01-01`).lte('fecha', `${anio - 1}-${finMes}`).range(desde, desde + TAMANO_PAGINA - 1)
+      ),
     ]);
-    const neta = ((cur ?? []) as FilaFactura[]).reduce((a, f) => a + Number(f.total ?? 0), 0);
-    const netaPrevio = ((prev ?? []) as FilaFactura[]).reduce((a, f) => a + Number(f.total ?? 0), 0);
+    const neta = cur.reduce((a, f) => a + Number(f.total ?? 0), 0);
+    const netaPrevio = prev.reduce((a, f) => a + Number(f.total ?? 0), 0);
     return { ok: true, datos: { ejercicio: anio, previo: anio - 1, hasta_mes: mes, neta, neta_previo: netaPrevio, delta_pct: netaPrevio > 0 ? Math.round(((neta - netaPrevio) / netaPrevio) * 1000) / 10 : null } };
   },
 
@@ -120,14 +127,17 @@ export const toolExecutor = {
     const supabase = createClient();
     const empresaId = await empresaDe(codigoEmpresa);
     const anio = Number(args.ejercicio ?? 2026) || 2026;
-    const { data: filas } = await supabase
-      .from('facturas')
-      .select('cliente_id, fecha, total')
-      .eq('empresa_id', empresaId)
-      .gte('fecha', `${anio}-01-01`)
-      .lte('fecha', `${anio}-12-31`);
+    const filas = await todasLasFilas<FilaFactura>((desde) =>
+      supabase
+        .from('facturas')
+        .select('cliente_id, fecha, total')
+        .eq('empresa_id', empresaId)
+        .gte('fecha', `${anio}-01-01`)
+        .lte('fecha', `${anio}-12-31`)
+        .range(desde, desde + TAMANO_PAGINA - 1)
+    );
     const porCliente = new Map<string, number>();
-    for (const f of (filas ?? []) as FilaFactura[]) {
+    for (const f of filas) {
       if (!f.cliente_id) continue;
       porCliente.set(f.cliente_id, (porCliente.get(f.cliente_id) ?? 0) + Number(f.total ?? 0));
     }
@@ -158,20 +168,26 @@ export const toolExecutor = {
     const empresaId = await empresaDe(codigoEmpresa);
     const anio = Number(args.ejercicio ?? 2026) || 2026;
     const previo = Number(args.previo ?? anio - 1) || anio - 1;
-    const { data: filas } = await supabase
-      .from('facturas')
-      .select('id, fecha, tipo_documento, total, cliente_id')
-      .eq('empresa_id', empresaId)
-      .gte('fecha', `${previo}-01-01`)
-      .lte('fecha', `${anio}-12-31`);
-    const docs = (filas ?? []) as FilaFactura[];
+    const docs = await todasLasFilas<FilaFactura>((desde) =>
+      supabase
+        .from('facturas')
+        .select('id, fecha, tipo_documento, total, cliente_id')
+        .eq('empresa_id', empresaId)
+        .gte('fecha', `${previo}-01-01`)
+        .lte('fecha', `${anio}-12-31`)
+        .range(desde, desde + TAMANO_PAGINA - 1)
+    );
     const info = new Map<string, { anio: number; tipo: string; cliente: string }>();
     for (const f of docs) info.set(f.id, { anio: Number(f.fecha.slice(0, 4)), tipo: f.tipo_documento, cliente: f.cliente_id ?? '' });
-    const { data: lineas } = await supabase.from('factura_lineas').select('factura_id, articulo_id, cantidad, importe').in('factura_id', [...info.keys()]);
+    const lineas = await lineasPorFacturas<{ factura_id: string; articulo_id: string; cantidad: number; importe: number }>(
+      supabase,
+      'factura_id, articulo_id, cantidad, importe',
+      [...info.keys()],
+    );
     const unidades = new Map<string, number[]>();
     const valores = new Map<string, number[]>();
     const porCliente = new Map<string, number[]>();
-    for (const l of (lineas ?? []) as { factura_id: string; articulo_id: string; cantidad: number; importe: number }[]) {
+    for (const l of lineas) {
       const inf = info.get(l.factura_id)!;
       const cli = inf.cliente;
       const idx = inf.anio === anio ? 1 : 0;
