@@ -162,11 +162,19 @@ Plan de rendimiento cerrado con el cliente (spec P1–P5). Estado:
   paralelo.
 
 Pendiente para la próxima sesión:
-- Verificar que el cliente aplicó la migración `0018` y validar números tras el nightly job.
-- Env vars Vercel que faltan: `JOBS_CRON_SECRET` (+ configurar Cron Secret), `VAPID_PUBLIC_KEY`,
-  `VAPID_PRIVATE_KEY`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`. Cliente solo añadió
-  `SUPABASE_SERVICE_ROLE_KEY`. Migraciones historias 0001–0017 ya aplicadas por el cliente.
-- Retirar `export const dynamic = 'force-dynamic'` donde toque (decisión pendiente tras P2).
+- **16 sep 2026 ✓**: eliminado `force-dynamic` redundante (33 rutas) — Next lo detecta por
+  `cookies()`.
+- **16 sep 2026 ✓**: corregido middleware para el cron: antes redirigía a `/login` cualquier
+  `/api/jobs/*` sin sesión, así que Vercel Cron (solo `Authorization: Bearer secret`) recibía
+  307 y no ejecutaba nada. Ahora `/api/jobs/*` pasa si lleva `JOBS_CRON_SECRET` (cabecera o
+  `?secret=`); `/api/jobs/jobs` es público. Verificado contra producción: el job
+  `resumen-diario` responde `ok`.
+- Env vars Vercel: `JOBS_CRON_SECRET`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`,
+  `NEXT_PUBLIC_VAPID_PUBLIC_KEY` (Config, no secret), `RESEND_*`/`ALERTAS_*` y
+  `ANTHROPIC_API_KEY` a cargo del cliente. Cliente añadió `SUPABASE_SERVICE_ROLE_KEY`.
+- Migraciones 0001–0018 aplicadas por el cliente.
+- Retirar provisional de fuerza bruta: `memo` por uid en portada ya da caché segura; no tocar
+  `unstable_cache` con `cookies()`.
 - Bugs previos cerrados y pusheados: export `dynamicForce` inválido en `mi-panel`,
   auditoría de cálculo (`fichaCliente`, `miDia`, `crosssell`, `buscar`, `alertas`, `stock`,
   `anomalias`), y saneo de búsqueda (`lib/buscar.ts` — `sanearTermino(q)` usado por
