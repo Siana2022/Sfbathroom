@@ -3,3 +3,6 @@ node_modules/
 .env.local
 .vercel
 *.tsbuildinfo
+mcp/.env
+mcp/node_modules/
+mcp/dist/
