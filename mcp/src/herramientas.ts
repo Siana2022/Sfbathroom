@@ -4,7 +4,7 @@ import { r2, inTroceado, empresaDe, DatosError } from './consulta.js';
 
 const MESES = ['', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
-type FilaFactura = { id: string; fecha: string; tipo_documento: string; total: number; cliente_id: string | null };
+type FilaFactura = { id: string; fecha: string; tipo_documento: string; base_imponible: number; cliente_id: string | null };
 type Signo = (tipo: string) => number;
 
 const signo: Signo = (tipo) => (tipo === 'abono' ? -1 : 1);
@@ -40,7 +40,7 @@ export const herramientas = {
       const empresaId = await empresaDe(args.empresa);
       const { data, error } = await supabase
         .from('facturas')
-        .select('id, fecha, tipo_documento, total')
+        .select('id, fecha, tipo_documento, base_imponible')
         .eq('empresa_id', empresaId)
         .gte('fecha', `${args.ejercicio}-01-01`)
         .lte('fecha', `${args.ejercicio}-12-31`);
@@ -53,7 +53,7 @@ export const herramientas = {
       for (const f of docs) {
         const m = Number(f.fecha.slice(5, 7));
         const cur = porMes.get(m) ?? { neta: 0, documentos: 0, abonosYNotas: 0 };
-        cur.neta += Number(f.total ?? 0);
+        cur.neta += Number(f.base_imponible ?? 0);
         if (f.tipo_documento === 'factura') {
           cur.documentos += 1;
           idsFactura.push(f.id);
@@ -76,7 +76,7 @@ export const herramientas = {
         }
       }
 
-      const totalNeta = docs.reduce((a, f) => a + Number(f.total ?? 0), 0);
+      const totalNeta = docs.reduce((a, f) => a + Number(f.base_imponible ?? 0), 0);
       const series = Array.from({ length: 12 }, (_, i) => {
         const m = i + 1;
         const c = porMes.get(m) ?? { neta: 0, documentos: 0, abonosYNotas: 0 };
@@ -94,12 +94,12 @@ export const herramientas = {
       const mes = args.mes ?? 12;
       const fin = `${String(mes).padStart(2, '0')}-${String(new Date(args.ejercicio, mes, 0).getDate()).padStart(2, '0')}`;
       const [{ data: cur }, { data: prev }] = await Promise.all([
-        supabase.from('facturas').select('total').eq('empresa_id', empresaId).gte('fecha', `${args.ejercicio}-01-01`).lte('fecha', `${args.ejercicio}-${fin}`),
-        supabase.from('facturas').select('total').eq('empresa_id', empresaId).gte('fecha', `${args.ejercicio - 1}-01-01`).lte('fecha', `${args.ejercicio - 1}-${fin}`),
+        supabase.from('facturas').select('base_imponible').eq('empresa_id', empresaId).gte('fecha', `${args.ejercicio}-01-01`).lte('fecha', `${args.ejercicio}-${fin}`),
+        supabase.from('facturas').select('base_imponible').eq('empresa_id', empresaId).gte('fecha', `${args.ejercicio - 1}-01-01`).lte('fecha', `${args.ejercicio - 1}-${fin}`),
       ]);
       if (!cur && !prev) throw new DatosError('Error consultando la evolución.');
-      const neta = ((cur ?? []) as FilaFactura[]).reduce((a, f) => a + Number(f.total ?? 0), 0);
-      const netaPrevio = ((prev ?? []) as FilaFactura[]).reduce((a, f) => a + Number(f.total ?? 0), 0);
+      const neta = ((cur ?? []) as FilaFactura[]).reduce((a, f) => a + Number(f.base_imponible ?? 0), 0);
+      const netaPrevio = ((prev ?? []) as FilaFactura[]).reduce((a, f) => a + Number(f.base_imponible ?? 0), 0);
       return texto({
         ejercicio: args.ejercicio,
         previo: args.ejercicio - 1,
@@ -118,7 +118,7 @@ export const herramientas = {
       const empresaId = await empresaDe(args.empresa);
       const { data, error } = await supabase
         .from('facturas')
-        .select('cliente_id, total')
+        .select('cliente_id, base_imponible')
         .eq('empresa_id', empresaId)
         .gte('fecha', `${args.ejercicio}-01-01`)
         .lte('fecha', `${args.ejercicio}-12-31`);
@@ -126,7 +126,7 @@ export const herramientas = {
       const porCliente = new Map<string, number>();
       for (const f of (data ?? []) as FilaFactura[]) {
         if (!f.cliente_id) continue;
-        porCliente.set(f.cliente_id, (porCliente.get(f.cliente_id) ?? 0) + Number(f.total ?? 0));
+        porCliente.set(f.cliente_id, (porCliente.get(f.cliente_id) ?? 0) + Number(f.base_imponible ?? 0));
       }
       const total = [...porCliente.values()].reduce((a, b) => a + b, 0);
       const top = [...porCliente.entries()].sort((a, b) => b[1] - a[1]).slice(0, args.limite ?? 10);
@@ -156,7 +156,7 @@ export const herramientas = {
       const previo = args.previo ?? args.ejercicio - 1;
       const { data, error } = await supabase
         .from('facturas')
-        .select('id, fecha, tipo_documento, total, cliente_id')
+        .select('id, fecha, tipo_documento, base_imponible, cliente_id')
         .eq('empresa_id', empresaId)
         .gte('fecha', `${previo}-01-01`)
         .lte('fecha', `${args.ejercicio}-12-31`);
@@ -234,7 +234,7 @@ export const herramientas = {
       const empresaId = await empresaDe(args.empresa);
       const { data: facRes, error } = await supabase
         .from('facturas')
-        .select('id, tipo_documento, total')
+        .select('id, tipo_documento, base_imponible')
         .eq('empresa_id', empresaId)
         .in('tipo_documento', ['factura', 'abono', 'nota_cargo'])
         .gte('fecha', `${args.ejercicio}-01-01`)
@@ -259,7 +259,7 @@ export const herramientas = {
       const nombreFamilia = new Map<string, string>();
       for (const f of famRes ?? []) nombreFamilia.set(f.id as string, f.nombre as string);
 
-      let importeVendido = docs.reduce((a, f) => a + Number(f.total ?? 0), 0);
+      let importeVendido = docs.reduce((a, f) => a + Number(f.base_imponible ?? 0), 0);
       let costeVenta = 0;
       const familiaResumen = new Map<string, { importe: number; coste: number }>();
       for (const l of lineas) {

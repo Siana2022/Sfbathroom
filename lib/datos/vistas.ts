@@ -43,10 +43,10 @@ export async function getVistasTemporales(codigoEmpresa: string, anio: number, f
 
   const idsFiltrados = await getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, desdeIso, hoyIso);
 
-  const filas = await todasLasFilas<{ id: string; fecha: string; tipo_documento: string; total: number }>((desde) =>
+  const filas = await todasLasFilas<{ id: string; fecha: string; tipo_documento: string; base_imponible: number }>((desde) =>
     supabase
       .from('facturas')
-      .select('id, fecha, tipo_documento, total')
+      .select('id, fecha, tipo_documento, base_imponible')
       .eq('empresa_id', empresa.id)
       .in('tipo_documento', [...TIPOS_NETA])
       .gte('fecha', desdeIso)
@@ -55,7 +55,7 @@ export async function getVistasTemporales(codigoEmpresa: string, anio: number, f
   );
   const facturas = filtrarPorIds(filas, idsFiltrados);
 
-  const importes = facturas.map((f) => netaDeDocumento(f.tipo_documento, f.total));
+  const importes = facturas.map((f) => netaDeDocumento(f.tipo_documento, f.base_imponible));
 
   const diaria = new Map<string, FilaDiaria>();
   const semanal = new Map<string, FilaSemanal>();

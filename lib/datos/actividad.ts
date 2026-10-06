@@ -33,7 +33,7 @@ export type ActividadData = {
   comerciales: ComercialRow[];
 };
 
-type Fila = { id: string; comercial_id: string | null; cliente_id: string | null; total: number; tipo_documento: string; descuento_pie: number; fecha: string };
+type Fila = { id: string; comercial_id: string | null; cliente_id: string | null; base_imponible: number; tipo_documento: string; descuento_pie: number; fecha: string };
 type FilaComercial = { id: string; nombre: string };
 type FilaPedido = { comercial_id: string | null };
 type FilaLinea = { factura_id: string; articulo_id: string | null; cantidad: number; importe: number; coste_unitario: number | null };
@@ -56,7 +56,7 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
     todasLasFilas<Fila>((desde) =>
       supabase
         .from('facturas')
-        .select('id, comercial_id, cliente_id, total, tipo_documento, descuento_pie, fecha')
+        .select('id, comercial_id, cliente_id, base_imponible, tipo_documento, descuento_pie, fecha')
         .eq('empresa_id', empresa.id)
         .in('tipo_documento', ['factura', 'abono', 'nota_cargo'])
         .gte('fecha', `${anio}-01-01`)
@@ -138,12 +138,12 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
   for (const f of filas) {
     const key = f.comercial_id ?? '';
     const c = porComercial.get(key) ?? { neta: 0, trimNeta: 0, facturas: 0, clientes: new Set<string>(), descuento: 0, margenImporte: 0, margenCoste: 0 };
-    c.neta += netaDeDocumento(f.tipo_documento, f.total);
+    c.neta += netaDeDocumento(f.tipo_documento, f.base_imponible);
     c.facturas += 1;
     if (f.cliente_id) c.clientes.add(f.cliente_id);
     c.descuento += Number(f.descuento_pie ?? 0);
     const trim = Math.floor((Number(f.fecha.slice(5, 7)) - 1) / 3) + 1;
-    if (trim === trimActual) c.trimNeta += netaDeDocumento(f.tipo_documento, f.total);
+    if (trim === trimActual) c.trimNeta += netaDeDocumento(f.tipo_documento, f.base_imponible);
     porComercial.set(key, c);
   }
 

@@ -41,10 +41,10 @@ export async function getCalidad(codigoEmpresa: string, anio: number, filtros?: 
   let importeDevoluciones = 0;
   const idsAbonos: string[] = [];
   {
-    const filas = await todasLasFilas<{ id: string; tipo_documento: string; total: number }>((desde) =>
+    const filas = await todasLasFilas<{ id: string; tipo_documento: string; base_imponible: number }>((desde) =>
       supabase
         .from('facturas')
-        .select('id, tipo_documento, total')
+        .select('id, tipo_documento, base_imponible')
         .eq('empresa_id', empresa.id)
         .gte('fecha', `${anio}-01-01`)
         .lte('fecha', `${anio}-12-31`)
@@ -52,12 +52,12 @@ export async function getCalidad(codigoEmpresa: string, anio: number, filtros?: 
     );
     const facturas = filtrarPorIds(filas, idsFiltrados);
     for (const f of facturas) {
-      const total = Number(f.total ?? 0);
+      const base = Number(f.base_imponible ?? 0);
       if (f.tipo_documento === 'abono') {
-        importeDevoluciones += Math.abs(total);
+        importeDevoluciones += Math.abs(base);
         idsAbonos.push(f.id);
       } else {
-        neta += total;
+        neta += base;
       }
     }
   }

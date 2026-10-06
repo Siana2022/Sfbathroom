@@ -4,7 +4,7 @@ import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 
 const MESES = ['', 'ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
-type FilaFactura = { id: string; fecha: string; tipo_documento: string; total: number; cliente_id: string | null };
+type FilaFactura = { id: string; fecha: string; tipo_documento: string; base_imponible: number; cliente_id: string | null };
 
 export type HerramientaMeta = {
   nombre: string;
@@ -73,7 +73,7 @@ export const toolExecutor = {
     const docs = await todasLasFilas<FilaFactura>((desde) =>
       supabase
         .from('facturas')
-        .select('id, fecha, tipo_documento, total')
+        .select('id, fecha, tipo_documento, base_imponible')
         .eq('empresa_id', empresaId)
         .gte('fecha', `${ejercicio}-01-01`)
         .lte('fecha', `${ejercicio}-12-31`)
@@ -84,7 +84,7 @@ export const toolExecutor = {
     for (const f of docs) {
       const m = Number(f.fecha.slice(5, 7));
       const cur = porMes.get(m) ?? { neta: 0, documentos: 0, abonosYNotas: 0 };
-      cur.neta += Number(f.total ?? 0);
+      cur.neta += Number(f.base_imponible ?? 0);
       if (f.tipo_documento === 'factura') {
         cur.documentos += 1;
         const arr = idsPorMes.get(m) ?? [];
@@ -95,7 +95,7 @@ export const toolExecutor = {
     }
     const unidades = new Map<number, number>();
     for (const [m, ids] of idsPorMes) unidades.set(m, await unidadesDeFactuas(supabase, ids));
-    const total = docs.reduce((acc, f) => acc + Number(f.total ?? 0), 0);
+    const total = docs.reduce((acc, f) => acc + Number(f.base_imponible ?? 0), 0);
     const series = Array.from({ length: 12 }, (_, i) => {
       const m = i + 1;
       const c = porMes.get(m) ?? { neta: 0, documentos: 0, abonosYNotas: 0 };
@@ -112,14 +112,14 @@ export const toolExecutor = {
     const finMes = `${String(mes).padStart(2, '0')}-${String(new Date(anio, mes, 0).getDate()).padStart(2, '0')}`;
     const [cur, prev] = await Promise.all([
       todasLasFilas<FilaFactura>((desde) =>
-        supabase.from('facturas').select('total').eq('empresa_id', empresaId).gte('fecha', `${anio}-01-01`).lte('fecha', `${anio}-${finMes}`).range(desde, desde + TAMANO_PAGINA - 1)
+        supabase.from('facturas').select('base_imponible').eq('empresa_id', empresaId).gte('fecha', `${anio}-01-01`).lte('fecha', `${anio}-${finMes}`).range(desde, desde + TAMANO_PAGINA - 1)
       ),
       todasLasFilas<FilaFactura>((desde) =>
-        supabase.from('facturas').select('total').eq('empresa_id', empresaId).gte('fecha', `${anio - 1}-01-01`).lte('fecha', `${anio - 1}-${finMes}`).range(desde, desde + TAMANO_PAGINA - 1)
+        supabase.from('facturas').select('base_imponible').eq('empresa_id', empresaId).gte('fecha', `${anio - 1}-01-01`).lte('fecha', `${anio - 1}-${finMes}`).range(desde, desde + TAMANO_PAGINA - 1)
       ),
     ]);
-    const neta = cur.reduce((a, f) => a + Number(f.total ?? 0), 0);
-    const netaPrevio = prev.reduce((a, f) => a + Number(f.total ?? 0), 0);
+    const neta = cur.reduce((a, f) => a + Number(f.base_imponible ?? 0), 0);
+    const netaPrevio = prev.reduce((a, f) => a + Number(f.base_imponible ?? 0), 0);
     return { ok: true, datos: { ejercicio: anio, previo: anio - 1, hasta_mes: mes, neta, neta_previo: netaPrevio, delta_pct: netaPrevio > 0 ? Math.round(((neta - netaPrevio) / netaPrevio) * 1000) / 10 : null } };
   },
 
@@ -130,7 +130,7 @@ export const toolExecutor = {
     const filas = await todasLasFilas<FilaFactura>((desde) =>
       supabase
         .from('facturas')
-        .select('cliente_id, fecha, total')
+        .select('cliente_id, fecha, base_imponible')
         .eq('empresa_id', empresaId)
         .gte('fecha', `${anio}-01-01`)
         .lte('fecha', `${anio}-12-31`)
@@ -139,7 +139,7 @@ export const toolExecutor = {
     const porCliente = new Map<string, number>();
     for (const f of filas) {
       if (!f.cliente_id) continue;
-      porCliente.set(f.cliente_id, (porCliente.get(f.cliente_id) ?? 0) + Number(f.total ?? 0));
+      porCliente.set(f.cliente_id, (porCliente.get(f.cliente_id) ?? 0) + Number(f.base_imponible ?? 0));
     }
     const total = [...porCliente.values()].reduce((a, b) => a + b, 0);
     const top = [...porCliente.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
@@ -171,7 +171,7 @@ export const toolExecutor = {
     const docs = await todasLasFilas<FilaFactura>((desde) =>
       supabase
         .from('facturas')
-        .select('id, fecha, tipo_documento, total, cliente_id')
+        .select('id, fecha, tipo_documento, base_imponible, cliente_id')
         .eq('empresa_id', empresaId)
         .gte('fecha', `${previo}-01-01`)
         .lte('fecha', `${anio}-12-31`)

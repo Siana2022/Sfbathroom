@@ -7,7 +7,7 @@ import { netaDeDocumento } from '@/lib/datos/neta';
 import { METRICAS, type KpiConfig, type MetricaClave } from '@/lib/datos/kpisCatalogo';
 
 type FilaFactura = {
-  id: string; fecha: string; tipo_documento: string; total: number;
+  id: string; fecha: string; tipo_documento: string; total: number; base_imponible: number;
   cliente_id: string | null; comercial_id: string | null;
 };
 type FilaLinea = { factura_id: string; articulo_id: string | null; importe: number; cantidad: number };
@@ -190,8 +190,8 @@ async function handleVentasNetas(
   ids: Set<string> | null, artIds: Set<string> | null,
 ): Promise<number> {
   if (artIds) return (await netaPorLineas(supabase, empId, desde, hasta, ids, artIds)).neta;
-  const filas = await filasFacturas(supabase, empId, desde, hasta, ids, 'id, fecha, tipo_documento, total, cliente_id');
-  return filas.reduce((s, f) => s + netaDeDocumento(f.tipo_documento, f.total), 0);
+  const filas = await filasFacturas(supabase, empId, desde, hasta, ids, 'id, fecha, tipo_documento, base_imponible, cliente_id');
+  return filas.reduce((s, f) => s + netaDeDocumento(f.tipo_documento, f.base_imponible), 0);
 }
 
 async function handleUnidades(
@@ -227,8 +227,8 @@ async function handleTicketMedio(
     const r = await netaPorLineas(supabase, empId, desde, hasta, ids, artIds);
     return r.nFacturas > 0 ? r.neta / r.nFacturas : 0;
   }
-  const filas = await filasFacturas(supabase, empId, desde, hasta, ids, 'id, tipo_documento, total, cliente_id');
-  const neta = filas.reduce((s, f) => s + netaDeDocumento(f.tipo_documento, f.total), 0);
+  const filas = await filasFacturas(supabase, empId, desde, hasta, ids, 'id, tipo_documento, base_imponible, cliente_id');
+  const neta = filas.reduce((s, f) => s + netaDeDocumento(f.tipo_documento, f.base_imponible), 0);
   const nFacturas = filas.filter((f) => f.tipo_documento !== 'abono').length;
   return nFacturas > 0 ? neta / nFacturas : 0;
 }
@@ -311,9 +311,9 @@ async function handlePctDevoluciones(
     const total = r.ventaAbs + r.abonosAbs;
     return total > 0 ? (r.abonosAbs / total) * 100 : 0;
   }
-  const filas = await filasFacturas(supabase, empId, desde, hasta, ids, 'tipo_documento, total, cliente_id');
-  const total = filas.reduce((s, f) => s + Math.abs(Number(f.total ?? 0)), 0);
-  const abonos = filas.filter((f) => f.tipo_documento === 'abono').reduce((s, f) => s + Math.abs(Number(f.total ?? 0)), 0);
+  const filas = await filasFacturas(supabase, empId, desde, hasta, ids, 'tipo_documento, base_imponible, cliente_id');
+  const total = filas.reduce((s, f) => s + Math.abs(Number(f.base_imponible ?? 0)), 0);
+  const abonos = filas.filter((f) => f.tipo_documento === 'abono').reduce((s, f) => s + Math.abs(Number(f.base_imponible ?? 0)), 0);
   return total > 0 ? (abonos / total) * 100 : 0;
 }
 

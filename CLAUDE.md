@@ -152,6 +152,16 @@ Detalle completo: `docs/asistente-ia.md`. Tools actuales: `ventas_por_mes`,
   null (dependían de `jobs_ejecutados` del cron de la app). Ahora muestran por empresa la
   última fecha con facturas cargadas (`max(fecha)` sobre `facturas`, con RLS), píldora
   coloreada según antigüedad, siempre visible en la cabecera.
+- **Neta = base imponible (semántica)**: la app mostraba `facturas.total` (TOTMONEDA, con
+  IVA+suplidos) como "facturación neta"; Power BI del cliente usa base imponible
+  (BASEMONEDA). Se alineó toda la app a `base_imponible` (vista `v_perf_facturacion_mensual`
+  recreada en `0021_neta_base_imponible.sql`, y `lib/datos/*` que suman neta de venta:
+  facturacion, vistas, miDia, actividad, desvioPresupuesto, clientes, concentracion,
+  kpiEval netas/ticket/devoluciones, fichaCliente netas, pedidos, calidad, alertas,
+  jobs anomalias/informe/reunirResumen y agente+MCP). Se conserva `total` (con IVA) en:
+  cobros/cartera y DSO (saldos con IVA), documentos (detalle de documentos) y los importes
+  por documento de fichaCliente. `getVariacion` ya calculaba sobre importe de línea (base),
+  con lo que ahora sí cuadra con la cabecera.
 
 ## Última sesión (15 sep 2026) · optimización de rendimiento P1–P5
 

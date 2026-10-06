@@ -63,16 +63,16 @@ export async function getFichaCliente(codigoEmpresa: string, clienteId: string, 
 
   const { data: facturas } = await supabase
     .from('facturas')
-    .select('id, numero_erp, fecha, tipo_documento, total')
+    .select('id, numero_erp, fecha, tipo_documento, total, base_imponible')
     .eq('empresa_id', empresa.id)
     .eq('cliente_id', clienteId)
     .gte('fecha', `${anio - 1}-01-01`);
-  const filas = (facturas ?? []) as { id: string; numero_erp: string | null; fecha: string; tipo_documento: string; total: number }[];
+  const filas = (facturas ?? []) as { id: string; numero_erp: string | null; fecha: string; tipo_documento: string; total: number; base_imponible: number }[];
 
   const delAnio = filas.filter((f) => f.fecha.slice(0, 4) === String(anio));
   const delPrevio = filas.filter((f) => f.fecha.slice(0, 4) === String(anio - 1));
-  const neta = delAnio.reduce((s, f) => s + netaDeDocumento(f.tipo_documento, f.total), 0);
-  const netaPrevio = delPrevio.reduce((s, f) => s + netaDeDocumento(f.tipo_documento, f.total), 0);
+  const neta = delAnio.reduce((s, f) => s + netaDeDocumento(f.tipo_documento, f.base_imponible), 0);
+  const netaPrevio = delPrevio.reduce((s, f) => s + netaDeDocumento(f.tipo_documento, f.base_imponible), 0);
   const facturasN = delAnio.filter((f) => f.tipo_documento !== 'abono').length;
 
   // histórico neto mensual (15 meses)
@@ -84,7 +84,7 @@ export async function getFichaCliente(codigoEmpresa: string, clienteId: string, 
   for (const f of filas) {
     if (!f.fecha || f.fecha < hace15.toISOString().slice(0, 10)) continue;
     const clave = f.fecha.slice(0, 7);
-    porMes.set(clave, (porMes.get(clave) ?? 0) + netaDeDocumento(f.tipo_documento, f.total));
+    porMes.set(clave, (porMes.get(clave) ?? 0) + netaDeDocumento(f.tipo_documento, f.base_imponible));
   }
   const claves = [...porMes.keys()].sort();
   for (const clave of claves) {

@@ -26,24 +26,24 @@ export async function reunirInforme(supabase: SupabaseClient, empresaCodigo: str
 
   const { data: facturas } = await supabase
     .from('facturas')
-    .select('tipo_documento, total, fecha, cliente_id')
+    .select('tipo_documento, base_imponible, fecha, cliente_id')
     .eq('empresa_id', empId)
     .gte('fecha', `${anio}-01-01`)
     .lte('fecha', `${anio}-12-31`);
-  const filas = (facturas ?? []) as { tipo_documento: string; total: number; fecha: string; cliente_id: string | null }[];
+  const filas = (facturas ?? []) as { tipo_documento: string; base_imponible: number; fecha: string; cliente_id: string | null }[];
 
-  const neta = filas.reduce((s, f) => s + netaDeDocumento(f.tipo_documento, f.total), 0);
+  const neta = filas.reduce((s, f) => s + netaDeDocumento(f.tipo_documento, f.base_imponible), 0);
   const nFacturas = filas.filter((f) => f.tipo_documento !== 'abono').length;
   const clientesActivos = new Set(filas.filter((f) => f.cliente_id).map((f) => f.cliente_id)).size;
   const ticketMedio = nFacturas > 0 ? neta / nFacturas : 0;
 
   const { data: previas } = await supabase
     .from('facturas')
-    .select('tipo_documento, total')
+    .select('tipo_documento, base_imponible')
     .eq('empresa_id', empId)
     .gte('fecha', `${anio - 1}-01-01`)
     .lte('fecha', `${anio - 1}-12-31`);
-  const netaPrevio = (previas ?? []).reduce((s: number, f: { tipo_documento: string; total: number }) => s + netaDeDocumento(f.tipo_documento, f.total), 0);
+  const netaPrevio = (previas ?? []).reduce((s: number, f: { tipo_documento: string; base_imponible: number }) => s + netaDeDocumento(f.tipo_documento, f.base_imponible), 0);
   const deltaPct = netaPrevio > 0 ? ((neta - netaPrevio) / netaPrevio) * 100 : null;
 
   const { data: presupuesto } = await supabase.from('presupuesto').select('importe').eq('empresa_id', empId).eq('ejercicio', anio);
@@ -62,7 +62,7 @@ export async function reunirInforme(supabase: SupabaseClient, empresaCodigo: str
   const porCliente = new Map<string, number>();
   for (const f of filas) {
     if (!f.cliente_id) continue;
-    porCliente.set(f.cliente_id, (porCliente.get(f.cliente_id) ?? 0) + netaDeDocumento(f.tipo_documento, f.total));
+    porCliente.set(f.cliente_id, (porCliente.get(f.cliente_id) ?? 0) + netaDeDocumento(f.tipo_documento, f.base_imponible));
   }
   const topIds = [...porCliente.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([id]) => id);
   const { data: clis } = await supabase.from('clientes').select('id, nombre').in('id', topIds);

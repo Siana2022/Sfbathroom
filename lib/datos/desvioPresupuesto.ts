@@ -21,7 +21,7 @@ export type DesvioPresupuesto = {
   porFamilia: FilaDesvio[];
 };
 
-type FilaFactura = { id: string; cliente_id: string | null; comercial_id: string | null; total: number; tipo_documento: string };
+type FilaFactura = { id: string; cliente_id: string | null; comercial_id: string | null; base_imponible: number; tipo_documento: string };
 type FilaLinea = { factura_id: string; articulo_id: string | null; importe: number };
 type FilaArticulo = { id: string; familia_id: string | null };
 
@@ -33,7 +33,7 @@ export async function getDesvioPresupuesto(codigoEmpresa: string, anio: number, 
   const filasRaw = await todasLasFilas<FilaFactura>((desde) =>
     supabase
       .from('facturas')
-      .select('id, cliente_id, comercial_id, total, tipo_documento')
+      .select('id, cliente_id, comercial_id, base_imponible, tipo_documento')
       .eq('empresa_id', empresa.id)
       .gte('fecha', `${anio}-01-01`)
       .lte('fecha', `${anio}-12-31`)
@@ -45,9 +45,9 @@ export async function getDesvioPresupuesto(codigoEmpresa: string, anio: number, 
   const netaCliente = new Map<string, number>();
   const netaComercial = new Map<string, number>();
   for (const f of facturas) {
-    const total = Number(f.total ?? 0);
-    if (f.cliente_id) netaCliente.set(f.cliente_id, (netaCliente.get(f.cliente_id) ?? 0) + total);
-    if (f.comercial_id) netaComercial.set(f.comercial_id, (netaComercial.get(f.comercial_id) ?? 0) + total);
+    const base = Number(f.base_imponible ?? 0);
+    if (f.cliente_id) netaCliente.set(f.cliente_id, (netaCliente.get(f.cliente_id) ?? 0) + base);
+    if (f.comercial_id) netaComercial.set(f.comercial_id, (netaComercial.get(f.comercial_id) ?? 0) + base);
   }
   const tipoFactura = new Map(facturas.map((f) => [f.id, f.tipo_documento]));
 

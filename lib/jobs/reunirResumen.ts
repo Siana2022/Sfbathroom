@@ -13,13 +13,13 @@ export async function reunirResumen(supabase: SupabaseClient, empresaCodigo: str
 
   const { data: facturas } = await supabase
     .from('facturas')
-    .select('id, fecha, tipo_documento, total, cliente_id')
+    .select('id, fecha, tipo_documento, base_imponible, cliente_id')
     .eq('empresa_id', empId)
     .gte('fecha', `${anio}-01-01`)
     .lte('fecha', `${anio}-12-31`);
 
-  const filas = (facturas ?? []) as { id: string; fecha: string; tipo_documento: string; total: number; cliente_id: string | null }[];
-  const neta = filas.reduce((s, f) => s + netaDeDocumento(f.tipo_documento, f.total), 0);
+  const filas = (facturas ?? []) as { id: string; fecha: string; tipo_documento: string; base_imponible: number; cliente_id: string | null }[];
+  const neta = filas.reduce((s, f) => s + netaDeDocumento(f.tipo_documento, f.base_imponible), 0);
   const nFacturas = filas.filter((f) => f.tipo_documento !== 'abono').length;
   const clientesActivos = new Set(filas.filter((f) => f.cliente_id).map((f) => f.cliente_id)).size;
   const ticketMedio = nFacturas > 0 ? neta / nFacturas : 0;
@@ -27,11 +27,11 @@ export async function reunirResumen(supabase: SupabaseClient, empresaCodigo: str
   // Facturas previas (año anterior) para Δ
   const { data: previas } = await supabase
     .from('facturas')
-    .select('tipo_documento, total')
+    .select('tipo_documento, base_imponible')
     .eq('empresa_id', empId)
     .gte('fecha', `${anio - 1}-01-01`)
     .lte('fecha', `${anio - 1}-12-31`);
-  const netaPrevio = (previas ?? []).reduce((s: number, f: { tipo_documento: string; total: number }) => s + netaDeDocumento(f.tipo_documento, f.total), 0);
+  const netaPrevio = (previas ?? []).reduce((s: number, f: { tipo_documento: string; base_imponible: number }) => s + netaDeDocumento(f.tipo_documento, f.base_imponible), 0);
 
   // Unidades (factura_lineas)
   const lineasIds = filas.filter((f) => f.tipo_documento === 'factura').map((f) => f.id);

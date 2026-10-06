@@ -39,15 +39,15 @@ export async function detectarAnomalias(supabase: SupabaseClient, empresaId: str
 
     const { data: facturas } = await supabase
       .from('facturas')
-      .select('tipo_documento, total, fecha')
+      .select('tipo_documento, base_imponible, fecha')
       .eq('empresa_id', empresaId)
       .gte('fecha', desdePrev)
       .lte('fecha', hasta);
 
-    const filas = (facturas ?? []) as { tipo_documento: string; total: number; fecha: string }[];
+    const filas = (facturas ?? []) as { tipo_documento: string; base_imponible: number; fecha: string }[];
     const enMes = (clave: string) => filas.filter((f) => f.fecha.slice(0, 7) === clave);
 
-    const neta = (fs: { tipo_documento: string; total: number }[]) => fs.reduce((s, f) => s + netaDeDocumento(f.tipo_documento, f.total), 0);
+    const neta = (fs: { tipo_documento: string; base_imponible: number }[]) => fs.reduce((s, f) => s + netaDeDocumento(f.tipo_documento, f.base_imponible), 0);
     const netaMes = neta(enMes(claveMes(mesCompReal)));
     const netaPrev = neta(enMes(claveMesPrevio(mesCompReal)));
 

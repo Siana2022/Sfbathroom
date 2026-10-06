@@ -39,7 +39,7 @@ export const UMBRAL_FAMILIA_RELEVANTE = 0.08;
 export const UMBRAL_CLIENTE_DE_FAMILIA = 0.7;
 export const PLAZO_PROVEEDOR_ALTO_DIAS = 75;
 
-type Fila = { id: string; cliente_id: string | null; fecha: string; total: number; tipo_documento: string };
+type Fila = { id: string; cliente_id: string | null; fecha: string; base_imponible: number; tipo_documento: string };
 type FilaLinea = { factura_id: string; articulo_id: string | null; importe: number };
 type FilaArticulo = { id: string; nombre: string; familia_id: string | null };
 type FilaFamilia = { id: string; nombre: string };
@@ -164,7 +164,7 @@ export async function getConcentracion(codigoEmpresa: string, anio: number, filt
     todasLasFilas<Fila>((desde) =>
       supabase
         .from('facturas')
-        .select('id, cliente_id, fecha, total, tipo_documento')
+        .select('id, cliente_id, fecha, base_imponible, tipo_documento')
         .eq('empresa_id', empresa.id)
         .gte('fecha', `${anio}-01-01`)
         .lte('fecha', `${anio}-12-31`)
@@ -182,9 +182,9 @@ export async function getConcentracion(codigoEmpresa: string, anio: number, filt
   const tipoPorFactura = new Map<string, string>();
   for (const f of filas) {
     tipoPorFactura.set(f.id, f.tipo_documento);
-    const total = Number(f.total ?? 0);
-    netaTotal += total;
-    if (f.cliente_id) porCliente.set(f.cliente_id, (porCliente.get(f.cliente_id) ?? 0) + total);
+    const base = Number(f.base_imponible ?? 0);
+    netaTotal += base;
+    if (f.cliente_id) porCliente.set(f.cliente_id, (porCliente.get(f.cliente_id) ?? 0) + base);
   }
 
   const orden = [...porCliente.entries()].sort((a, b) => b[1] - a[1]);

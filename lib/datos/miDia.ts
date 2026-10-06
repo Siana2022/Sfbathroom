@@ -40,18 +40,18 @@ export async function getMiDia(codigoEmpresa: string, anio: number): Promise<MiD
 
   const { data: facturas } = await supabase
     .from('facturas')
-    .select('id, cliente_id, fecha, total, tipo_documento')
+    .select('id, cliente_id, fecha, base_imponible, tipo_documento')
     .eq('empresa_id', empresa.id)
     .in('cliente_id', ids.slice(0, 150))
     .gte('fecha', `${anio - 1}-01-01`);
-  const filas0 = (facturas ?? []) as { id: string; cliente_id: string | null; fecha: string; total: number; tipo_documento: string }[];
+  const filas0 = (facturas ?? []) as { id: string; cliente_id: string | null; fecha: string; base_imponible: number; tipo_documento: string }[];
 
   let filas = filas0;
   if (ids.length > 150) {
     for (let i = 150; i < ids.length; i += 150) {
       const { data: extra } = await supabase
         .from('facturas')
-        .select('id, cliente_id, fecha, total, tipo_documento')
+        .select('id, cliente_id, fecha, base_imponible, tipo_documento')
         .eq('empresa_id', empresa.id)
         .in('cliente_id', ids.slice(i, i + 150))
         .gte('fecha', `${anio - 1}-01-01`);
@@ -60,7 +60,7 @@ export async function getMiDia(codigoEmpresa: string, anio: number): Promise<MiD
   }
 
   const delAnio = filas.filter((f) => f.fecha.slice(0, 4) === String(anio));
-  const neta = delAnio.reduce((s, f) => s + netaDeDocumento(f.tipo_documento, f.total), 0);
+  const neta = delAnio.reduce((s, f) => s + netaDeDocumento(f.tipo_documento, f.base_imponible), 0);
   const nFacturas = delAnio.filter((f) => f.tipo_documento !== 'abono').length;
 
   const nombreCliente = new Map(clientesCargo.map((c) => [c.id, c.nombre]));
@@ -89,7 +89,7 @@ export async function getMiDia(codigoEmpresa: string, anio: number): Promise<MiD
   const ultimas = [...delAnio]
     .sort((a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0))
     .slice(0, 6)
-    .map((f) => ({ id: f.id, nombre: nombreCliente.get(f.cliente_id ?? '') ?? '—', fecha: f.fecha, importe: Number(f.total ?? 0) }));
+    .map((f) => ({ id: f.id, nombre: nombreCliente.get(f.cliente_id ?? '') ?? '—', fecha: f.fecha, importe: Number(f.base_imponible ?? 0) }));
 
   const { data: pedidos } = await supabase
     .from('pedidos')

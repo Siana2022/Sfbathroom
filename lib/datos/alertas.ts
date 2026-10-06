@@ -152,21 +152,21 @@ export async function getAlertas(codigoEmpresa: string, anio: number): Promise<A
   const mesActual = Number(new Date().toISOString().slice(5, 7));
   const trimActual = Math.floor((mesActual - 1) / 3) + 1;
   {
-    const netaRes = await todasLasFilas<{ total: number; fecha: string }>((desde) =>
+    const netaRes = await todasLasFilas<{ base_imponible: number; fecha: string }>((desde) =>
       supabase
         .from('facturas')
-        .select('total, fecha')
+        .select('base_imponible, fecha')
         .eq('empresa_id', empresa.id)
         .gte('fecha', `${anio}-01-01`)
         .lte('fecha', `${anio}-12-31`)
         .range(desde, desde + TAMANO_PAGINA - 1)
     );
     for (const f of netaRes) {
-      const total = Number(f.total ?? 0);
-      neta += total;
+      const base = Number(f.base_imponible ?? 0);
+      neta += base;
       const fecha = f.fecha;
       const trim = Math.floor((Number(fecha.slice(5, 7)) - 1) / 3) + 1;
-      if (trim === trimActual) trimNeta += total;
+      if (trim === trimActual) trimNeta += base;
     }
     const { data: presRes } = await supabase
       .from('presupuesto')

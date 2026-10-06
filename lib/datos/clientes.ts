@@ -23,7 +23,7 @@ export type ClientesData = {
   cohortes: { mes: string; nuevos: number; activos12m: number; retencion: number | null }[];
 };
 
-type FilaFactura = { id: string; cliente_id: string | null; fecha: string; total: number };
+type FilaFactura = { id: string; cliente_id: string | null; fecha: string; base_imponible: number };
 type FilaCliente = { id: string; nombre: string; estado: string; fecha_primer_pedido: string | null };
 type FilaFamilia = { id: string; nombre: string };
 type FilaArticulo = { id: string; familia_id: string | null };
@@ -46,7 +46,7 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
   const filas = await todasLasFilas<FilaFactura>((desde) =>
     supabase
       .from('facturas')
-      .select('id, cliente_id, fecha, total')
+      .select('id, cliente_id, fecha, base_imponible')
       .eq('empresa_id', empresa.id)
       .gte('fecha', iso(730))
       .lte('fecha', `${anio}-12-31`)
@@ -67,7 +67,7 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
     if (esActual) {
       activos.add(f.cliente_id);
       const c = porCliente.get(f.cliente_id) ?? { neta: 0, facturas: 0 };
-      c.neta += Number(f.total ?? 0);
+      c.neta += Number(f.base_imponible ?? 0);
       c.facturas += 1;
       porCliente.set(f.cliente_id, c);
       idsFacturasAnio.push(f.id);
@@ -133,9 +133,9 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
     if (!f.cliente_id) continue;
     const dia = Math.floor(Date.parse(f.fecha) / DIA);
     if (dia > hoy) continue;
-    const total = Number(f.total ?? 0);
-    if (dia > hoy - 365) netaW1.set(f.cliente_id, (netaW1.get(f.cliente_id) ?? 0) + total);
-    else if (dia > hoy - 730) netaW2.set(f.cliente_id, (netaW2.get(f.cliente_id) ?? 0) + total);
+    const base = Number(f.base_imponible ?? 0);
+    if (dia > hoy - 365) netaW1.set(f.cliente_id, (netaW1.get(f.cliente_id) ?? 0) + base);
+    else if (dia > hoy - 730) netaW2.set(f.cliente_id, (netaW2.get(f.cliente_id) ?? 0) + base);
   }
   const nombreCliente = new Map(clientes.map((c) => [c.id, c.nombre]));
   const movimiento = [...new Set([...netaW1.keys(), ...netaW2.keys()])]

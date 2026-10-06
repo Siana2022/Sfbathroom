@@ -36,7 +36,7 @@ export type FacturacionData = {
 const MESES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 const TIPOS_UNIDADES = new Set(['factura']);
 
-type FilaFactura = { id: string; cliente_id: string | null; fecha: string; tipo_documento: string; total: number };
+type FilaFactura = { id: string; cliente_id: string | null; fecha: string; tipo_documento: string; base_imponible: number };
 type FilaLinea = { factura_id: string; cantidad: number };
 
 export type Variacion = {
@@ -174,7 +174,7 @@ export async function getFacturacion(codigoEmpresa: string, anio: number, filtro
   const facturasP = todasLasFilas<FilaFactura>((desde) =>
     supabase
       .from('facturas')
-      .select('id, cliente_id, fecha, tipo_documento, total')
+      .select('id, cliente_id, fecha, tipo_documento, base_imponible')
       .eq('empresa_id', empresa.id)
       .gte('fecha', `${anioPrevio}-01-01`)
       .lte('fecha', `${anio}-12-31`)
@@ -238,10 +238,10 @@ export async function getFacturacion(codigoEmpresa: string, anio: number, filtro
 
   for (const f of facturas) {
     const esActual = f.fecha.slice(0, 4) === at;
-    const total = Number(f.total ?? 0);
+    const base = Number(f.base_imponible ?? 0);
     if (esActual) {
       if (TIPOS_UNIDADES.has(f.tipo_documento)) {
-        if (f.cliente_id) porCliente.set(f.cliente_id, (porCliente.get(f.cliente_id) ?? 0) + total);
+        if (f.cliente_id) porCliente.set(f.cliente_id, (porCliente.get(f.cliente_id) ?? 0) + base);
       } else {
         curs.abonosYNotas += 1;
       }
@@ -249,8 +249,8 @@ export async function getFacturacion(codigoEmpresa: string, anio: number, filtro
     if (vistaDisp) continue;
     const mes = Number(f.fecha.slice(5, 7));
     if (esActual) {
-      curs.neta += total;
-      netaMesCur.set(mes, (netaMesCur.get(mes) ?? 0) + total);
+      curs.neta += base;
+      netaMesCur.set(mes, (netaMesCur.get(mes) ?? 0) + base);
       if (TIPOS_UNIDADES.has(f.tipo_documento)) {
         curs.facturas += 1;
         facturasMesCur.set(mes, (facturasMesCur.get(mes) ?? 0) + 1);
@@ -260,8 +260,8 @@ export async function getFacturacion(codigoEmpresa: string, anio: number, filtro
         curs.abonosYNotas += 1;
       }
     } else {
-      prev.neta += total;
-      netaMesPrev.set(mes, (netaMesPrev.get(mes) ?? 0) + total);
+      prev.neta += base;
+      netaMesPrev.set(mes, (netaMesPrev.get(mes) ?? 0) + base);
       if (TIPOS_UNIDADES.has(f.tipo_documento)) {
         prev.facturas += 1;
         idsPrevio.push(f.id);

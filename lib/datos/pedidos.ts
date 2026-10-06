@@ -233,10 +233,10 @@ async function getFacturacionProxy(
   filtros?: Filtros,
 ): Promise<{ neta: number }> {
   const idsFiltrados = await getFacturaIdsFiltradas(supabase, empresaId, filtros ?? {}, `${anio}-01-01`, `${anio}-12-31`);
-  const data = await todasLasFilas<{ id: string; total: number }>((desde) =>
+  const data = await todasLasFilas<{ id: string; base_imponible: number }>((desde) =>
     supabase
       .from('facturas')
-      .select('id, total')
+      .select('id, base_imponible')
       .eq('empresa_id', empresaId)
       .gte('fecha', `${anio}-01-01`)
       .lte('fecha', `${anio}-12-31`)
@@ -245,7 +245,7 @@ async function getFacturacionProxy(
   let neta = 0;
   for (const f of data) {
     if (idsFiltrados && !idsFiltrados.has(f.id)) continue;
-    neta += Number(f.total ?? 0);
+    neta += Number(f.base_imponible ?? 0);
   }
   return { neta };
 }
