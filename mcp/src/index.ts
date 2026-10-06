@@ -29,6 +29,8 @@ for (const [nombre, herramienta] of Object.entries(herramientas)) {
   );
 }
 
-// Permite invocar herramientas por función sencilla (pruebas rápidas).
+async function main() {
+  await server.connect(new StdioServerTransport());
+}
 
-await server.connect(new StdioServerTransport());
+void main();

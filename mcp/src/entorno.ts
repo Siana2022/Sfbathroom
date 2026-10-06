@@ -8,6 +8,7 @@ if (!SERVICE_ROLE) {
   console.error('[sfbathroom-mcp] Falta SUPABASE_SERVICE_ROLE_KEY. Rellena mcp/.env o el env del cliente MCP.');
   process.exit(1);
 }
+console.error(`[sfbathroom-mcp] boot ok (url=${URL}, key=${SERVICE_ROLE ? 'presente' : 'FALTA'})`);
 
 /**
  * Cliente de propósito único para este MCP. Usa la service role key porque es

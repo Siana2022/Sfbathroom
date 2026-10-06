@@ -1,0 +1,44 @@
+{
+  "_comentario": "Define la consulta de ventas de A3ERP (CABEFACV + LINEFACT, las mismas tablas que usa el cubo de Ventas del Power BI), el mapeo y el registro de empresas (cada empresa = su propia base de datos A3ERP). La consulta usa {base} para la base de la empresa y {RANGO} para el filtro de fechas. TIPODOC: 'Cargo' = factura emitida, 'Abono' = factura rectificativa.",
+  "empresas": [
+    { "codigo": "SF", "base": "SFBATHROOM" },
+    { "codigo": "FUX", "base": "FUXSA" },
+    { "codigo": "DOT", "base": "DOTSURFACE" }
+  ],
+  "sqlVentas": {
+    "consulta": "SELECT c.FECHA AS FECHA, c.SERIE AS SERIE, CAST(c.NUMDOC AS bigint) AS NRO_DOC, c.TIPODOC AS TIPO_DOC, LTRIM(RTRIM(c.CODCLI)) AS COD_CLIENTE, c.NOMCLI AS NOMBRE_CLIENTE, LTRIM(RTRIM(c.CODREP)) AS COD_COMERCIAL, REPRESEN.NOMREP AS NOMBRE_COMERCIAL, c.BASEMONEDA AS BASE_IMPONIBLE, c.TOTMONEDA AS TOTAL, ISNULL(c.TOTALSUPLIDOSMON,0) AS PORTES, c.TOTDTOMONEDA AS DESC_PIE, 0 AS RAPPEL, NULL AS NRO_ALBARAN, NULL AS NRO_ANULADA, LTRIM(RTRIM(l.CODART)) AS COD_ARTICULO, LTRIM(RTRIM(a.DESCART)) AS NOMBRE_ARTICULO, l.UNIDADES AS CANTIDAD, l.PRECIO AS PRECIO, l.PRCMEDIO AS COSTE_UNITARIO, l.DESC1 AS DESC_LINEA FROM [{base}].dbo.CABEFACV c LEFT JOIN [{base}].dbo.REPRESEN ON REPRESEN.CODREP = c.CODREP LEFT JOIN [{base}].dbo.LINEFACT l ON l.IDFACV = c.IDFACV AND l.ESCOMPONENTE = 'F' LEFT JOIN [{base}].dbo.ARTICULO a ON a.CODART = l.CODART {RANGO}",
+    "filtroFecha": "WHERE c.FECHA >= CONVERT(datetime, '{desde}', 120) AND c.FECHA <= CONVERT(datetime, '{hasta}', 120)"
+  },
+  "tiposDocumento": {
+    "Cargo": "factura",
+    "Abono": "abono",
+    "F": "factura",
+    "A": "abono",
+    "NC": "nota_cargo",
+    "Factura": "factura",
+    "Nota de cargo": "nota_cargo"
+  },
+  "columnas": {
+    "fecha": "FECHA",
+    "serie": "SERIE",
+    "numero_erp": "NRO_DOC",
+    "tipo_documento": "TIPO_DOC",
+    "cliente_codigo": "COD_CLIENTE",
+    "cliente_nombre": "NOMBRE_CLIENTE",
+    "comercial_codigo": "COD_COMERCIAL",
+    "comercial_nombre": "NOMBRE_COMERCIAL",
+    "base_imponible": "BASE_IMPONIBLE",
+    "total": "TOTAL",
+    "portes": "PORTES",
+    "descuento_pie": "DESC_PIE",
+    "rappel_devengado": "RAPPEL",
+    "albaran_numero": "NRO_ALBARAN",
+    "factura_anula_numero": "NRO_ANULADA",
+    "articulo_codigo": "COD_ARTICULO",
+    "articulo_nombre": "NOMBRE_ARTICULO",
+    "cantidad": "CANTIDAD",
+    "precio_unitario": "PRECIO",
+    "coste_unitario": "COSTE_UNITARIO",
+    "descuento_pct": "DESC_LINEA"
+  }
+}

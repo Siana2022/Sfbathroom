@@ -6,3 +6,6 @@ node_modules/
 mcp/.env
 mcp/node_modules/
 mcp/dist/
+ingesta/**/.env
+
+.DS_Store

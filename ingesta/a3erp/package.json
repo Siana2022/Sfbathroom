@@ -1,0 +1,26 @@
+{
+  "name": "a3erp-ingesta",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+"scripts": {
+    "diario": "tsx --env-file=.env src/vuelo.ts --modo diario",
+    "diario:sf": "tsx --env-file=.env src/vuelo.ts --modo diario --empresa SF",
+    "diario:fux": "tsx --env-file=.env src/vuelo.ts --modo diario --empresa FUX",
+    "diario:dot": "tsx --env-file=.env src/vuelo.ts --modo diario --empresa DOT",
+    "reconciliacion": "tsx --env-file=.env src/vuelo.ts --modo reconciliacion --empresa SF",
+    "reconciliacion:fux": "tsx --env-file=.env src/vuelo.ts --modo reconciliacion --empresa FUX",
+    "reconciliacion:dot": "tsx --env-file=.env src/vuelo.ts --modo reconciliacion --empresa DOT",
+    "manual": "tsx --env-file=.env src/vuelo.ts --desde 2024-01-01 --hasta 2026-09-22 --empresa SF",
+    "manual:agosto": "tsx --env-file=.env src/vuelo.ts --desde 2026-08-01 --hasta 2026-08-31 --empresa SF"
+  },
+  "dependencies": {
+    "mssql": "^11.0.1"
+  },
+  "devDependencies": {
+    "@types/mssql": "^9.1.5",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

@@ -1,0 +1,34 @@
+# A3ERP · Ingesta en este PC
+
+## 1. Instalar dependencias (una vez)
+Abre "Símbolo del sistema" (cmd) en esta carpeta y ejecuta:
+
+    npm install
+
+## 2. Primera carga de validación (agosto 2026)
+Sin cerrar la ventana:
+
+    npm run manual:agosto
+
+Espera el resumen final. Debe acabar con una línea:
+
+    [a3erp] aplicado: {"empresa": "SF", ...}
+
+Si algo falla, copia TODO el mensaje de error.
+
+## 3. Carga diaria (cuando se valide)
+    npm run diario:sf
+
+## 4. Tarea programada (06:00) para el paso 3
+Crear `diario.bat` en esta carpeta con:
+
+    @echo off
+    cd /d %~dp0
+    npm run diario:sf >> logs\diario.log 2>&1
+
+Y programarla (cmd):
+
+    schtasks /Create /TN "A3ERP-Ventas-SF" /SC DAILY /ST 06:00 /TR "%~dp0diario.bat"
+
+Nota: esta carpeta contiene las credenciales de acceso (.env). Protege el
+usuario del PC con contraseña y no la compartas.
