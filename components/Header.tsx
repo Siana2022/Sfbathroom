@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import CampanaNotificaciones from '@/components/CampanaNotificaciones';
 import BuscadorGlobal from '@/components/BuscadorGlobal';
 import FrescuraDatos from '@/components/FrescuraDatos';
@@ -12,6 +13,7 @@ const empresas = [
 
 export default function Header({ rol }: { rol?: string }) {
   const [empresa, setEmpresa] = useState('SF');
+  const router = useRouter();
 
   useEffect(() => {
     const desdeCookie = document.cookie.split('; ').find((c) => c.startsWith('sfb_empresa='))?.split('=')[1];
@@ -23,6 +25,9 @@ export default function Header({ rol }: { rol?: string }) {
     setEmpresa(codigo);
     localStorage.setItem('sfb_empresa', codigo);
     document.cookie = `sfb_empresa=${codigo}; path=/; max-age=2592000; SameSite=Lax`;
+    // Navegación suave a la misma ruta: los server components re-leen la cookie
+    // y la página se re-renderiza con la nueva empresa sin recarga completa.
+    router.replace(window.location.pathname);
   }
 
   const hoy = new Date().toLocaleDateString('es-ES', {
@@ -38,7 +43,7 @@ export default function Header({ rol }: { rol?: string }) {
         <strong>sfbathroom · BI</strong>
       </span>
       <div className="topbar-derecha">
-        <FrescuraDatos />
+        <FrescuraDatos empresa={empresa} />
         <BuscadorGlobal />
         <span className="topbar-fecha">{hoy}</span>
         <select

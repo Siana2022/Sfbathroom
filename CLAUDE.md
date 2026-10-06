@@ -138,6 +138,21 @@ Detalle completo: `docs/asistente-ia.md`. Tools actuales: `ventas_por_mes`,
    `docs/desbloqueos-cliente.md` (B4 fotos stock, B8 impagos/seguro de crédito, marketing,
    financiero, A3ERP, datos DOT/Fuxsabany para la consolidada holding).
 
+## Última sesión (06 oct 2026) · go-live ingesta A3ERP + selector de empresa
+
+- **Go-live ingesta A3ERP**: carga histórica completa SF/FUX/DOT cargada y validada en
+  producción (0019+0020 aplicadas, runner troceado por meses, password MSSQL entre
+  comillas por el `#` de Node `--env-file`). Datos demo del seed purgados. Detalle:
+  `docs/a3erp-plan-implantacion.md`, `docs/a3erp-mapeo-ventas.md` (tabla go-live).
+- **Selector de empresa sin recarga**: `Header.tsx` ahora hace `router.replace(pathname)`
+  al cambiar empresa → los server components (que leen la cookie `sfb_empresa`) se
+  re-renderizan sin recarga completa (y se limpian los filtros de la empresa anterior).
+  La caché `memo` de portada ya escala por empresa en la clave.
+- **Indicador de frescura arreglado**: `FrescuraDatos` + `app/api/frescura` devolvían
+  null (dependían de `jobs_ejecutados` del cron de la app). Ahora muestran por empresa la
+  última fecha con facturas cargadas (`max(fecha)` sobre `facturas`, con RLS), píldora
+  coloreada según antigüedad, siempre visible en la cabecera.
+
 ## Última sesión (15 sep 2026) · optimización de rendimiento P1–P5
 
 Plan de rendimiento cerrado con el cliente (spec P1–P5). Estado:
