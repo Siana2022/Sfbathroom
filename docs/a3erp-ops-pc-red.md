@@ -45,6 +45,23 @@ administrador:
    38 docus · 134 lín. · base 35.508,29 / total 41.212,50). Debe terminar con
    `"facturas_replace":38`.
 
+4b. **Diagnóstico de discrepancias** (solo si una consulta vs el Power BI del cliente no
+cuadra): copiar el archivo suelto `ingesta/a3erp/diag.mjs` del repo a
+`C:\Apps\sfbathroom-ingesta` (junto al `.env`) y ejecutar en el PC (con VPN):
+
+```
+node --env-file=.env diag.mjs --referencia "SF 1062820.66,DOT 1385170.57,FUX 1363849.15"
+```
+
+pasándole las cifras del cliente del Power BI (YTD). Imprime por empresa, por
+`SERIE`+`TIPODOC`, los agregados de `CABEFACV` (base, total, portes, desc_pie) y el
+importe de las líneas de **suplemento** (`LINEFACT` con `ESCOMPONENTE='S'`, que la carga
+normal excluye), más cuatro candidatos:
+`C1 base (app)` = lo que suma la app hoy · `C2 base+portes` · `C3 base+suplementos netos` ·
+`C4 total (con IVA)`, cada uno con la diferencia vs la cifra de referencia del cliente.
+El candidato que salga a 0,00 indica qué mide el Power BI del cliente (revisar si hay que
+ajustar `v_perf_facturacion_mensual`/neta o el loader).
+
 ## 2b. Solución de problemas
 
 - **El runner falla con "Error de inicio de sesión del usuario 'siana'"** aunque

@@ -22,8 +22,8 @@ No se usa el "cubo" del Power BI: se leen las mismas tablas que usa el cubo,
 | --- | --- |
 | `CABEFACV` | Cabecera de factura de venta (SERIE, NUMDOC, TIPODOC, CODCLI, CODREP, FECHA, BASEMONEDA, TOTMONEDA, TOTDTOMONEDA, TOTALSUPLIDOSMON) |
 | `LINEFACT` | Líneas, filtradas por `ESCOMPONENTE = 'F'` (mismo criterio que el cubo). Suma de `BASEMONEDA` de líneas = `BASEMONEDA` de cabecera (validado: 129 lín. ≡ 35.718,18) |
-| `ARTICULO` | DESCART (nombre) por CODART |
-| `REPRESEN` | NOMREP (nombre del comercial) por CODREP |
+| `ARTICULO` | DESCART (nombre) por CODART · **CODART NO es único** → resolver con `OUTER APPLY (SELECT TOP 1 …)`, nunca `JOIN` (ver incidencia oct/2026) |
+| `REPRESEN` | NOMREP (nombre del comercial) por CODREP · idem, `OUTER APPLY` |
 
 Operativa por empresa: cada empresa del grupo tiene **su propia base de datos**
 (SF→`SFBATHROOM`, FUX→`FUXSA`, DOT→`DOTSURFACE`); la consulta usa `{base}` y el
@@ -44,6 +44,55 @@ Operativa por empresa: cada empresa del grupo tiene **su propia base de datos**
 5. No existen columnas `EJERCICIO`/`MES` en `CABEFACV` (se filtra por `FECHA`).
 6. `PRCMEDIO` de `LINEFACT` = valoración línea (usa como `coste_unitario` provisional;
    el coste real vendrá de compras, D5).
+
+## Incidencia (oct/2026): duplicación de líneas por fan-out en el JOIN de `ARTICULO`
+
+**Síntoma**: `public.factura_lineas` tenía líneas repetidas (DOT 4.444 · FUX 2.007 · SF 121
+= **6.572**), y con ellas el `base_imponible` de documento quedó inflado (la ingesta lo
+calcula como Σ de bases de línea, ver `normalizar.ts:149-151`).
+
+**Causa raíz**: la consulta de ventas usaba `LEFT JOIN [{base}].dbo.ARTICULO a ON a.CODART =
+l.CODART`. Como `CODART` **no es único** en `ARTICULO`, cada línea se multiplicaba por el nº
+de filas de ese artículo (fan-out). `normalizarRows` deduplica el **documento** (Map por
+`numero_erp`) pero **no** las líneas, así que cada copia entraba como fila distinta
+(`randomUUID()`). Evidencia: artículos como `295SEEMBA140` aparecían 12× con 11 repetidas,
+mientras otros (`ZZLBM2MC`) no se duplicaban.
+
+**No era** la anulación de facturas: la consulta trae `NULL AS NRO_ANULADA`, luego
+`factura_anula_id` siempre es `NULL` y la "protección de anuladas" del swap nunca enlaza
+(diagnóstico: `con_abono = 0`). Ese bug queda latente hasta que se mapee el nº de anulada.
+
+**Arreglo** (`config/a3erp.config.json`): sustituir ambos `LEFT JOIN` de maestros por
+`OUTER APPLY (SELECT TOP 1 …)` para no multiplicar filas:
+
+```sql
+LEFT JOIN [{base}].dbo.LINEFACT l ON l.IDFACV = c.IDFACV AND l.ESCOMPONENTE = 'F'
+OUTER APPLY (SELECT TOP 1 r.NOMREP FROM [{base}].dbo.REPRESEN r
+             WHERE r.CODREP = c.CODREP ORDER BY r.NOMREP) rep
+OUTER APPLY (SELECT TOP 1 a.DESCART FROM [{base}].dbo.ARTICULO a
+             WHERE a.CODART = l.CODART ORDER BY a.DESCART) art
+```
+
+**Limpieza de datos ya cargados** (`0024`/`0025`): `a3erp.deduplicar_lineas()` colapsa filas
+exactamente iguales (mismo factura/artículo/cantidad/precio/coste/descuento/base); borró las
+6.572 y dejó `a3erp.contar_lineas_duplicadas()` en 0. Las **cabeceras**, sin embargo, siguen
+infladas y hay que recuadrarlas desde las líneas ya limpias:
+
+```sql
+update public.facturas f
+set base_imponible = sub.base_lineas
+from (
+  select fl.factura_id, round(sum(fl.base_imponible),2) as base_lineas
+  from public.factura_lineas fl
+  group by fl.factura_id
+) sub
+where sub.factura_id = f.id and f.base_imponible is distinct from sub.base_lineas;
+```
+
+**Reparación autoritativa**: con el config corregido, re-ejecutar la ingesta en modo
+reconciliación (las 3 empresas). El swap borra y recarga el rango, recuadrando cabeceras y
+líneas. Mientras el config del PC (`C:\Apps\sfbathroom-ingesta`) no se actualice, cada
+ingesta nocturna volverá a duplicar dentro de su ventana de 45 días.
 
 ## Contrato de campos
 
@@ -124,6 +173,27 @@ join public.facturas f on f.id=fl.factura_id
 join public.empresas e on e.id=f.empresa_id
 where e.codigo='SF' and f.fecha>='2026-08-01' and f.fecha<'2026-09-01';
 ```
+
+## Discrepancias YTD oct/2026 vs Power BI del cliente (sin resolver)
+
+El cliente reportó sus cifras de "facturación neta 2026" del Power BI: SF **1.062.820,66**,
+DOT **1.385.170,57**, FUX **1.363.849,15**. La app suma 1.062.310,04 / 1.385.037,27 /
+1.351.009,11. Diagnóstico (`ingesta/a3erp/diag.mjs`, ejecutado en el PC con VPN):
+
+- **Las bases reales del ERP dan exactamente lo que suma la app**: `SFBATHROOM` 893 docs
+  1.062.310,04 · `FUXSA` 236 docs 1.351.009,11 · `DOTSURFACE` 628 docs 1.385.037,27.
+- `DBATHROOM` y `FUXSABANY_1` existen en el servidor pero están **vacías** (0 facturas
+  2026) → el mapa `SFBATHROOM`/`FUXSA`/`DOTSURFACE` es correcto. `SALINAS_FURIO_INVEST`
+  no es del grupo de ventas (20 docs, inversión).
+- **Ningún candidato del ERP reproduce las cifras del cliente**: base, base+portes
+  (`TOTALSUPLIDOSMON`=0 en todo), suplementos `ESCOMPONENTE='S'` (0), suma por líneas `F`,
+  y las 11 columnas `FECHA%` de `CABEFACV` (todas dan ≤ lo que suma la app).
+- **Conclusión**: el Power BI del cliente no se alimenta de esas tablas tal cual — o está
+  anticuado (snapshot anterior), usa otro periodo, u otra medida (p. ej. "Importe" del
+  cubo/PVM, no base imponible). Pendiente obtener del cliente: fecha de refresh + periodo,
+  nombre de la medida, o el desglose mensual 2026 para comparar mes a mes.
+- `diag.mjs` es solo lectura y no toca Supabase; sirve además de verificación del mapa de
+  bases (imprime el scan de todas las DB del servidor).
 
 ## Vías pendientes con el cliente
 

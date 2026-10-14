@@ -162,6 +162,16 @@ Detalle completo: `docs/asistente-ia.md`. Tools actuales: `ventas_por_mes`,
   cobros/cartera y DSO (saldos con IVA), documentos (detalle de documentos) y los importes
   por documento de fichaCliente. `getVariacion` ya calculaba sobre importe de línea (base),
   con lo que ahora sí cuadra con la cabecera.
+- **Discrepancias 2026 vs Power BI del cliente (investigadas, pendientes del cliente)**:
+  el cliente reportó SF 1.062.820,66 / DOT 1.385.170,57 / FUX 1.363.849,15; la app y el ERP
+  (SFBATHROOM/FUXSA/DOTSURFACE) dan idéntico 1.062.310,04 / 1.385.037,27 / 1.351.009,11.
+  Con `ingesta/a3erp/diag.mjs` se descartaron: portes/suplidos (0 en todo), suma por líneas
+  `F`, y las 11 columnas de fecha de `CABEFACV`. `DBATHROOM`/`FUXSABANY_1` existen vacías
+  (mapa de bases correcto). **Ninguna medida/fecha/base del ERP reproduce las cifras del
+  cliente** → su Power BI debe estar anticuado, usar otro periodo o medida distinta de la
+  base imponible. Pendiente: que el cliente confirme fecha de refresh, medida y/o de mes en
+  mes (detalle en `docs/a3erp-mapeo-ventas.md`). `0021_neta_base_imponible.sql` sigue
+  pendiente de aplicar en Supabase.
 
 ## Última sesión (15 sep 2026) · optimización de rendimiento P1–P5
 

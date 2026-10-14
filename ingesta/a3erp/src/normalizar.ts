@@ -29,6 +29,7 @@ export type LineaNormalizada = {
   precio_unitario: number;
   coste_unitario: number | null;
   descuento_pct: number;
+  base_imponible: number | null;
 };
 
 const col = (fila: Record<string, unknown>, campo: string): unknown => {
@@ -120,6 +121,7 @@ export function normalizarRows(filas: Record<string, unknown>[], empresaCodigo: 
   }
 
   const lineas: LineaNormalizada[] = [];
+  const baseLineasPorDoc = new Map<string, number>();
   for (const f of filas) {
     const numero = numeroCompuesto(f);
     const cantidad = aNumero(col(f, 'cantidad'));
@@ -127,6 +129,7 @@ export function normalizarRows(filas: Record<string, unknown>[], empresaCodigo: 
     const articulo = texto(col(f, 'articulo_codigo'));
     const precio = aNumero(col(f, 'precio_unitario'));
     if (!articulo || precio === null) continue;
+    const base = aNumero(col(f, 'base_linea'));
     lineas.push({
       id: randomUUID(),
       factura_numero_erp: numero,
@@ -136,7 +139,16 @@ export function normalizarRows(filas: Record<string, unknown>[], empresaCodigo: 
       precio_unitario: precio,
       coste_unitario: aNumero(col(f, 'coste_unitario')),
       descuento_pct: Math.abs(aNumero(col(f, 'descuento_pct')) ?? 0),
+      base_imponible: base === null ? null : Math.round(base * 100) / 100,
     });
+    if (base !== null) {
+      baseLineasPorDoc.set(numero, (baseLineasPorDoc.get(numero) ?? 0) + (Math.round(base * 100) / 100));
+    }
+  }
+
+  for (const doc of porDoc.values()) {
+    const suma = baseLineasPorDoc.get(doc.numero_erp);
+    if (suma !== undefined) doc.base_imponible = Math.round(suma * 100) / 100;
   }
 
   return { documentos: [...porDoc.values()], lineas };

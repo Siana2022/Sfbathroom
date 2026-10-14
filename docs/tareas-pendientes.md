@@ -169,6 +169,20 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
       `compra_lineas`, `stock_en_transito`, `cobros` vía Supabase REST (`service_role key`).
 - [ ] Manejar abonos/devoluciones (el cliente confirmó que existen y deben restarse).
 
+## 2a. Incidencia duplicación de líneas A3ERP (oct 2026)
+- [x] Diagnóstico: fan-out en `LEFT JOIN ARTICULO` (`CODART` no único) → líneas repetidas
+      (6.572) y cabeceras infladas. Detalle en `docs/a3erp-mapeo-ventas.md`.
+- [x] Fix en `ingesta/a3erp/config/a3erp.config.json`: `OUTER APPLY (SELECT TOP 1 …)` para
+      `ARTICULO` y `REPRESEN`. Añadido fix de borrado por rango de líneas en el swap
+      (`0024_ingesta_fix_duplicados_lineas.sql`, aplicada por el cliente).
+- [x] Limpieza: `a3erp.deduplicar_lineas()` (`0025`) borró las 6.572 líneas repetidas;
+      `contar_lineas_duplicadas()` = 0.
+- [ ] **Recuadrar cabeceras** infladas desde líneas limpias (SQL en `a3erp-mapeo-ventas.md`).
+- [ ] **Copiar el config corregido al PC** (`C:\Apps\sfbathroom-ingesta`) y re-ejecutar la
+      reconciliación de las 3 empresas. Si no, la ingesta nocturna vuelve a duplicar.
+- [ ] Confirmar con el cliente el mapeo del nº de factura anulada (`NRO_ANULADA`, hoy `NULL`
+      → `factura_anula_id` siempre nulo).
+
 ## 3. Margen por producto
 - [ ] Cargar compras desde A3ERP en `compras`/`compra_lineas` (coste real por lote — la vista
       `v_coste_completo_por_lote` reparte flete/aduana/seguro/transporte y roturas; es la base
