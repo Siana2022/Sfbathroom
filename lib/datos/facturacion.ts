@@ -34,7 +34,10 @@ export type FacturacionData = {
 };
 
 const MESES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-const TIPOS_UNIDADES = new Set(['factura']);
+const TIPOS_FACTURA = new Set(['factura']);
+// Unidades NETAS (como el informe "Facturas de venta" de A3ERP): facturas + notas de cargo
+// − abonos. Las líneas de abono ya vienen con cantidad negativa.
+const TIPOS_UNIDADES = new Set(['factura', 'abono', 'nota_cargo']);
 
 type FilaFactura = { id: string; cliente_id: string | null; fecha: string; tipo_documento: string; base_imponible: number };
 type FilaLinea = { factura_id: string; cantidad: number };
@@ -101,7 +104,7 @@ export async function getVariacion(codigoEmpresa: string, anio: number, filtros?
 
     if (l.articulo_id) {
       const u = (unidades.get(l.articulo_id) ?? [0, 0]) as [number, number];
-      if (info.tipo === 'factura') u[idx] += Number(l.cantidad ?? 0);
+      u[idx] += Number(l.cantidad ?? 0);
       unidades.set(l.articulo_id, u);
       const v = (valores.get(l.articulo_id) ?? [0, 0]) as [number, number];
       v[idx] += importe;
@@ -238,28 +241,30 @@ export async function getFacturacion(codigoEmpresa: string, anio: number, filtro
   for (const f of facturas) {
     const esActual = f.fecha.slice(0, 4) === at;
     const base = Number(f.base_imponible ?? 0);
+    const esFactura = TIPOS_FACTURA.has(f.tipo_documento);
+    const cuentaUnidades = TIPOS_UNIDADES.has(f.tipo_documento);
     if (esActual) {
       if (f.cliente_id) porCliente.set(f.cliente_id, (porCliente.get(f.cliente_id) ?? 0) + base);
-      if (!TIPOS_UNIDADES.has(f.tipo_documento)) curs.abonosYNotas += 1;
+      if (!esFactura) curs.abonosYNotas += 1;
     }
     if (vistaDisp) continue;
     const mes = Number(f.fecha.slice(5, 7));
     if (esActual) {
       curs.neta += base;
       netaMesCur.set(mes, (netaMesCur.get(mes) ?? 0) + base);
-      if (TIPOS_UNIDADES.has(f.tipo_documento)) {
+      if (esFactura) {
         curs.facturas += 1;
         facturasMesCur.set(mes, (facturasMesCur.get(mes) ?? 0) + 1);
+      }
+      if (cuentaUnidades) {
         idsActivo.push(f.id);
         mesDeLaFactura.set(f.id, mes);
-      } else {
-        curs.abonosYNotas += 1;
       }
     } else {
       prev.neta += base;
       netaMesPrev.set(mes, (netaMesPrev.get(mes) ?? 0) + base);
-      if (TIPOS_UNIDADES.has(f.tipo_documento)) {
-        prev.facturas += 1;
+      if (esFactura) prev.facturas += 1;
+      if (cuentaUnidades) {
         idsPrevio.push(f.id);
         mesDeLaFactura.set(f.id, mes);
       }

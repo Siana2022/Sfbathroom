@@ -4,6 +4,9 @@ import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 
 const MESES = ['', 'ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
+// Unidades NETAS (facturas + notas de cargo − abonos). Las líneas de abono ya llevan cantidad negativa.
+const TIPOS_UNIDADES = new Set(['factura', 'abono', 'nota_cargo']);
+
 type FilaFactura = { id: string; fecha: string; tipo_documento: string; base_imponible: number; cliente_id: string | null };
 
 export type HerramientaMeta = {
@@ -85,12 +88,13 @@ export const toolExecutor = {
       const m = Number(f.fecha.slice(5, 7));
       const cur = porMes.get(m) ?? { neta: 0, documentos: 0, abonosYNotas: 0 };
       cur.neta += Number(f.base_imponible ?? 0);
-      if (f.tipo_documento === 'factura') {
-        cur.documentos += 1;
+      if (f.tipo_documento === 'factura') cur.documentos += 1;
+      else cur.abonosYNotas += 1;
+      if (TIPOS_UNIDADES.has(f.tipo_documento)) {
         const arr = idsPorMes.get(m) ?? [];
         arr.push(f.id);
         idsPorMes.set(m, arr);
-      } else cur.abonosYNotas += 1;
+      }
       porMes.set(m, cur);
     }
     const unidades = new Map<number, number>();

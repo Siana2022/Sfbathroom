@@ -1,6 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { netaDeDocumento } from '@/lib/datos/neta';
 
+// Unidades NETAS (facturas + notas de cargo − abonos). Las líneas de abono ya llevan cantidad negativa.
+const TIPOS_UNIDADES = new Set(['factura', 'abono', 'nota_cargo']);
+
 const euroFmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
 const numFmt = (n: number) => n.toLocaleString('es-ES', { maximumFractionDigits: 0 });
 
@@ -34,7 +37,7 @@ export async function reunirResumen(supabase: SupabaseClient, empresaCodigo: str
   const netaPrevio = (previas ?? []).reduce((s: number, f: { tipo_documento: string; base_imponible: number }) => s + netaDeDocumento(f.tipo_documento, f.base_imponible), 0);
 
   // Unidades (factura_lineas)
-  const lineasIds = filas.filter((f) => f.tipo_documento === 'factura').map((f) => f.id);
+  const lineasIds = filas.filter((f) => TIPOS_UNIDADES.has(f.tipo_documento)).map((f) => f.id);
   let unidades = 0;
   for (let i = 0; i < lineasIds.length; i += 150) {
     const lote = lineasIds.slice(i, i + 150);

@@ -2,6 +2,9 @@ import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { netaDeDocumento } from '@/lib/datos/neta';
 
+// Unidades NETAS (facturas + notas de cargo − abonos). Las líneas de abono ya llevan cantidad negativa.
+const TIPOS_UNIDADES = new Set(['factura', 'abono', 'nota_cargo']);
+
 export type FichaCliente = {
   cliente: {
     id: string;
@@ -93,7 +96,7 @@ export async function getFichaCliente(codigoEmpresa: string, clienteId: string, 
   }
 
   // unidades del año
-  const facturasAnioIds = delAnio.filter((f) => f.tipo_documento === 'factura').map((f) => f.id);
+  const facturasAnioIds = delAnio.filter((f) => TIPOS_UNIDADES.has(f.tipo_documento)).map((f) => f.id);
   let unidades = 0;
   let topMap = new Map<string, { nombre: string; unidades: number; importe: number }>();
   for (let i = 0; i < facturasAnioIds.length; i += 150) {

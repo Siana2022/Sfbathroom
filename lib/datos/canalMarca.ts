@@ -65,7 +65,7 @@ async function getSegmentos(
       .from('facturas')
       .select('id, cliente_id, fecha')
       .eq('empresa_id', empresaId)
-      .eq('tipo_documento', 'factura')
+      .in('tipo_documento', ['factura', 'abono', 'nota_cargo'])
       .gte('fecha', `${anioPrevio}-01-01`)
       .lte('fecha', `${anio}-12-31`)
       .range(desde, desde + TAMANO_PAGINA - 1)

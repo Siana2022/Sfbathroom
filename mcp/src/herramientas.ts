@@ -9,6 +9,9 @@ type Signo = (tipo: string) => number;
 
 const signo: Signo = (tipo) => (tipo === 'abono' ? -1 : 1);
 
+// Unidades NETAS (facturas + notas de cargo − abonos). Las líneas de abono ya llevan cantidad negativa.
+const TIPOS_UNIDADES = new Set(['factura', 'abono', 'nota_cargo']);
+
 function texto(datos: unknown): { content: { type: 'text'; text: string }[] } {
   return { content: [{ type: 'text' as const, text: JSON.stringify(datos, null, 2) }] };
 }
@@ -48,30 +51,31 @@ export const herramientas = {
       const docs = (data ?? []) as FilaFactura[];
 
       const porMes = new Map<number, { neta: number; documentos: number; abonosYNotas: number }>();
-      const idsDeFactura = new Map<string, number>();
-      const idsFactura: string[] = [];
+      const idsDeMes = new Map<string, number>();
+      const idsUnidades: string[] = [];
       for (const f of docs) {
         const m = Number(f.fecha.slice(5, 7));
         const cur = porMes.get(m) ?? { neta: 0, documentos: 0, abonosYNotas: 0 };
         cur.neta += Number(f.base_imponible ?? 0);
-        if (f.tipo_documento === 'factura') {
-          cur.documentos += 1;
-          idsFactura.push(f.id);
-          idsDeFactura.set(f.id, m);
-        } else cur.abonosYNotas += 1;
+        if (f.tipo_documento === 'factura') cur.documentos += 1;
+        else cur.abonosYNotas += 1;
+        if (TIPOS_UNIDADES.has(f.tipo_documento)) {
+          idsUnidades.push(f.id);
+          idsDeMes.set(f.id, m);
+        }
         porMes.set(m, cur);
       }
 
       const unidadesPorMes = new Map<number, number>();
-      if (idsFactura.length) {
+      if (idsUnidades.length) {
         const lineas = await inTroceado<{ factura_id: string; cantidad: number }>(
           'factura_lineas',
           'factura_id',
-          idsFactura,
+          idsUnidades,
           'factura_id, cantidad',
         );
         for (const l of lineas) {
-          const m = idsDeFactura.get(l.factura_id);
+          const m = idsDeMes.get(l.factura_id);
           if (m) unidadesPorMes.set(m, (unidadesPorMes.get(m) ?? 0) + Number(l.cantidad ?? 0));
         }
       }
