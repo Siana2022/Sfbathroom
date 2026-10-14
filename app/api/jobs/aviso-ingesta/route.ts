@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
     texto,
   });
 
-  return NextResponse.json({ enviado: result.enviado, razon: result.razon });
+  return NextResponse.json({ enviado: result.enviado, razon: result.razon, respuesta: result.respuesta });
 }
 
 export async function GET(req: NextRequest) {
