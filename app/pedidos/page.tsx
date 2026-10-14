@@ -5,9 +5,11 @@ import { decimal, eur, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
 import Filtros from '@/components/Filtros';
+import Aviso from '@/components/Aviso';
+import { ANIO_ACTUAL } from '@/lib/ejercicio';
 
 
-const ANIO = 2026;
+const ANIO = ANIO_ACTUAL;
 
 const ESTADOS_LABEL: Record<string, string> = {
   captado: 'Captado',
@@ -31,6 +33,11 @@ export default async function PedidosPage({ searchParams }: { searchParams: Sear
         Captación de pedidos de {d.empresa.nombre}, cartera pendiente de servir, antigüedad y
         cumplimiento frente a la facturación.
       </p>
+
+      <Aviso tipo="demo">
+        Los pedidos y la cartera proceden de datos de demostración: la ingesta de A3ERP carga
+        de momento solo ventas (facturas). No interpretes estas cifras como actividad real.
+      </Aviso>
 
       <Filtros opciones={opciones} />
 

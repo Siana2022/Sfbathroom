@@ -79,11 +79,12 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
 
   if (pedidos.length) {
     const lineas = await enLotes<FilaLinea>(
-      (lote) =>
+      (lote, desde) =>
         supabase
           .from('pedido_lineas')
           .select('pedido_id, cantidad, cantidad_servida, precio_unitario, descuento_pct')
-          .in('pedido_id', lote),
+          .in('pedido_id', lote)
+          .range(desde, desde + TAMANO_PAGINA - 1),
       pedidos.map((p) => p.id),
     );
     for (const l of lineas) {
@@ -163,7 +164,12 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
   const modificados: { tipo: string; count: number }[] = [];
   if (pedidos.length) {
     const mods = await enLotes<FilaModificacion>(
-      (lote) => supabase.from('pedido_modificaciones').select('tipo').in('pedido_id', lote),
+      (lote, desde) =>
+        supabase
+          .from('pedido_modificaciones')
+          .select('tipo')
+          .in('pedido_id', lote)
+          .range(desde, desde + TAMANO_PAGINA - 1),
       pedidos.map((p) => p.id),
     );
     const counts = new Map<string, number>();

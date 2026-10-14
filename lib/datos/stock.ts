@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getArticuloIdsFiltrados, type Filtros } from '@/lib/datos/filtros';
-import { enLotes } from '@/lib/datos/query';
+import { enLotes, TAMANO_PAGINA } from '@/lib/datos/query';
 
 type FilaPedidoLinea = {
   pedido_id: string;
@@ -171,11 +171,12 @@ export async function getStock(codigoEmpresa: string, filtros?: Filtros): Promis
   const pedidoIds = pedidosEstados.map((p) => p.id);
   if (pedidoIds.length) {
     const lineasS = await enLotes<FilaPedidoLinea>(
-      (lote) =>
+      (lote, desde) =>
         supabase
           .from('pedido_lineas')
           .select('pedido_id, articulo_id, cantidad, cantidad_servida, precio_unitario, descuento_pct')
-          .in('pedido_id', lote),
+          .in('pedido_id', lote)
+          .range(desde, desde + TAMANO_PAGINA - 1),
       pedidoIds,
     );
     for (const l of lineasS) {
@@ -236,11 +237,12 @@ export async function getStock(codigoEmpresa: string, filtros?: Filtros): Promis
   const carteraArticulo = new Map<string, number>();
   if (pedidoIds.length) {
     const lineasC = await enLotes<FilaPedidoLinea>(
-      (lote) =>
+      (lote, desde) =>
         supabase
           .from('pedido_lineas')
           .select('pedido_id, articulo_id, cantidad, cantidad_servida, precio_unitario, descuento_pct')
-          .in('pedido_id', lote),
+          .in('pedido_id', lote)
+          .range(desde, desde + TAMANO_PAGINA - 1),
       pedidoIds,
     );
     const carteraSet = new Set(['captado', 'aceptado', 'parcial']);

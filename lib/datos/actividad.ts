@@ -114,7 +114,12 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
     const artIds = [...new Set(lineas.map((l) => l.articulo_id).filter(Boolean))] as string[];
     if (artIds.length) {
       const articulosRaw = await enLotes<FilaArticulo>(
-        (lote) => supabase.from('articulos').select('id, coste_unitario').in('id', lote),
+        (lote, desde) =>
+          supabase
+            .from('articulos')
+            .select('id, coste_unitario')
+            .in('id', lote)
+            .range(desde, desde + TAMANO_PAGINA - 1),
         artIds,
       );
       for (const a of articulosRaw) articuloCoste.set(a.id, a.coste_unitario);

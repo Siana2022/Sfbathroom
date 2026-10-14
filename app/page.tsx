@@ -10,9 +10,10 @@ import { decimal, eur, numero, pct } from '@/lib/formato';
 import { FORMATOS } from '@/lib/datos/kpisCatalogo';
 import Kpi from '@/components/Kpi';
 import GraficoBarras, { type Barra } from '@/components/GraficoBarras';
+import { ANIO_ACTUAL } from '@/lib/ejercicio';
 
 
-const ANIO = 2026;
+const ANIO = ANIO_ACTUAL;
 const NOMBRE_MES = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
 async function getResumenHoy(codigoEmpresa: string) {

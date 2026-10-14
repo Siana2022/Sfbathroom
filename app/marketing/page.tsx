@@ -1,9 +1,10 @@
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
+import { ANIO_ACTUAL } from '@/lib/ejercicio';
 
 
-const ANIO = 2026;
+const ANIO = ANIO_ACTUAL;
 
 export default async function MarketingPage() {
   const cookieStore = cookies();

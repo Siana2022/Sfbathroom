@@ -59,7 +59,12 @@ export async function getCosteTransporte(codigoEmpresa: string, anio: number): P
   const ids = comprasIds.map((c) => c.id);
   if (ids.length) {
     const lineas = await enLotes<{ cantidad: number; coste_unitario_compra: number }>(
-      (lote) => supabase.from('compra_lineas').select('cantidad, coste_unitario_compra').in('compra_id', lote),
+      (lote, desde) =>
+        supabase
+          .from('compra_lineas')
+          .select('cantidad, coste_unitario_compra')
+          .in('compra_id', lote)
+          .range(desde, desde + TAMANO_PAGINA - 1),
       ids,
     );
     for (const l of lineas) {

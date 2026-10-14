@@ -6,9 +6,10 @@ import { getCrossSell } from '@/lib/datos/crosssell';
 import { decimal, eur, numero, pct } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import GraficoBarras from '@/components/GraficoBarras';
+import { ANIO_ACTUAL } from '@/lib/ejercicio';
 
 
-const ANIO = 2026;
+const ANIO = ANIO_ACTUAL;
 
 export default async function FichaClientePage({ params }: { params: { id: string } }) {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';

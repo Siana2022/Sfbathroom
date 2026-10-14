@@ -5,9 +5,11 @@ import { eur2, numero, decimal } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
 import Filtros from '@/components/Filtros';
+import Aviso from '@/components/Aviso';
+import { ANIO_ACTUAL } from '@/lib/ejercicio';
 
 
-const ANIO = 2026;
+const ANIO = ANIO_ACTUAL;
 
 export default async function ActividadComercialPage({ searchParams }: { searchParams: SearchParams }) {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
@@ -53,6 +55,13 @@ export default async function ActividadComercialPage({ searchParams }: { searchP
       </p>
 
       <Filtros opciones={opciones} />
+
+      {totalPresupuesto === 0 && (
+        <Aviso tipo="info">
+          No hay presupuesto cargado para {d.anio}: la columna de cumplimiento por comercial queda
+          vacía hasta que se importe el presupuesto.
+        </Aviso>
+      )}
 
       <ul className="grid-kpis">
         <Kpi etiqueta={`Facturación gestionada ${d.anio}`} valor={numero(totalNeta)} nota={`${d.comerciales.length} comerciales activos`} />

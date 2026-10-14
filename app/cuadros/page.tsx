@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import { cookies } from 'next/headers';
-import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
+import { getConsolidado } from '@/lib/datos/consolidado';
+import { ANIO_ACTUAL } from '@/lib/ejercicio';
+import { eur, numero } from '@/lib/formato';
 import { bloques } from '@/lib/bloques';
 
 
@@ -51,9 +53,7 @@ const VISTAS = [
 export default async function CuadrosPage() {
   const codigo = cookies().get('sfb_empresa')?.value ?? 'SF';
   const empresa = await getEmpresaPorCodigo(codigo);
-
-  const supabase = createClient();
-  const { data: empresas } = await supabase.from('empresas').select('codigo, nombre');
+  const consolidado = await getConsolidado(ANIO_ACTUAL);
 
   return (
     <div>
@@ -90,20 +90,37 @@ export default async function CuadrosPage() {
       ))}
 
       <div className="card">
-        <h2>Consolidada de holding</h2>
+        <h2>Consolidada de holding · {consolidado.anio}</h2>
         <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
-          SF Bathroom más DOT Surfaces (y Fuxsabany) en un mismo número: facturación, margen,
-          carga del equipo compartido y tesorería conjunta. Requiere cargar datos de las demás
-          empresas en el mismo esquema; hoy solo hay datos demo de SF.
+          Facturación neta de A3ERP sumada para todo el grupo ({consolidado.empresasConDatos}{' '}
+          empresa{consolidado.empresasConDatos === 1 ? '' : 's'} con datos en el ejercicio). Es el
+          mismo número que dan SF Bathroom, DOT Surfaces y Fuxsabany juntos.
         </p>
-        <ul className="tablas">
-          {((empresas ?? []) as { codigo: string; nombre: string }[]).map((e) => (
-            <li key={e.codigo}>
-              {e.nombre}
-              <span style={{ color: 'var(--muted)' }}> — {e.codigo === empresa.codigo ? 'con datos' : 'sin datos cargados'}</span>
-            </li>
-          ))}
-        </ul>
+        <table className="tabla">
+          <thead>
+            <tr>
+              <th>Empresa</th>
+              <th className="td-num">Facturación neta</th>
+              <th className="td-num">Facturas</th>
+            </tr>
+          </thead>
+          <tbody>
+            {consolidado.porEmpresa.map((e) => (
+              <tr key={e.codigo}>
+                <td>{e.nombre} <span style={{ color: 'var(--muted)' }}>({e.codigo})</span></td>
+                <td className="td-num">{e.conDatos ? eur(e.neta) : '—'}</td>
+                <td className="td-num">{numero(e.facturas)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th>Total grupo</th>
+              <th className="td-num">{eur(consolidado.totalNeta)}</th>
+              <th className="td-num">{numero(consolidado.totalFacturas)}</th>
+            </tr>
+          </tfoot>
+        </table>
       </div>
 
       <div className="card">

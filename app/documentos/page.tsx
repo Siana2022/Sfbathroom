@@ -4,9 +4,10 @@ import { getDocumentos } from '@/lib/datos/documentos';
 import { parseFiltros, getOpcionesFiltros, type SearchParams } from '@/lib/datos/filtros';
 import { decimal, eur } from '@/lib/formato';
 import Filtros from '@/components/Filtros';
+import { ANIO_ACTUAL } from '@/lib/ejercicio';
 
 
-const ANIO = 2026;
+const ANIO = ANIO_ACTUAL;
 const POR_PAGINA = 50;
 
 export default async function DocumentosPage({ searchParams }: { searchParams: SearchParams }) {

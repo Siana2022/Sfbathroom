@@ -5,9 +5,11 @@ import { decimal, eur, eur2, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
 import Filtros from '@/components/Filtros';
+import Aviso from '@/components/Aviso';
+import { ANIO_ACTUAL } from '@/lib/ejercicio';
 
 
-const ANIO = 2026;
+const ANIO = ANIO_ACTUAL;
 
 export default async function MargenPage({ searchParams }: { searchParams: SearchParams }) {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
@@ -305,6 +307,11 @@ export default async function MargenPage({ searchParams }: { searchParams: Searc
 
       <div className="card">
         <h2>Coste completo de llegada · últimos lotes</h2>
+        <Aviso tipo="demo">
+          Los lotes y sus costes de llegada (flete, aduana, seguro) proceden de datos de
+          demostración: A3ERP aún no carga compras. El margen de arriba sí usa el coste real de
+          cada línea de factura.
+        </Aviso>
         {d.ultimosLotes.length === 0 ? (
           <p style={{ color: 'var(--muted)' }}>Sin lotes de compra cargados.</p>
         ) : (

@@ -10,9 +10,11 @@ import Kpi from '@/components/Kpi';
 import GraficoBarras, { type Barra } from '@/components/GraficoBarras';
 import DescargarExcel from '@/components/DescargarExcel';
 import Filtros from '@/components/Filtros';
+import Aviso from '@/components/Aviso';
+import { ANIO_ACTUAL } from '@/lib/ejercicio';
 
 
-const ANIO = 2026;
+const ANIO = ANIO_ACTUAL;
 
 const NOMBRE_MES = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
@@ -79,6 +81,13 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
 
       <Filtros opciones={opciones} />
 
+      {d.presupuesto === 0 && (
+        <Aviso tipo="info">
+          No hay presupuesto cargado para {d.anio}: los indicadores de cumplimiento y desviación
+          quedan en blanco hasta que se importe el presupuesto del ejercicio.
+        </Aviso>
+      )}
+
       <ul className="grid-kpis">
         <Kpi etiqueta={`Facturación neta ${d.anio}`} valor={eur(d.neta)} nota={`vs ${previo}: ${delta}`} />
         <Kpi etiqueta="Desviación presupuesto" valor={d.cumplimiento === null ? '—' : `${decimal(d.cumplimiento)} %`} nota={d.cumplimiento === null ? 'sin presupuesto' : `presupuesto ${eur(d.presupuesto)}`} />
@@ -93,6 +102,10 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
           Métrica propia Q1: portes, aduana, seguro y transporte interior de las compras. Se
           informa aparte; no se imputa como venta al cliente.
         </p>
+        <Aviso tipo="demo">
+          Se calcula sobre las compras, que todavía son datos de demostración (A3ERP aún no carga
+          el cubo de compras).
+        </Aviso>
         <ul className="grid-kpis">
           <Kpi etiqueta="Coste de transporte total" valor={trans.total === 0 ? '—' : eur(trans.total)} nota={`${trans.compras} compras en el ejercicio`} />
           <Kpi etiqueta="Flete" valor={eur(trans.flete)} nota="marítimo/aéreo" />

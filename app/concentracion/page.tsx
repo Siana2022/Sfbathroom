@@ -5,9 +5,11 @@ import { decimal, eur, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
 import Filtros from '@/components/Filtros';
+import Aviso from '@/components/Aviso';
+import { ANIO_ACTUAL } from '@/lib/ejercicio';
 
 
-const ANIO = 2026;
+const ANIO = ANIO_ACTUAL;
 
 export default async function ConcentracionPage({ searchParams }: { searchParams: SearchParams }) {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
@@ -115,6 +117,10 @@ export default async function ConcentracionPage({ searchParams }: { searchParams
           proveedor. La alerta dispara por encima de 75 días pactados; un solo proveedor
           activo marca ausencia de alternativa.
         </p>
+        <Aviso tipo="demo">
+          Proveedores y compras son datos de demostración (A3ERP aún no carga el cubo de compras),
+          así que este cuadro no refleja el riesgo real de aprovisionamiento.
+        </Aviso>
         <table className="tabla">
           <thead>
             <tr>

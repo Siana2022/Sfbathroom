@@ -326,6 +326,34 @@ main.content { flex: 1; padding: 30px 34px 60px; width: 100%; }
 .badge.rol { background: var(--wash); color: var(--accent); margin: 0; text-transform: uppercase; letter-spacing: 0.08em; font-size: 11px; }
 .badge.vacio { background: #eef0f2; color: var(--tenue); }
 
+.aviso {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 10px 14px;
+  border-radius: 10px;
+  margin: 0 0 18px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.aviso-info { background: rgba(var(--accent-rgb), 0.06); border-color: var(--accent-suave); }
+.aviso-demo { background: #fbf7ec; border-color: var(--ambar); }
+
+.aviso-etiqueta {
+  flex-shrink: 0;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ambar);
+}
+
+.aviso strong { color: var(--ink, inherit); }
+
 ul.tablas { color: var(--muted); font-size: 13px; margin: 8px 0 0; padding-left: 18px; }
 
 .btn {

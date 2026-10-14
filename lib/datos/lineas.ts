@@ -1,5 +1,5 @@
 import type { createClient } from '@/lib/supabase/server';
-import { enLotes } from '@/lib/datos/query';
+import { enLotes, TAMANO_PAGINA } from '@/lib/datos/query';
 
 /**
  * Lee filas de `factura_lineas` para un conjunto de IDs de factura, troceando
@@ -17,7 +17,12 @@ export async function lineasPorFacturas<T = Record<string, unknown>>(
   ids: string[],
 ): Promise<T[]> {
   return enLotes<T>(
-    (lote) => supabase.from('factura_lineas').select(columnas).in('factura_id', lote),
+    (lote, desde) =>
+      supabase
+        .from('factura_lineas')
+        .select(columnas)
+        .in('factura_id', lote)
+        .range(desde, desde + TAMANO_PAGINA - 1),
     ids,
   );
 }

@@ -88,11 +88,12 @@ async function getRiesgoProveedorList(supabase: ReturnType<typeof createClient>,
   const volumen = new Map<string, number>();
   const [lineasP, artRes] = await Promise.all([
     enLotes<{ compra_id: string; cantidad: number; coste_unitario_compra: number }>(
-      (lote) =>
+      (lote, desde) =>
         supabase
           .from('compra_lineas')
           .select('compra_id, cantidad, coste_unitario_compra')
-          .in('compra_id', lote),
+          .in('compra_id', lote)
+          .range(desde, desde + TAMANO_PAGINA - 1),
       compras.map((c) => c.id),
     ),
     supabase

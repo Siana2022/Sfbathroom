@@ -5,9 +5,11 @@ import { decimal, eur, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
 import Filtros from '@/components/Filtros';
+import Aviso from '@/components/Aviso';
+import { ANIO_ACTUAL } from '@/lib/ejercicio';
 
 
-const ANIO = 2026;
+const ANIO = ANIO_ACTUAL;
 
 const TIPO_LABEL: Record<string, string> = {
   rotura_transporte: 'Rotura en transporte',
@@ -30,6 +32,12 @@ export default async function CalidadPage({ searchParams }: { searchParams: Sear
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
         Devoluciones sobre facturación e incidencias registradas por {d.empresa.nombre} en {d.anio}.
       </p>
+
+      <Aviso tipo="demo">
+        Las <strong>devoluciones</strong> son reales (se calculan sobre los abonos de facturas de
+        A3ERP). Las <strong>incidencias y reclamaciones</strong> proceden todavía de datos de
+        demostración.
+      </Aviso>
 
       <Filtros opciones={opciones} />
 

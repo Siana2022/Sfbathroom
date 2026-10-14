@@ -17,19 +17,29 @@ export const TAMANO_PAGINA = 1000;
 
 /**
  * Ejecuta un fetch por lotes de `valores`. `fetchLote` recibe un lote (≤
- * TAMANO_LOTE valores) y debe devolver la promesa de una consulta ya configurada
- * con su `.in(col, lote)`. Devuelve solo el array de filas.
+ * TAMANO_LOTE valores) y el offset `desde`, y debe devolver la promesa de una
+ * consulta ya configurada con su `.in(col, lote)` y `.range(desde, desde +
+ * TAMANO_PAGINA - 1)`. Devuelve solo el array de filas.
+ *
+ * Además de trocear el `.in(...)` (para no reventar la URL), pagina dentro de
+ * cada lote: un lote de 150 facturas puede devolver más de 1000 líneas, que es
+ * el tope que PostgREST devuelve por petición. Sin paginar, esas líneas se
+ * perdían en silencio (unidades, coste y margen a la baja).
  */
 export async function enLotes<T>(
-  fetchLote: (lote: string[]) => PromiseLike<{ data: T[] | null }> | PromiseLike<any>,
+  fetchLote: (lote: string[], desde: number) => PromiseLike<{ data: T[] | null }> | PromiseLike<any>,
   valores: string[],
 ): Promise<T[]> {
   if (!valores.length) return [];
   const salida: T[] = [];
   for (let i = 0; i < valores.length; i += TAMANO_LOTE) {
     const lote = valores.slice(i, i + TAMANO_LOTE);
-    const { data } = await fetchLote(lote);
-    if (data) salida.push(...(data as T[]));
+    for (let desde = 0; ; desde += TAMANO_PAGINA) {
+      const { data } = await fetchLote(lote, desde);
+      if (!data) break;
+      salida.push(...(data as T[]));
+      if (data.length < TAMANO_PAGINA) break;
+    }
   }
   return salida;
 }

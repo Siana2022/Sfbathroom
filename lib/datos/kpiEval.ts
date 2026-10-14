@@ -352,7 +352,12 @@ async function handleMargen(
   const articulosMap = new Map<string, number>();
   if (artIdsTodas.length) {
     const arts = await enLotes<FilaArticulo>(
-      (lote) => supabase.from('articulos').select('id, coste_unitario').in('id', lote),
+      (lote, desde) =>
+        supabase
+          .from('articulos')
+          .select('id, coste_unitario')
+          .in('id', lote)
+          .range(desde, desde + TAMANO_PAGINA - 1),
       artIdsTodas,
     );
     for (const a of arts) articulosMap.set(a.id, Number(a.coste_unitario ?? 0));

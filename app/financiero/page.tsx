@@ -3,6 +3,7 @@ import { getCobros } from '@/lib/datos/cobros';
 import { getTesoreria } from '@/lib/datos/tesoreria';
 import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
+import Aviso from '@/components/Aviso';
 import { decimal, eur, numero, pct } from '@/lib/formato';
 
 
@@ -21,6 +22,12 @@ export default async function FinancieroPage() {
         desde Excel de la gestoría, cierre mensual, 3-5 ejercicios históricos. Los KPIs
         de estructura dependen de esa carga; hoy se estiman los de cobro (DSO) con datos reales.
       </p>
+
+      <Aviso tipo="info">
+        Los indicadores de cobro (proyección, DSO y aging) parten de las facturas reales de A3ERP
+        pero <strong>sin cobros cargados</strong>: todo el saldo aparece como pendiente y el DSO
+        sale inflado hasta que A3ERP exporte los pagos.
+      </Aviso>
 
       <div className="card">
         <h2>Proyección de cobros (próximas 8 semanas)</h2>

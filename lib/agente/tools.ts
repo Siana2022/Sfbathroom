@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { lineasPorFacturas } from '@/lib/datos/lineas';
 import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
+import { ANIO_ACTUAL } from '@/lib/ejercicio';
 
 const MESES = ['', 'ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
@@ -72,7 +73,7 @@ export const toolExecutor = {
   async ventas_por_mes(codigoEmpresa: string): Promise<Ejecucion> {
     const supabase = createClient();
     const empresaId = await empresaDe(codigoEmpresa);
-    const ejercicio = 2026;
+    const ejercicio = ANIO_ACTUAL;
     const docs = await todasLasFilas<FilaFactura>((desde) =>
       supabase
         .from('facturas')
@@ -112,7 +113,7 @@ export const toolExecutor = {
     const supabase = createClient();
     const empresaId = await empresaDe(codigoEmpresa);
     const mes = Math.min(12, Math.max(1, Number(args.mes ?? 6) || 12));
-    const anio = Number(args.ejercicio ?? 2026) || 2026;
+    const anio = Number(args.ejercicio ?? ANIO_ACTUAL) || ANIO_ACTUAL;
     const finMes = `${String(mes).padStart(2, '0')}-${String(new Date(anio, mes, 0).getDate()).padStart(2, '0')}`;
     const [cur, prev] = await Promise.all([
       todasLasFilas<FilaFactura>((desde) =>
@@ -130,7 +131,7 @@ export const toolExecutor = {
   async top_clientes(codigoEmpresa: string, args: { ejercicio?: string }): Promise<Ejecucion> {
     const supabase = createClient();
     const empresaId = await empresaDe(codigoEmpresa);
-    const anio = Number(args.ejercicio ?? 2026) || 2026;
+    const anio = Number(args.ejercicio ?? ANIO_ACTUAL) || ANIO_ACTUAL;
     const filas = await todasLasFilas<FilaFactura>((desde) =>
       supabase
         .from('facturas')
@@ -170,7 +171,7 @@ export const toolExecutor = {
   async desglose_variacion(codigoEmpresa: string, args: { ejercicio?: string; previo?: string }): Promise<Ejecucion> {
     const supabase = createClient();
     const empresaId = await empresaDe(codigoEmpresa);
-    const anio = Number(args.ejercicio ?? 2026) || 2026;
+    const anio = Number(args.ejercicio ?? ANIO_ACTUAL) || ANIO_ACTUAL;
     const previo = Number(args.previo ?? anio - 1) || anio - 1;
     const docs = await todasLasFilas<FilaFactura>((desde) =>
       supabase

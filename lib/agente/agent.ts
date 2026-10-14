@@ -1,5 +1,6 @@
 import { HERRAMIENTAS, ejecutar } from '@/lib/agente/tools';
 import { callLLM, type LLMTool, type LLMMessage } from '@/lib/agente/llm';
+import { ANIO_ACTUAL } from '@/lib/ejercicio';
 
 const MAX_ITERACIONES = 6;
 
@@ -20,7 +21,7 @@ Eres el asistente de BI de sfbathroom. Responde SIEMPRE en español y solo con d
 La métrica base es la facturación neta: suma de facturas + notas de cargo − abonos, imputada en la fecha del documento (no en la fecha del pedido ni del albarán).
 Nunca inventes datos. Si la herramienta no da la respuesta, di que no está disponible. Para mostrar tablas, usa formato de texto alineado o explica con palabras.
 Sé conciso, factual y directo. Si el usuario pide un filtro, usa primero detalle_clientes u otras herramientas para obtener IDs.
-Año por defecto: 2026. Empresa actual: la del contexto del usuario.
+Año por defecto: ${ANIO_ACTUAL}. Empresa actual: la del contexto del usuario.
 `.trim();
 
 export async function consult(

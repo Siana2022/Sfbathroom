@@ -5,9 +5,11 @@ import { decimal, eur, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
 import Filtros from '@/components/Filtros';
+import Aviso from '@/components/Aviso';
+import { ANIO_ACTUAL } from '@/lib/ejercicio';
 
 
-const ANIO = 2026;
+const ANIO = ANIO_ACTUAL;
 
 export default async function CreditoCobroPage({ searchParams }: { searchParams: SearchParams }) {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
@@ -24,6 +26,12 @@ export default async function CreditoCobroPage({ searchParams }: { searchParams:
       </p>
 
       <Filtros opciones={opciones} />
+
+      <Aviso tipo="info">
+        Aún no hay <strong>cobros</strong> cargados (A3ERP no los exporta todavía). El saldo se
+        estima como el importe de las facturas de A3ERP sin descontar pagos, por lo que el
+        vencido y el DSO salen más altos que la realidad.
+      </Aviso>
 
       <ul className="grid-kpis">
         <Kpi etiqueta="Saldo total de clientes" valor={eur(d.saldoTotal)} nota={`de los que ${eur(d.vencido)} vencido`} />

@@ -58,7 +58,12 @@ export async function getDesvioPresupuesto(codigoEmpresa: string, anio: number, 
     const familiaDeArticulo = new Map<string, string | null>();
     if (artIds.length) {
       const articulosRaw = await enLotes<FilaArticulo>(
-        (lote) => supabase.from('articulos').select('id, familia_id').in('id', lote),
+        (lote, desde) =>
+          supabase
+            .from('articulos')
+            .select('id, familia_id')
+            .in('id', lote)
+            .range(desde, desde + TAMANO_PAGINA - 1),
         artIds,
       );
       for (const a of articulosRaw) familiaDeArticulo.set(a.id, a.familia_id);

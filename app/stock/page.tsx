@@ -5,6 +5,7 @@ import { decimal, eur, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
 import Filtros from '@/components/Filtros';
+import Aviso from '@/components/Aviso';
 
 
 export default async function StockPage({ searchParams }: { searchParams: SearchParams }) {
@@ -21,6 +22,11 @@ export default async function StockPage({ searchParams }: { searchParams: Search
         Cobertura en días por artículo y almacén, stock disponible real, en tránsito, roturas y
         referencias bajo el punto de pedido de {d.empresa.nombre}.
       </p>
+
+      <Aviso tipo="demo">
+        El stock, las compras y los proveedores siguen siendo datos de demostración: la ingesta
+        de A3ERP aún no carga almacén. La cobertura y las roturas no reflejan el stock real.
+      </Aviso>
 
       <Filtros opciones={opciones} />
 
