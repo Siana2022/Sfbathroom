@@ -37,7 +37,49 @@ export type OpcionesFiltros = {
   marcas: OpcionFiltro[];
 };
 
-export async function getOpcionesFiltros(codigoEmpresa: string): Promise<OpcionesFiltros> {
+// Cuando se pasa `scopeClientes`, la lista de clientes se limita a los que tienen
+// documentos (pedidos o facturas) en ese ejercicio, para que el selector no ofrezca
+// clientes sin actividad (que devolverían páginas vacías).
+export type ScopeClientes = { fuente: 'facturas' | 'pedidos'; anio: number };
+
+async function clientesConDocumentos(
+  supabase: ReturnType<typeof createClient>,
+  empresaId: string,
+  scope: ScopeClientes,
+): Promise<Set<string>> {
+  const desde = `${scope.anio}-01-01`;
+  const hasta = `${scope.anio}-12-31`;
+  let filas: { cliente_id: string | null }[];
+  if (scope.fuente === 'pedidos') {
+    filas = await todasLasFilas<{ cliente_id: string | null }>((desde2) =>
+      supabase
+        .from('pedidos')
+        .select('cliente_id')
+        .eq('empresa_id', empresaId)
+        .gte('fecha_entrada', desde)
+        .lte('fecha_entrada', hasta)
+        .not('cliente_id', 'is', null)
+        .range(desde2, desde2 + TAMANO_PAGINA - 1),
+    );
+  } else {
+    filas = await todasLasFilas<{ cliente_id: string | null }>((desde2) =>
+      supabase
+        .from('facturas')
+        .select('cliente_id')
+        .eq('empresa_id', empresaId)
+        .gte('fecha', desde)
+        .lte('fecha', hasta)
+        .not('cliente_id', 'is', null)
+        .range(desde2, desde2 + TAMANO_PAGINA - 1),
+    );
+  }
+  return new Set(filas.map((f) => f.cliente_id as string).filter(Boolean));
+}
+
+export async function getOpcionesFiltros(
+  codigoEmpresa: string,
+  scopeClientes?: ScopeClientes,
+): Promise<OpcionesFiltros> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
 
@@ -48,8 +90,14 @@ export async function getOpcionesFiltros(codigoEmpresa: string): Promise<Opcione
     supabase.from('marcas').select('id, nombre').eq('empresa_id', empresa.id).order('nombre'),
   ]);
 
+  let opcionesClientes = (clientes.data ?? []).map((c) => ({ id: c.id, nombre: c.nombre }));
+  if (scopeClientes) {
+    const conActividad = await clientesConDocumentos(supabase, empresa.id, scopeClientes);
+    opcionesClientes = opcionesClientes.filter((c) => conActividad.has(c.id));
+  }
+
   return {
-    clientes: (clientes.data ?? []).map((c) => ({ id: c.id, nombre: c.nombre })),
+    clientes: opcionesClientes,
     comerciales: (comerciales.data ?? []).map((c) => ({ id: c.id, nombre: c.nombre })),
     familias: (familias.data ?? []).map((f) => ({ id: f.id, nombre: f.nombre })),
     marcas: (marcas.data ?? []).map((m) => ({ id: m.id, nombre: m.nombre })),

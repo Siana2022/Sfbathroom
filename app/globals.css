@@ -522,6 +522,56 @@ ul.tablas { color: var(--muted); font-size: 13px; margin: 8px 0 0; padding-left:
   box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15);
 }
 
+/* Selector de cliente buscable (combobox) */
+.selector-buscable .selector-envoltura { position: relative; }
+.selector-buscable input { width: 100%; }
+.selector-limpiar {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.selector-limpiar:hover { color: var(--text); }
+.selector-lista {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--panel);
+  border: 1px solid var(--border-2);
+  border-radius: 9px;
+  box-shadow: var(--sombra-suave);
+}
+.selector-opcion {
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.selector-opcion.resaltado { background: rgba(var(--accent-rgb), 0.14); }
+.selector-vacio {
+  padding: 6px 8px;
+  font-size: 13px;
+  color: var(--tenue);
+}
+
 .input-dato {
   background: var(--panel);
   border: 1px solid var(--border-2);

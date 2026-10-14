@@ -48,7 +48,7 @@ function TablaDesvio({ filas }: { filas: { nombre: string; presupuesto: number; 
 export default async function FacturacionPage({ searchParams }: { searchParams: SearchParams }) {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
   const filtros = parseFiltros(searchParams);
-  const opciones = await getOpcionesFiltros(empresa);
+  const opciones = await getOpcionesFiltros(empresa, { fuente: 'facturas', anio: ANIO });
   const d = await getFacturacion(empresa, ANIO, filtros);
   const t = await getVistasTemporales(empresa, ANIO, filtros);
   const previo = d.anioPrevio;

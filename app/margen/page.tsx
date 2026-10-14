@@ -12,7 +12,7 @@ const ANIO = 2026;
 export default async function MargenPage({ searchParams }: { searchParams: SearchParams }) {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
   const filtros = parseFiltros(searchParams);
-  const opciones = await getOpcionesFiltros(empresa);
+  const opciones = await getOpcionesFiltros(empresa, { fuente: 'facturas', anio: ANIO });
   const d = await getMargen(empresa, ANIO, filtros);
 
   if (d.sinAcceso) {

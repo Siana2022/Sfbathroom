@@ -2,6 +2,7 @@
 import { Suspense } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { OpcionesFiltros } from '@/lib/datos/filtros';
+import SelectorBuscable from '@/components/SelectorBuscable';
 
 type Props = {
   opciones: OpcionesFiltros;
@@ -35,17 +36,13 @@ function FiltrosInner({ opciones }: Props) {
     <div className="barra-filtros">
       <span className="barra-filtros-titulo">Filtros</span>
 
-      <label className="campo-filtro">
-        Cliente
-        <select value={valor('cliente')} onChange={(e) => setUrl({ cliente: e.target.value || undefined })}>
-          <option value="">Todos</option>
-          {opciones.clientes.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.nombre}
-            </option>
-          ))}
-        </select>
-      </label>
+      <SelectorBuscable
+        etiqueta="Cliente"
+        textoTodos="Todos"
+        opciones={opciones.clientes}
+        valor={valor('cliente')}
+        onChange={(id) => setUrl({ cliente: id })}
+      />
 
       <label className="campo-filtro">
         Comercial
