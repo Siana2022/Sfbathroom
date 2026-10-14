@@ -169,19 +169,35 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
       `compra_lineas`, `stock_en_transito`, `cobros` vía Supabase REST (`service_role key`).
 - [ ] Manejar abonos/devoluciones (el cliente confirmó que existen y deben restarse).
 
-## 2a. Incidencia duplicación de líneas A3ERP (oct 2026)
+## 2a. Incidencia duplicación / pérdida de líneas A3ERP (oct 2026) — RESUELTA
 - [x] Diagnóstico: fan-out en `LEFT JOIN ARTICULO` (`CODART` no único) → líneas repetidas
-      (6.572) y cabeceras infladas. Detalle en `docs/a3erp-mapeo-ventas.md`.
-- [x] Fix en `ingesta/a3erp/config/a3erp.config.json`: `OUTER APPLY (SELECT TOP 1 …)` para
-      `ARTICULO` y `REPRESEN`. Añadido fix de borrado por rango de líneas en el swap
-      (`0024_ingesta_fix_duplicados_lineas.sql`, aplicada por el cliente).
-- [x] Limpieza: `a3erp.deduplicar_lineas()` (`0025`) borró las 6.572 líneas repetidas;
-      `contar_lineas_duplicadas()` = 0.
-- [ ] **Recuadrar cabeceras** infladas desde líneas limpias (SQL en `a3erp-mapeo-ventas.md`).
-- [ ] **Copiar el config corregido al PC** (`C:\Apps\sfbathroom-ingesta`) y re-ejecutar la
-      reconciliación de las 3 empresas. Si no, la ingesta nocturna vuelve a duplicar.
+      y sumas infladas. Detalle en `docs/a3erp-mapeo-ventas.md`.
+- [x] Fix de raíz en `ingesta/a3erp/config/a3erp.config.json`: `OUTER APPLY (SELECT TOP 1 …)`
+      para `ARTICULO` y `REPRESEN` (commit `610127f`). Evita que la ingesta vuelva a duplicar.
+- [x] **NO volver a ejecutar el dedup `0025` (`a3erp.deduplicar_lineas()`)**: borraba líneas
+      **legítimamente repetidas** (misma factura+artículo+cantidad+precio+base), no solo
+      duplicados de fan-out → pérdida de unidades y base de línea. Las líneas malas de la
+      0025 las recupera la **reconciliación completa** (`facturas_replace` rehace docs y líneas).
+- [x] Config copiado al PC y `npm run reconciliacion` de las 3 empresas ejecutada **sin** dedup
+      (SF 1555 docs · FUX 34022 · DOT 1843).
+- [x] **Verificado contra el ERP** (`ingesta/a3erp/diag-unidades.mjs`): app = ERP exactamente
+      (Δ0) en SF/FUX/DOT. Capítulo de unidades cerrado. (El "objetivo" 33.816/14.648/30.712 era
+      una medición hasta el 5-oct; la app va hasta el 14-oct.)
 - [ ] Confirmar con el cliente el mapeo del nº de factura anulada (`NRO_ANULADA`, hoy `NULL`
       → `factura_anula_id` siempre nulo).
+
+## 2b. Ingesta automática en el PC (oct 2026) — funcionando
+- [x] `ingesta/a3erp/bin/` con `ingesta-diaria.bat`, `ingesta-semanal.bat` y
+      `programar-tareas.bat`; tareas `sfbathroom-Ingesta-Diaria` (L–S 22:00) y
+      `sfbathroom-Ingesta-Semanal` (domingos 22:00). Probado en el PC: las 3 empresas OK.
+      Detalle en `docs/a3erp-ops-pc-red.md`.
+- [ ] **Aviso por correo si falla una empresa — verificar `sfbathroom.com` en Resend**
+      (hoy responde `403 The sfbathroom.com domain is not verified`). Endpoint
+      `app/api/jobs/aviso-ingesta` + `src/notificar.mjs` ya listos; faltan los 3 registros DNS
+      en Hostinger (`send` y `resend._domainkey`, no tocan web ni correo). Hasta entonces el
+      fallo solo queda en el log. **Aparcado por decisión del cliente (14 oct 2026).**
+- [ ] Menor: log del `.bat` con mojibake en PowerShell (codificación); cosmético.
+
 
 ## 3. Margen por producto
 - [ ] Cargar compras desde A3ERP en `compras`/`compra_lineas` (coste real por lote — la vista

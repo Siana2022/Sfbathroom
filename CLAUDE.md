@@ -138,6 +138,41 @@ Detalle completo: `docs/asistente-ia.md`. Tools actuales: `ventas_por_mes`,
    `docs/desbloqueos-cliente.md` (B4 fotos stock, B8 impagos/seguro de crédito, marketing,
    financiero, A3ERP, datos DOT/Fuxsabany para la consolidada holding).
 
+## Última sesión (14 oct 2026) · arreglo de unidades + ingesta automática en el PC
+
+- **Desvío de unidades (resuelto)**: la app mostraba menos unidades que A3ERP. Causa raíz:
+  el parche `0025_ingesta_dedup_lineas.sql` (`a3erp.deduplicar_lineas()`) borró **líneas
+  legítimamente repetidas** (misma factura+artículo+cantidad+precio+base) → se perdían
+  unidades y base de línea (la neta no se movía porque sale de la cabecera). El fix bueno
+  era la consulta sin fan-out (`OUTER APPLY`, ya en `610127f`) + **no** deduplicar.
+- **Solución aplicada en el PC**: copiado `config/a3erp.config.json` (OUTER APPLY) y
+  `src/normalizar.ts` (rellena `base_linea`), y `npm run reconciliacion` de las 3 empresas
+  **sin** volver a ejecutar el dedup. SF 1555 docs · FUX 34022 · DOT 1843. Base de línea de
+  FUX rellenada → margen de FUX deja de salir a ~0.
+- **Verificado contra el ERP** con `ingesta/a3erp/diag-unidades.mjs` (nuevo, solo lectura):
+  `M1` (TIPODOC `Cargo` + `ESCOMPONENTE='F'`) = **app exactamente** (Δ0 en las 3). `M5`=0 →
+  `normalizar.ts` no descarta líneas; `M1`=`M2` → no hay suplementos (`'S'`). Unidades 2026
+  a 14-oct: SF 35.071 · FUX 31.404 · DOT 15.133.
+- **El "objetivo" (33.816/14.648/30.712) no era desvío**: eran mediciones de A3ERP
+  **filtradas hasta el 5-oct**; la app iba hasta el 14-oct. La diferencia es lo facturado del
+  6 al 14 (1.255/692/485). No hay nada que igualar.
+- **Ingesta automática en el PC** (`ingesta/a3erp/bin/`, `.bat` con CRLF vía `.gitattributes`):
+  `ingesta-diaria.bat` (ventana móvil 45 días, SF+FUX+DOT en serie) e `ingesta-semanal.bat`
+  (reconciliación completa). `programar-tareas.bat` registra `sfbathroom-Ingesta-Diaria`
+  (L–S 22:00) y `sfbathroom-Ingesta-Semanal` (domingos 22:00). Logs por día en
+  `ingesta\logs\`. **Probado en el PC: SF OK → FUX OK → DOT OK → FIN**.
+- **Aviso por correo si falla** (nuevo): endpoint `app/api/jobs/aviso-ingesta` (bajo
+  `/api/jobs/*` para reutilizar `JOBS_CRON_SECRET`; envía vía `enviarEmail`) +
+  `ingesta/a3erp/src/notificar.mjs` (lo llama el `.bat` solo si una empresa falla). **Pendiente
+  real: verificar el dominio `sfbathroom.com` en Resend** (Resend responde
+  `403 The sfbathroom.com domain is not verified`). Destinatario `ALERTAS_EMAIL_TO` =
+  `asalinas@sfbathroom.com`, remitente `RESEND_FROM` = `alertas@sfbathroom.com`, todo ya en
+  Vercel. Mientras no se verifique, el fallo solo queda en el log (no rompe la tarea).
+  El DNS lo lleva el cliente en **Hostinger** (los 3 registros de Resend van en `send` y
+  `resend._domainkey`, nunca en la raíz → no tocan web ni correo existente).
+- **Pendiente menor**: el `.bat` escribe el log en una codificación que PowerShell muestra con
+  mojibake (`â†'`); es cosmético, no afecta a los datos.
+
 ## Última sesión (06 oct 2026) · go-live ingesta A3ERP + selector de empresa
 
 - **Go-live ingesta A3ERP**: carga histórica completa SF/FUX/DOT cargada y validada en

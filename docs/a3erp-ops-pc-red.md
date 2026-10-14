@@ -75,44 +75,56 @@ ajustar `v_perf_facturacion_mensual`/neta o el loader).
 - PowerShell bloquea `npm.ps1` (execution policy): usar `cmd` (`npm.cmd`) o `.bat`. La
   tarea programada usa `.bat` → no afectada.
 
-## 3. Tarea programada diaria (06:00)
+## 3. Ingesta automática (diaria + reconciliación semanal)
 
-Crear `C:\Apps\sfbathroom-ingesta\diario.bat` — lanza las tres empresas en secuencia
-(`call` para que una fallida no corte a las siguientes):
+La carpeta `ingesta/a3erp/bin/` trae los scripts ya hechos (vienen en el repo; se copian al
+PC junto al resto, sin tocar `.env` ni `node_modules`):
 
-```bat
-@echo off
-cd /d C:\Apps\sfbathroom-ingesta
-mkdir logs 2>nul
-echo [%date% %time%] INICIO >> logs\diario.log
-call npm run diario:sf  >> logs\diario.log 2>&1
-call npm run diario:fux >> logs\diario.log 2>&1
-call npm run diario:dot >> logs\diario.log 2>&1
-echo [%date% %time%] FIN >> logs\diario.log
+- `ingesta-diaria.bat` — carga las 3 empresas en serie con la **ventana móvil de 45 días**
+  (`npm run diario:sf`, `diario:fux`, `diario:dot`).
+- `ingesta-semanal.bat` — **reconciliación completa** del histórico
+  (`reconciliacion`, `reconciliacion:fux`, `reconciliacion:dot`).
+- `programar-tareas.bat` — crea/actualiza las dos tareas en el Programador de tareas.
+
+Cada `.bat` escribe un log por día en `ingesta\logs\` y, si alguna empresa falla, llama a
+`src/notificar.mjs` (aviso por correo, ver punto 4). Los `.bat` van con fin de línea **CRLF**
+(forzado por `.gitattributes`).
+
+Registrar las tareas (ejecutar **como administrador**):
+
+```
+C:\Apps\sfbathroom-ingesta\bin\programar-tareas.bat
 ```
 
-Programar (Task Scheduler, sin abrir consola):
+Crea:
 
-```
-schtasks /Create /TN "A3ERP-Ventas-Diario" /SC DAILY /ST 06:00 /TR "C:\Apps\sfbathroom-ingesta\diario.bat"
-```
+| Tarea | Cuándo | Qué hace |
+| --- | --- | --- |
+| `sfbathroom-Ingesta-Diaria` | lunes a sábado, **22:00** | ventana móvil de 45 días |
+| `sfbathroom-Ingesta-Semanal` | domingos, **22:00** | reconciliación completa |
 
-Si el PC está despierto solo con "wake", marcar en Task Scheduler:
-*Conditions → Wake the computer to run this task*.
+Probar sin esperar la hora: `schtasks /Run /TN "sfbathroom-Ingesta-Diaria"`. El log del día
+(`ingesta\logs\ingesta-diaria-AAAA-MM-DD.log`) debe terminar con
+`OK: las 3 empresas cargadas sin errores.` / `FIN ingesta DIARIA.`
 
-Ver de que funcionó: `schtasks /Run /TN "A3ERP-Ventas-Diario"` y luego `logs\diario.log`.
-Debe contener los tres resúmenes (`facturas_replace`) y terminar con `FIN`.
-`diario:sf|fux|dot` re-leen la ventana móvil de 45 días, así que son idempotentes y no se
-pisan.
+> **Ojo al pegar**: no pegar texto de instrucciones en la consola (las líneas sueltas se
+> ejecutan como comandos; una de ellas borró las tareas). Pegar solo el comando.
 
-## 4. Vigilancia (pendiente)
+## 4. Aviso por correo si falla (pendiente: verificar el dominio en Resend)
 
-La ingesta graba su resultado/en el que el runner escribe; el **watchdog** que salta
-si una empresa no carga en 24h está en el roadmap (necesita RESEND). De momento,
-opcional: regla en el correo o CheckMK sobre `logs\diario.log` si no contiene
-"ha finalizado". Las siguientes empresas se añaden como `diario:fux.bat`,
-`diario:dot.bat` y sus `schtasks` (SF/FUX/DOT se lanzan en secuencia para no
-pisarse).
+El `.bat` llama a `node --env-file=.env src/notificar.mjs` solo cuando una empresa falla; ese
+script hace POST a `https://sfbathroom.vercel.app/api/jobs/aviso-ingesta` (protegido con
+`JOBS_CRON_SECRET`), y el endpoint envía el correo vía Resend (`lib/datos/email.ts`).
+
+Variables necesarias en el `.env` del PC: `APP_URL` y `JOBS_CRON_SECRET` (el mismo de Vercel).
+
+**Estado: la app/endpoint funcionan, pero Resend rechaza** con
+`403 The sfbathroom.com domain is not verified`. Destinatario `ALERTAS_EMAIL_TO =
+asalinas@sfbathroom.com`, remitente `RESEND_FROM = alertas@sfbathroom.com` (todo ya en
+Vercel). Para activarlo: **verificar `sfbathroom.com` en Resend** (https://resend.com/domains
+→ Add Domain → los 3 registros DNS se añaden en **Hostinger**, en `send` y
+`resend._domainkey`; no tocan la web ni el correo existente). Mientras no se verifique, el
+fallo solo queda en el log y la tarea sigue funcionando igual.
 
 ## 5. Seguridad
 
