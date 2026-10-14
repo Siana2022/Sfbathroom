@@ -1,34 +1,83 @@
-# A3ERP · Ingesta en este PC
+# A3ERP · Ingesta automatica en este PC
+
+Este PC carga cada noche las ventas de A3ERP (SQooL Server, via VPN) a Supabase,
+y el cuadro de mando de la web las lee. No hay que lanzar nada a mano.
+
+## 0. Requisitos
+
+- Node.js instalado (LTS). Comprueba en cmd:  node --version
+- VPN conectada y PC encendido (es el caso de este equipo).
+- Esta carpeta con el `.env` relleno.
 
 ## 1. Instalar dependencias (una vez)
-Abre "Símbolo del sistema" (cmd) en esta carpeta y ejecuta:
+
+Abre "Simbolo del sistema" (cmd) en esta carpeta y ejecuta:
 
     npm install
 
-## 2. Primera carga de validación (agosto 2026)
-Sin cerrar la ventana:
+## 2. Rellenar el .env (una vez)
 
-    npm run manual:agosto
+Ademas de los datos de SQL Server y Supabase (MSSQL_*, SUPABASE_URL,
+SUPABASE_SERVICE_ROLE_KEY), anade al final:
 
-Espera el resumen final. Debe acabar con una línea:
+    APP_URL=https://sfbathroom.vercel.app
+    JOBS_CRON_SECRET=<el mismo secreto que en Vercel>
 
-    [a3erp] aplicado: {"empresa": "SF", ...}
+`APP_URL` y `JOBS_CRON_SECRET` son solo para el aviso por correo si algo falla.
 
-Si algo falla, copia TODO el mensaje de error.
+> La contrasena de SQL Server va ENTRE COMILLAS en el `.env` (si no, el `#`
+> la trunca).
 
-## 3. Carga diaria (cuando se valide)
-    npm run diario:sf
+## 3. Arreglo unico (IMPRESCINDIBLE, una sola vez)
 
-## 4. Tarea programada (06:00) para el paso 3
-Crear `diario.bat` en esta carpeta con:
+La ultima carga quedo mal (lineas duplicadas/interrumpidas). Antes de
+automatizar hay que dejarlo bien con una recarga completa:
 
-    @echo off
-    cd /d %~dp0
-    npm run diario:sf >> logs\diario.log 2>&1
+    npm run reconciliacion          (SF)
+    npm run reconciliacion:fux
+    npm run reconciliacion:dot
 
-Y programarla (cmd):
+Espera a que las 3 terminen con "aplicado: {...}". NO ejecutes el script de
+deduplicar lineas (ya no hace falta).
 
-    schtasks /Create /TN "A3ERP-Ventas-SF" /SC DAILY /ST 06:00 /TR "%~dp0diario.bat"
+## 4. Automatizar (una vez)
 
-Nota: esta carpeta contiene las credenciales de acceso (.env). Protege el
-usuario del PC con contraseña y no la compartas.
+Ejecuta **como administrador**:
+
+    bin\programar-tareas.bat
+
+Crea dos tareas en el Programador de tareas de Windows:
+
+    sfbathroom-Ingesta-Diaria     lunes a sabado a las 22:00  (ventana de 45 dias)
+    sfbathroom-Ingesta-Semanal    domingos a las 22:00        (reconciliacion completa)
+
+Cada noche carga SF, FUX y DOT en serie. Si alguna empresa falla, manda un
+correo de aviso al buzon configurado en la web (ALERTAS_EMAIL_TO).
+
+## 5. Probar sin esperar a la hora
+
+    schtasks /Run /TN "sfbathroom-Ingesta-Diaria"
+
+Y mira el resultado en el log del dia:
+
+    ingesta\logs\ingesta-diaria-AAAA-MM-DD.log
+
+## 6. Logs y avisos
+
+- Un archivo por dia en `ingesta\logs\` (se conservan los ultimos; puedes
+  borrar los antiguos de vez en cuando).
+- Si un dia no ves movimiento, mira la "frescura" (ultima factura cargada)
+  en el cuadro de mando; si esta parada, revisa el log del PC.
+
+## 7. Si algo falla
+
+- **"Error de inicio de sesion del usuario"**: la contrasena del `.env` debe
+  ir entre comillas.
+- **No conecta a la base de datos**: comprueba que el cliente de VPN este
+  conectado en ese momento.
+- **El correo de aviso no llega**: revisa que APP_URL y JOBS_CRON_SECRET del
+  `.env` sean correctos, y que la web tenga configurados RESEND_API_KEY y
+  ALERTAS_EMAIL_TO.
+
+Nota: esta carpeta contiene las credenciales (.env). Protege el usuario del
+PC con contrasena y no compartas la carpeta.
