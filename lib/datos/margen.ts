@@ -24,12 +24,12 @@ export type MargenData = {
   erosionTarifa: { articulo: string; unidades: number; pvd: number; tarifa: number; erosionPct: number }[];
   erosionMedia: number | null;
   matrizMargenRotacion: { tramoMargen: string; baja: number; media: number; alta: number }[];
-  mensual: { mes: string; importe: number; margenPct: number }[];
+  mensual: { mes: string; unidades: number; bruto: number; descuento: number; neto: number; coste: number; margen: number; margenPct: number }[];
   ultimosLotes: { lote: string; articulo: string; fecha: string; costeCompra: number; costeRepartido: number; costeCompleto: number }[];
 };
 
-type FilaFactura = { id: string; cliente_id: string | null; comercial_id: string | null; fecha: string; tipo_documento: string; total: number; descuento_pie: number; rappel_devengado: number };
-type FilaLinea = { factura_id: string; articulo_id: string | null; cantidad: number; importe: number; coste_unitario: number | null };
+type FilaFactura = { id: string; cliente_id: string | null; comercial_id: string | null; fecha: string; tipo_documento: string; total: number };
+type FilaLinea = { factura_id: string; articulo_id: string | null; cantidad: number; precio_unitario: number | null; base_imponible: number | null; coste_unitario: number | null };
 type FilaArticulo = { id: string; nombre: string; familia_id: string | null; marca_id: string | null; marca_blanca_cliente_id: string | null; coste_unitario: number | null; precio_tarifa: number | null };
 type FilaCliente = { id: string; nombre: string; canal_id: string | null; pais_facturacion: string | null };
 type FilaFamilia = { id: string; nombre: string };
@@ -85,7 +85,7 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
     todasLasFilas<FilaFactura>((desde) =>
       supabase
         .from('facturas')
-        .select('id, cliente_id, comercial_id, fecha, tipo_documento, total, descuento_pie, rappel_devengado')
+        .select('id, cliente_id, comercial_id, fecha, tipo_documento, total')
         .eq('empresa_id', empresa.id)
         .in('tipo_documento', ['factura', 'abono', 'nota_cargo'])
         .gte('fecha', `${anio}-01-01`)
@@ -112,7 +112,7 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
   const facturas = filtrarPorIds(facturasRes, idsFiltrados);
   const ids = facturas.map((f) => f.id);
 
-  const filasLineas = await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, articulo_id, cantidad, importe, coste_unitario', ids);
+  const filasLineas = await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, articulo_id, cantidad, precio_unitario, base_imponible, coste_unitario', ids);
 
   const articuloPorId = new Map<string, FilaArticulo>((articulosRes.data ?? []).map((a) => [a.id, a as FilaArticulo]));
 
@@ -129,17 +129,6 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
   for (const c of (comercialesRes.data ?? []) as FilaEtiqueta[]) comercialesMap.set(c.id, c.nombre);
 
   const facturaPorId = new Map(facturas.map((f) => [f.id, f]));
-  // Factor de reparto de descuento_pie y rappel por línea (distribuye proporcionalmente)
-  const importeLineasPorFactura = new Map<string, number>();
-  for (const l of filasLineas) {
-    importeLineasPorFactura.set(l.factura_id, (importeLineasPorFactura.get(l.factura_id) ?? 0) + Number(l.importe ?? 0));
-  }
-  const factorPorFactura = new Map<string, number>();
-  for (const f of facturas) {
-    const base = importeLineasPorFactura.get(f.id) ?? 0;
-    const ajuste = Number(f.descuento_pie ?? 0) + Number(f.rappel_devengado ?? 0);
-    factorPorFactura.set(f.id, base > 0 ? (base - ajuste) / base : 1);
-  }
   // Coste completo por artículo (media ponderada de v_coste_completo_por_lote)
   const costeLlegada = new Map<string, { sum: number; qty: number }>();
   for (const l of (costeLlegadaRes.data ?? []) as { articulo_id: string; coste_completo_unitario: number | null; cantidad: number | null }[]) {
@@ -157,7 +146,7 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
   const porPaisRaw = new Map<string, { importe: number; coste: number }>();
   const porClienteRaw = new Map<string, { importe: number; coste: number }>();
   const porFacturaRaw = new Map<string, { importe: number; coste: number }>();
-  const porMesRaw = new Map<string, { importe: number; coste: number }>();
+  const porMesRaw = new Map<string, { unidades: number; bruto: number; neto: number; coste: number }>();
   const porArticuloUnides = new Map<string, number>();
   const tarifaExport = new Map<string, { nombre: string; unidades: number; importe: number; tarifa: number }>();
   let importeVendido = 0;
@@ -167,9 +156,7 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
     const a = l.articulo_id ? articuloPorId.get(l.articulo_id) : undefined;
     const f = facturaPorId.get(l.factura_id);
     const c = f?.cliente_id ? clientesPorId.get(f.cliente_id) : undefined;
-    const factor = factorPorFactura.get(l.factura_id) ?? 1;
-    const sign = f?.tipo_documento === 'abono' ? -1 : 1;
-    const importe = sign * Number(l.importe ?? 0) * factor;
+    const importe = Number(l.base_imponible ?? 0);
     // Preferir coste de llegada completo, luego coste de línea, luego coste de artículo
     let costeUnit = Number(l.coste_unitario ?? 0);
     if (costeUnit === 0 && l.articulo_id) {
@@ -177,7 +164,7 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
       if (llegada && llegada.qty > 0) costeUnit = llegada.sum / llegada.qty;
       else costeUnit = Number((a?.coste_unitario as number | undefined) ?? 0);
     }
-    const coste = sign * Number(l.cantidad ?? 0) * costeUnit;
+    const coste = Number(l.cantidad ?? 0) * costeUnit;
     importeVendido += importe;
     costeVenta += coste;
 
@@ -211,7 +198,12 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
       if (f.comercial_id) pushMap(porComercialRaw, com ?? '—', importe, coste);
       pushMap(porFacturaRaw, f.id, importe, coste);
       const mes = f.fecha.slice(0, 7);
-      pushMap(porMesRaw, mes, importe, coste);
+      const mesRaw = porMesRaw.get(mes) ?? { unidades: 0, bruto: 0, neto: 0, coste: 0 };
+      mesRaw.unidades += Number(l.cantidad ?? 0);
+      mesRaw.bruto += Number(l.cantidad ?? 0) * Number(l.precio_unitario ?? 0);
+      mesRaw.neto += importe;
+      mesRaw.coste += coste;
+      porMesRaw.set(mes, mesRaw);
       if (c) {
         pushMap(porClienteRaw, c.nombre, importe, coste);
         const canal = c.canal_id && canalesMap.get(c.canal_id);
@@ -294,7 +286,16 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
   }));
 
   const mensual = [...porMesRaw.entries()]
-    .map(([mes, v]) => ({ mes, importe: v.importe, margenPct: margenPct(v.importe, v.coste) }))
+    .map(([mes, v]) => ({
+      mes,
+      unidades: v.unidades,
+      bruto: v.bruto,
+      descuento: v.bruto - v.neto,
+      neto: v.neto,
+      coste: v.coste,
+      margen: v.neto - v.coste,
+      margenPct: margenPct(v.neto, v.coste),
+    }))
     .sort((a, b) => (a.mes < b.mes ? -1 : 1));
 
   const ultimosLotes = ((lotesRes.data ?? []) as { lote_id: string; articulo: string; fecha_compra: string; coste_unitario_compra: number; coste_repartido_unitario: number; coste_completo_unitario: number }[])

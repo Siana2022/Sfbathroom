@@ -53,7 +53,7 @@ type FilaFacturaVariacion = {
   fecha: string;
   tipo_documento: string;
 };
-type FilaLineaVariacion = { factura_id: string; articulo_id: string; cantidad: number; importe: number };
+type FilaLineaVariacion = { factura_id: string; articulo_id: string; cantidad: number; base_imponible: number | null };
 
 export async function getVariacion(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<Variacion> {
   const supabase = createClient();
@@ -83,7 +83,7 @@ export async function getVariacion(codigoEmpresa: string, anio: number, filtros?
 
   const lineasArr = await lineasPorFacturas<FilaLineaVariacion>(
     supabase,
-    'factura_id, articulo_id, cantidad, importe',
+    'factura_id, articulo_id, cantidad, base_imponible',
     [...infoPorId.keys()],
   );
 
@@ -96,8 +96,7 @@ export async function getVariacion(codigoEmpresa: string, anio: number, filtros?
     const cliente = clientePorId.get(l.factura_id);
     if (!info) continue;
     const idx = info.anio === anio ? 1 : 0;
-    const signo = info.tipo === 'abono' ? -1 : 1;
-    const importe = Number(l.importe ?? 0) * signo;
+    const importe = Number(l.base_imponible ?? 0);
     if (importe === 0) continue;
 
     if (l.articulo_id) {
@@ -240,11 +239,8 @@ export async function getFacturacion(codigoEmpresa: string, anio: number, filtro
     const esActual = f.fecha.slice(0, 4) === at;
     const base = Number(f.base_imponible ?? 0);
     if (esActual) {
-      if (TIPOS_UNIDADES.has(f.tipo_documento)) {
-        if (f.cliente_id) porCliente.set(f.cliente_id, (porCliente.get(f.cliente_id) ?? 0) + base);
-      } else {
-        curs.abonosYNotas += 1;
-      }
+      if (f.cliente_id) porCliente.set(f.cliente_id, (porCliente.get(f.cliente_id) ?? 0) + base);
+      if (!TIPOS_UNIDADES.has(f.tipo_documento)) curs.abonosYNotas += 1;
     }
     if (vistaDisp) continue;
     const mes = Number(f.fecha.slice(5, 7));

@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { getMargen } from '@/lib/datos/margen';
 import { parseFiltros, getOpcionesFiltros, type SearchParams } from '@/lib/datos/filtros';
-import { decimal, eur, eur2 } from '@/lib/formato';
+import { decimal, eur, eur2, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
 import Filtros from '@/components/Filtros';
@@ -261,12 +261,21 @@ export default async function MargenPage({ searchParams }: { searchParams: Searc
       </div>
 
       <div className="card">
-        <h2>Evolución mensual del margen</h2>
+        <h2>Cuadro analítico mensual</h2>
+        <p style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>
+          Reproduce el analítico de {d.anio}: Bruto = Σ unidades × precio; Descuento = Bruto − Neto;
+          Neto = base imponible de línea; Margen = Neto − Coste.
+        </p>
         <table className="tabla">
           <thead>
             <tr>
               <th>Mes</th>
-              <th className="td-num">Importe</th>
+              <th className="td-num">Unidades</th>
+              <th className="td-num">Bruto</th>
+              <th className="td-num">Descuento</th>
+              <th className="td-num">Neto</th>
+              <th className="td-num">Coste</th>
+              <th className="td-num">Margen</th>
               <th className="td-num">Margen %</th>
             </tr>
           </thead>
@@ -274,12 +283,24 @@ export default async function MargenPage({ searchParams }: { searchParams: Searc
             {d.mensual.map((m) => (
               <tr key={m.mes}>
                 <td>{m.mes}</td>
-                <td className="td-num">{eur(m.importe)}</td>
-                <td className={`td-num ${m.margenPct < 30 ? 'td-pos' : ''}`}>{decimal(m.margenPct)} %</td>
+                <td className="td-num">{numero(m.unidades)}</td>
+                <td className="td-num">{eur(m.bruto)}</td>
+                <td className="td-num">{eur(m.descuento)}</td>
+                <td className="td-num">{eur(m.neto)}</td>
+                <td className="td-num">{eur(m.coste)}</td>
+                <td className="td-num">{eur(m.margen)}</td>
+                <td className={`td-num ${m.margenPct >= 0 ? 'td-pos' : ''}`}>{decimal(m.margenPct)} %</td>
               </tr>
             ))}
           </tbody>
         </table>
+        <div style={{ marginTop: 12 }}>
+          <DescargarExcel
+            nombre="cuadro-analitico-mensual"
+            columnas={['Mes', 'Unidades', 'Bruto', 'Descuento', 'Neto', 'Coste', 'Margen', 'Margen %']}
+            registros={d.mensual.map((m) => [m.mes, m.unidades, m.bruto, m.descuento, m.neto, m.coste, m.margen, m.margenPct])}
+          />
+        </div>
       </div>
 
       <div className="card">

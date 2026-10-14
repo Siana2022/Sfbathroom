@@ -25,9 +25,13 @@ export default function Header({ rol }: { rol?: string }) {
     setEmpresa(codigo);
     localStorage.setItem('sfb_empresa', codigo);
     document.cookie = `sfb_empresa=${codigo}; path=/; max-age=2592000; SameSite=Lax`;
-    // Navegación suave a la misma ruta: los server components re-leen la cookie
-    // y la página se re-renderiza con la nueva empresa sin recarga completa.
-    router.replace(window.location.pathname);
+    // Limpia los filtros de la empresa anterior (si los hay): cambiar la URL fuerza
+    // un fetch del RSC con la cookie nueva.
+    if (window.location.search) router.replace(window.location.pathname);
+    // router.replace a la MISMA URL no re-ejecuta los server components (la caché del
+    // router devuelve el payload del segmento). refresh() descarta esa caché y vuelve a
+    // renderizar la página en servidor, re-leyendo la cookie sfb_empresa. Sin recarga completa.
+    router.refresh();
   }
 
   const hoy = new Date().toLocaleDateString('es-ES', {
