@@ -37,7 +37,7 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
 
   const { data: filas } = await supabase
     .from('pedidos')
-    .select('id, numero_erp, serie, fecha, cliente_codigo, cliente_nombre, estado, base_imponible, total')
+    .select('id, numero_erp, serie, fecha, cliente_codigo, cliente_nombre, estado, situacion, base_imponible, total')
     .eq('empresa_id', empresa.id)
     .gte('fecha', `${anio}-01-01`)
     .lte('fecha', `${anio}-12-31`);
@@ -48,7 +48,20 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
   const importeCaptado = pedidos.reduce((s, p) => s + Number(p.base_imponible ?? p.total ?? 0), 0);
   const ticketMedio = captados > 0 ? importeCaptado / captados : 0;
 
-  // Agrupación real por trimestre (Q1, Q2, Q3, Q4) según la fecha del pedido
+  const servidosList = pedidos.filter((p) => p.estado === 'servido');
+  const anuladosList = pedidos.filter((p) => p.estado === 'anulado');
+  const pendientesList = pedidos.filter((p) => p.estado === 'pendiente');
+
+  const servidos = servidosList.length;
+  const importeServido = servidosList.reduce((s, p) => s + Number(p.base_imponible ?? p.total ?? 0), 0);
+
+  const anulados = anuladosList.length;
+  const importeAnulado = anuladosList.reduce((s, p) => s + Number(p.base_imponible ?? p.total ?? 0), 0);
+
+  const enCartera = pendientesList.length;
+  const enCarteraImporte = pendientesList.reduce((s, p) => s + Number(p.base_imponible ?? p.total ?? 0), 0);
+
+  // Trimestres reales por fecha
   const trimestresMap = new Map<string, number>([
     [`Q1 ${anio}`, 0],
     [`Q2 ${anio}`, 0],
@@ -56,7 +69,7 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
     [`Q4 ${anio}`, 0],
   ]);
 
-  for (const p of pedidos) {
+  for (const p of pendientesList) {
     if (!p.fecha) continue;
     const mes = Number(p.fecha.slice(5, 7));
     const importe = Number(p.base_imponible ?? p.total ?? 0);
@@ -69,9 +82,9 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
 
   const carteraFechaSolicitada = [...trimestresMap.entries()].map(([label, importe]) => ({ label, importe }));
 
-  // Agrupación por cliente real
+  // Agrupación por cliente pendiente (cartera)
   const porCliente = new Map<string, { pedidos: number; pendiente: number }>();
-  for (const p of pedidos) {
+  for (const p of pendientesList) {
     const nombre = p.cliente_nombre || p.cliente_codigo || 'Cliente desconocido';
     const actual = porCliente.get(nombre) ?? { pedidos: 0, pendiente: 0 };
     actual.pedidos += 1;
@@ -91,21 +104,23 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
     anio,
     captados,
     importeCaptado,
-    enCartera: captados,
-    enCarteraImporte: importeCaptado,
+    enCartera,
+    enCarteraImporte,
     ratioServidoVsFacturado: null,
     ticketMedio,
-    servidos: 0,
-    importeServido: 0,
-    anulados: 0,
-    importeAnulado: 0,
+    servidos,
+    importeServido,
+    anulados,
+    importeAnulado,
     antiguedadMediaCartera: 15,
     plazoMedioEntrega: null,
     cumplimientoFecha: null,
     carteraFechaSolicitada,
     enCarteraCliente,
     porEstado: [
-      { estado: 'pendiente', label: 'Pendiente', pedidos: captados, importe: importeCaptado },
+      { estado: 'pendiente', label: 'Pendiente', pedidos: enCartera, importe: enCarteraImporte },
+      { estado: 'servido', label: 'Servido', pedidos: servidos, importe: importeServido },
+      { estado: 'anulado', label: 'Anulado', pedidos: anulados, importe: importeAnulado },
     ],
     anulacionesMotivo: [],
     modificados: [],
