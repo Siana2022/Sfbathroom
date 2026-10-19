@@ -48,9 +48,9 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
   const importeCaptado = pedidos.reduce((s, p) => s + Number(p.base_imponible ?? p.total ?? 0), 0);
   const ticketMedio = captados > 0 ? importeCaptado / captados : 0;
 
-  const servidosList = pedidos.filter((p) => p.estado === 'servido');
-  const anuladosList = pedidos.filter((p) => p.estado === 'anulado');
-  const pendientesList = pedidos.filter((p) => p.estado === 'pendiente');
+  const servidosList = pedidos.filter((p) => p.estado === 'servido' || p.situacion === 'S');
+  const anuladosList = pedidos.filter((p) => p.estado === 'anulado' || p.situacion === 'A');
+  const pendientesList = pedidos.filter((p) => p.estado === 'pendiente' && p.situacion !== 'S' && p.situacion !== 'A');
 
   const servidos = servidosList.length;
   const importeServido = servidosList.reduce((s, p) => s + Number(p.base_imponible ?? p.total ?? 0), 0);
@@ -61,7 +61,7 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
   const enCartera = pendientesList.length;
   const enCarteraImporte = pendientesList.reduce((s, p) => s + Number(p.base_imponible ?? p.total ?? 0), 0);
 
-  // Trimestres reales por fecha
+  // Trimestres reales por fecha para los pendientes
   const trimestresMap = new Map<string, number>([
     [`Q1 ${anio}`, 0],
     [`Q2 ${anio}`, 0],
