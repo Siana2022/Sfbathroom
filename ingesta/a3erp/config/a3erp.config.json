@@ -1,9 +1,18 @@
 {
   "_comentario": "Define la consulta de ventas de A3ERP (CABEFACV + LINEFACT, las mismas tablas que usa el cubo de Ventas del Power BI), el mapeo y el registro de empresas (cada empresa = su propia base de datos A3ERP). La consulta usa {base} para la base de la empresa y {RANGO} para el filtro de fechas. TIPODOC: 'Cargo' = factura emitida, 'Abono' = factura rectificativa.",
   "empresas": [
-    { "codigo": "SF", "base": "SFBATHROOM" },
-    { "codigo": "FUX", "base": "FUXSA" },
-    { "codigo": "DOT", "base": "DOTSURFACE" }
+    {
+      "codigo": "SF",
+      "base": "SFBATHROOM"
+    },
+    {
+      "codigo": "FUX",
+      "base": "FUXSA"
+    },
+    {
+      "codigo": "DOT",
+      "base": "DOTSURFACE"
+    }
   ],
   "sqlVentas": {
     "consulta": "SELECT c.FECHA AS FECHA, c.SERIE AS SERIE, CAST(c.NUMDOC AS bigint) AS NRO_DOC, c.TIPODOC AS TIPO_DOC, LTRIM(RTRIM(c.CODCLI)) AS COD_CLIENTE, c.NOMCLI AS NOMBRE_CLIENTE, LTRIM(RTRIM(c.CODREP)) AS COD_COMERCIAL, rep.NOMREP AS NOMBRE_COMERCIAL, c.BASEMONEDA AS BASE_IMPONIBLE, c.TOTMONEDA AS TOTAL, ISNULL(c.TOTALSUPLIDOSMON,0) AS PORTES, c.TOTDTOMONEDA AS DESC_PIE, 0 AS RAPPEL, NULL AS NRO_ALBARAN, NULL AS NRO_ANULADA, LTRIM(RTRIM(l.CODART)) AS COD_ARTICULO, LTRIM(RTRIM(art.DESCART)) AS NOMBRE_ARTICULO, l.UNIDADES AS CANTIDAD, l.PRECIO AS PRECIO, l.PRCMEDIO AS COSTE_UNITARIO, l.DESC1 AS DESC_LINEA, l.BASEMONEDA AS BASE_LINEA FROM [{base}].dbo.CABEFACV c LEFT JOIN [{base}].dbo.LINEFACT l ON l.IDFACV = c.IDFACV AND l.ESCOMPONENTE = 'F' OUTER APPLY (SELECT TOP 1 r.NOMREP FROM [{base}].dbo.REPRESEN r WHERE r.CODREP = c.CODREP ORDER BY r.NOMREP) rep OUTER APPLY (SELECT TOP 1 a.DESCART FROM [{base}].dbo.ARTICULO a WHERE a.CODART = l.CODART ORDER BY a.DESCART) art {RANGO}",
@@ -41,5 +50,10 @@
     "coste_unitario": "COSTE_UNITARIO",
     "descuento_pct": "DESC_LINEA",
     "base_linea": "BASE_LINEA"
+  },
+  "sqlMaestros": {
+    "consulta": "SELECT \n  'SF' as EMPRESA_COD, \n  c.CODCLI, \n  LTRIM(RTRIM(c.CODCLI)) as COD_CLIENTE,\n  o.NOMBRE as NOMBRE_CLIENTE,\n  o.NOMFISCAL,\n  o.DIR1, o.DIR2, o.POBLACION, o.MUNICIPIO, o.PROVIFISCAL, o.CODPROVI, o.CODPAIS, o.PAISFISCAL,\n  o.TELEFONO, o.FAX, o.E_MAIL, o.CODREP, o.CODREP2, o.CODREP3,\n  r.NOMREP as NOMBRE_COMERCIAL\nFROM [{base}].dbo.__CLIENTES c\nLEFT JOIN [{base}].dbo.__ORGANIZACION o ON o.IDORG = c.IDORG\nLEFT JOIN [{base}].dbo.REPRESEN r ON r.CODREP = o.CODREP\n {RANGO}",
+    "filtroFecha": "WHERE 1=1",
+    "consultaComerciales": "SELECT LTRIM(RTRIM(r.CODREP)) AS COD_REP, r.NOMREP AS NOMBRE FROM [{base}].dbo.REPRESEN r"
   }
 }

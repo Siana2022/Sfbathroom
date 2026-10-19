@@ -17,8 +17,11 @@ echo. >> "%LOG%"
 echo ============================================================ >> "%LOG%"
 echo [%DATE% %TIME%] INICIO reconciliacion SEMANAL (SF, FUX, DOT) >> "%LOG%"
 
+call :correr SF  maestros:sf
 call :correr SF  reconciliacion
+call :correr FUX maestros:fux
 call :correr FUX reconciliacion:fux
+call :correr DOT maestros:dot
 call :correr DOT reconciliacion:dot
 
 if defined FALLOS (

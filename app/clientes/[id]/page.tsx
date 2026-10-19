@@ -34,6 +34,21 @@ export default async function FichaClientePage({ params }: { params: { id: strin
         {' · '}<span className={d.cliente.estado === 'activo' ? 'badge listo' : 'badge construccion'}>{d.cliente.estado}</span>
       </p>
 
+      {(d.cliente.nombreFiscal || d.cliente.direccion || d.cliente.telefono || d.cliente.email) && (
+        <div className="card">
+          <h2>Datos de contacto</h2>
+          <ul className="tablas" style={{ maxWidth: 760 }}>
+            {d.cliente.nombreFiscal && d.cliente.nombreFiscal !== d.cliente.nombre && (
+              <li>Nombre fiscal: {d.cliente.nombreFiscal}</li>
+            )}
+            {d.cliente.direccion && <li>{d.cliente.direccion}{d.cliente.poblacion ? `, ${d.cliente.poblacion}` : ''}</li>}
+            {d.cliente.provincia && <li>Provincia: {d.cliente.provincia}{d.cliente.pais ? ` · ${d.cliente.pais}` : ''}</li>}
+            {d.cliente.telefono && <li>Teléfono: {d.cliente.telefono}</li>}
+            {d.cliente.email && <li>Email: {d.cliente.email}</li>}
+          </ul>
+        </div>
+      )}
+
       <ul className="grid-kpis">
         <Kpi etiqueta={`Facturación neta ${d.anio}`} valor={eur(d.neta)} nota={d.deltaPct === null ? 'sin dato previo' : `vs ${d.anio - 1}: ${pct(d.deltaPct)}`} />
         <Kpi etiqueta="Facturas" valor={numero(d.facturas)} nota={`${numero(d.unidades)} unidades`} />

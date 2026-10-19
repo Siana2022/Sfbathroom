@@ -17,8 +17,11 @@ echo. >> "%LOG%"
 echo ============================================================ >> "%LOG%"
 echo [%DATE% %TIME%] INICIO ingesta DIARIA (SF, FUX, DOT) >> "%LOG%"
 
+call :correr SF  maestros:sf
 call :correr SF  diario:sf
+call :correr FUX maestros:fux
 call :correr FUX diario:fux
+call :correr DOT maestros:dot
 call :correr DOT diario:dot
 
 if defined FALLOS (
