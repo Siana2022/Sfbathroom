@@ -30,14 +30,8 @@ export default async function PedidosPage({ searchParams }: { searchParams: Sear
       <p className="breadcrumb">Cuadro de mando · Bloque 2</p>
       <h1>Pedidos y cartera</h1>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
-        Captación de pedidos de {d.empresa.nombre}, cartera pendiente de servir, antigüedad y
-        cumplimiento frente a la facturación.
+        Captación de pedidos de {d.empresa.nombre}, cartera y distribución por cliente extraídos en tiempo real de A3ERP.
       </p>
-
-      <Aviso tipo="demo">
-        Los pedidos y la cartera proceden de datos de demostración: la ingesta de A3ERP carga
-        de momento solo ventas (facturas). No interpretes estas cifras como actividad real.
-      </Aviso>
 
       <Filtros opciones={opciones} />
 
