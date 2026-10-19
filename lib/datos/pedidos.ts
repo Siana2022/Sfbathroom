@@ -35,12 +35,14 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
 
+  // Traemos todos los pedidos del año sin el límite por defecto de 1000 filas de Supabase
   const { data: filas } = await supabase
     .from('pedidos')
     .select('id, numero_erp, serie, fecha, cliente_codigo, cliente_nombre, estado, situacion, base_imponible, total')
     .eq('empresa_id', empresa.id)
     .gte('fecha', `${anio}-01-01`)
-    .lte('fecha', `${anio}-12-31`);
+    .lte('fecha', `${anio}-12-31`)
+    .range(0, 9999);
 
   const pedidos = (filas ?? []) as any[];
 
