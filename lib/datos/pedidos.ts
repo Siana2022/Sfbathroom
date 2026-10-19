@@ -35,16 +35,34 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
 
-  // Traemos todos los pedidos del año sin el límite por defecto de 1000 filas de Supabase
-  const { data: filas } = await supabase
-    .from('pedidos')
-    .select('id, numero_erp, serie, fecha, cliente_codigo, cliente_nombre, estado, situacion, base_imponible, total')
-    .eq('empresa_id', empresa.id)
-    .gte('fecha', `${anio}-01-01`)
-    .lte('fecha', `${anio}-12-31`)
-    .range(0, 9999);
+  // Paginación por lotes para superar el límite de 1000 filas de Supabase
+  let todosLosPedidos: any[] = [];
+  let offset = 0;
+  const pageSize = 1000;
+  let fetching = true;
 
-  const pedidos = (filas ?? []) as any[];
+  while (fetching) {
+    const { data: filas, error } = await supabase
+      .from('pedidos')
+      .select('id, numero_erp, serie, fecha, cliente_codigo, cliente_nombre, estado, situacion, base_imponible, total')
+      .eq('empresa_id', empresa.id)
+      .gte('fecha', `${anio}-01-01`)
+      .lte('fecha', `${anio}-12-31`)
+      .range(offset, offset + pageSize - 1);
+
+    if (error || !filas || filas.length === 0) {
+      fetching = false;
+    } else {
+      todosLosPedidos = todosLosPedidos.concat(filas);
+      if (filas.length < pageSize) {
+        fetching = false;
+      } else {
+        offset += pageSize;
+      }
+    }
+  }
+
+  const pedidos = todosLosPedidos;
 
   const captados = pedidos.length;
   const importeCaptado = pedidos.reduce((s, p) => s + Number(p.base_imponible ?? p.total ?? 0), 0);
