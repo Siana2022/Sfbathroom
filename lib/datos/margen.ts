@@ -30,9 +30,8 @@ export type MargenData = {
 
 type FilaFactura = { id: string; cliente_id: string | null; comercial_id: string | null; fecha: string; tipo_documento: string; total: number };
 type FilaLinea = { factura_id: string; articulo_id: string | null; cantidad: number; precio_unitario: number | null; base_imponible: number | null; coste_unitario: number | null };
-type FilaArticulo = { id: string; nombre: string; familia_id: string | null; marca_id: string | null; marca_blanca_cliente_id: string | null; coste_unitario: number | null; precio_tarifa: number | null };
+type FilaArticulo = { id: string; nombre: string; familia: string | null; marca_id: string | null; marca_blanca_cliente_id: string | null; coste_unitario: number | null; precio_tarifa: number | null };
 type FilaCliente = { id: string; nombre: string; canal_id: string | null; pais_facturacion: string | null };
-type FilaFamilia = { id: string; nombre: string };
 type FilaEtiqueta = { id: string; nombre: string };
 
 const TRAMOS_MARGEN = [
@@ -80,7 +79,7 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
     };
   }
 
-  const [idsFiltrados, facturasRes, articulosRes, familiasRes, marcasRes, canalesRes, clientesRes, comercialesRes, costeLlegadaRes, lotesRes] = await Promise.all([
+  const [idsFiltrados, facturasRes, articulosRes, marcasRes, canalesRes, clientesRes, comercialesRes, costeLlegadaRes, lotesRes] = await Promise.all([
     getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anio}-01-01`, `${anio}-12-31`),
     todasLasFilas<FilaFactura>((desde) =>
       supabase
@@ -94,9 +93,8 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
     ),
     supabase
       .from('articulos')
-      .select('id, nombre, familia_id, marca_id, marca_blanca_cliente_id, coste_unitario, precio_tarifa')
+      .select('id, nombre, familia, marca_id, marca_blanca_cliente_id, coste_unitario, precio_tarifa')
       .eq('empresa_id', empresa.id),
-    supabase.from('familias_articulo').select('id, nombre'),
     supabase.from('marcas').select('id, nombre'),
     supabase.from('canales').select('id, nombre'),
     supabase.from('clientes').select('id, nombre, canal_id, pais_facturacion').eq('empresa_id', empresa.id),
@@ -116,8 +114,6 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
 
   const articuloPorId = new Map<string, FilaArticulo>((articulosRes.data ?? []).map((a) => [a.id, a as FilaArticulo]));
 
-  const familiasMap = new Map<string, string>();
-  for (const f of (familiasRes.data ?? []) as FilaFamilia[]) familiasMap.set(f.id, f.nombre);
   const marcasMap = new Map<string, string>();
   for (const m of (marcasRes.data ?? []) as FilaEtiqueta[]) marcasMap.set(m.id, m.nombre);
   const canalesMap = new Map<string, string>();
@@ -129,7 +125,6 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
   for (const c of (comercialesRes.data ?? []) as FilaEtiqueta[]) comercialesMap.set(c.id, c.nombre);
 
   const facturaPorId = new Map(facturas.map((f) => [f.id, f]));
-  // Coste completo por artículo (media ponderada de v_coste_completo_por_lote)
   const costeLlegada = new Map<string, { sum: number; qty: number }>();
   for (const l of (costeLlegadaRes.data ?? []) as { articulo_id: string; coste_completo_unitario: number | null; cantidad: number | null }[]) {
     const v = costeLlegada.get(l.articulo_id) ?? { sum: 0, qty: 0 };
@@ -157,7 +152,6 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
     const f = facturaPorId.get(l.factura_id);
     const c = f?.cliente_id ? clientesPorId.get(f.cliente_id) : undefined;
     const importe = Number(l.base_imponible ?? 0);
-    // Preferir coste de llegada completo, luego coste de línea, luego coste de artículo
     let costeUnit = Number(l.coste_unitario ?? 0);
     if (costeUnit === 0 && l.articulo_id) {
       const llegada = costeLlegada.get(l.articulo_id);
@@ -168,7 +162,7 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
     importeVendido += importe;
     costeVenta += coste;
 
-    const fam = (a?.familia_id && familiasMap.get(a.familia_id)) ?? 'Sin familia';
+    const fam = a?.familia ? String(a.familia).trim() : 'Sin familia';
     pushMap(porFamiliaRaw, fam, importe, coste);
 
     const key = a?.id ?? l.factura_id;
