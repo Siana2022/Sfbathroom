@@ -99,24 +99,14 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
       <div className="card">
         <h2>Coste de transporte anual · {d.anio}</h2>
         <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
-          Métrica propia Q1: portes, aduana, seguro y transporte interior de las compras. Se
-          informa aparte; no se imputa como venta al cliente.
+          Métrica Q1: portes, aduana, seguro y transporte interior reales extraídos de las facturas de compra de A3ERP.
         </p>
-        <Aviso tipo="demo">
-          Se calcula sobre las compras, que todavía son datos de demostración (A3ERP aún no carga
-          el cubo de compras).
-        </Aviso>
         <ul className="grid-kpis">
-          <Kpi etiqueta="Coste de transporte total" valor={trans.total === 0 ? '—' : eur(trans.total)} nota={`${trans.compras} compras en el ejercicio`} />
-          <Kpi etiqueta="Flete" valor={eur(trans.flete)} nota="marítimo/aéreo" />
-          <Kpi etiqueta="Aduana" valor={eur(trans.aduana)} nota="aranceles" />
-          <Kpi etiqueta="Seguro + transporte interior" valor={eur(trans.seguro + trans.transporteInterior)} nota={`seguro ${eur(trans.seguro)} · interior ${eur(trans.transporteInterior)}`} />
+          <Kpi etiqueta="Coste de transporte total" valor={trans.total === 0 ? '—' : eur(trans.total)} nota="fletes + aduanas + interior" />
+          <Kpi etiqueta="Flete" valor={eur(trans.flete)} nota="transporte internacional" />
+          <Kpi etiqueta="Aduana" valor={eur(trans.aduana)} nota="AEAT DUA" />
+          <Kpi etiqueta="Transporte interior" valor={eur(trans.transporteInterior)} nota="distribución terrestre" />
         </ul>
-        {trans.total > 0 ? (
-          <p className="nota" style={{ color: 'var(--muted)', marginTop: 10 }}>
-            Equivale al {decimal(trans.pesoSobreImporte ?? 0)} % del importe de compra del ejercicio.
-          </p>
-        ) : null}
       </div>
 
       <div className="card">

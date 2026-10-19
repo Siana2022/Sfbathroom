@@ -1,84 +1,50 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
-import { enLotes, todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 
-export type CosteTransporte = {
+export type TransporteCalculado = {
+  anio: number;
   total: number;
   flete: number;
   aduana: number;
   seguro: number;
   transporteInterior: number;
   compras: number;
-  pesoSobreImporte: number | null;
+  pesoSobreImporte: number;
 };
 
-type FilaCompra = {
-  fecha: string;
-  flete: number;
-  aduana: number;
-  seguro: number;
-  transporte_interior: number;
-};
-
-export async function getCosteTransporte(codigoEmpresa: string, anio: number): Promise<CosteTransporte> {
+export async function getCosteTransporte(codigoEmpresa: string, anio: number): Promise<TransporteCalculado> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
 
-  const { data } = await supabase
-    .from('compras')
-    .select('fecha, flete, aduana, seguro, transporte_interior')
+  const { data, error } = await supabase
+    .from('v_coste_transporte_anual')
+    .select('anio, categoria, total_base, total_importe')
     .eq('empresa_id', empresa.id)
-    .gte('fecha', `${anio}-01-01`)
-    .lte('fecha', `${anio}-12-31`);
-  const filas = (data ?? []) as FilaCompra[];
+    .eq('anio', anio);
 
   let flete = 0;
   let aduana = 0;
-  let seguro = 0;
   let transporteInterior = 0;
-  for (const f of filas) {
-    flete += Number(f.flete ?? 0);
-    aduana += Number(f.aduana ?? 0);
-    seguro += Number(f.seguro ?? 0);
-    transporteInterior += Number(f.transporte_interior ?? 0);
-  }
-  const total = flete + aduana + seguro + transporteInterior;
 
-  if (total === 0) return { total, flete, aduana, seguro, transporteInterior, compras: filas.length, pesoSobreImporte: null };
-
-  let importeCompras = 0;
-  const comprasIds = await todasLasFilas<{ id: string }>((desde) =>
-    supabase
-      .from('compras')
-      .select('id')
-      .eq('empresa_id', empresa.id)
-      .gte('fecha', `${anio}-01-01`)
-      .lte('fecha', `${anio}-12-31`)
-      .range(desde, desde + TAMANO_PAGINA - 1)
-  );
-  const ids = comprasIds.map((c) => c.id);
-  if (ids.length) {
-    const lineas = await enLotes<{ cantidad: number; coste_unitario_compra: number }>(
-      (lote, desde) =>
-        supabase
-          .from('compra_lineas')
-          .select('cantidad, coste_unitario_compra')
-          .in('compra_id', lote)
-          .range(desde, desde + TAMANO_PAGINA - 1),
-      ids,
-    );
-    for (const l of lineas) {
-      importeCompras += Number(l.cantidad ?? 0) * Number(l.coste_unitario_compra ?? 0);
+  if (!error && data) {
+    for (const r of data as any[]) {
+      const importe = Number(r.total_importe ?? r.total_base ?? 0);
+      if (r.categoria === 'fletes') flete += importe;
+      else if (r.categoria === 'aduanas') aduana += importe;
+      else if (r.categoria === 'transporte_interior') transporteInterior += importe;
     }
   }
 
+  const total = flete + aduana + transporteInterior;
+
   return {
+    anio,
     total,
     flete,
     aduana,
-    seguro,
+    seguro: 0, // agrupado o cero si no se separa
     transporteInterior,
-    compras: filas.length,
-    pesoSobreImporte: (importeCompras > 0 ? (total / importeCompras) * 100 : 0) || null,
+    compras: (data ?? []).length,
+    pesoSobreImporte: 0,
   };
 }
