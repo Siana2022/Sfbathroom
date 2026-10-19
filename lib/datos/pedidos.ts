@@ -48,7 +48,28 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
   const importeCaptado = pedidos.reduce((s, p) => s + Number(p.base_imponible ?? p.total ?? 0), 0);
   const ticketMedio = captados > 0 ? importeCaptado / captados : 0;
 
-  // Agrupación por cliente
+  // Agrupación real por trimestre (Q1, Q2, Q3, Q4) según la fecha del pedido
+  const trimestresMap = new Map<string, number>([
+    [`Q1 ${anio}`, 0],
+    [`Q2 ${anio}`, 0],
+    [`Q3 ${anio}`, 0],
+    [`Q4 ${anio}`, 0],
+  ]);
+
+  for (const p of pedidos) {
+    if (!p.fecha) continue;
+    const mes = Number(p.fecha.slice(5, 7));
+    const importe = Number(p.base_imponible ?? p.total ?? 0);
+    let q = `Q4 ${anio}`;
+    if (mes <= 3) q = `Q1 ${anio}`;
+    else if (mes <= 6) q = `Q2 ${anio}`;
+    else if (mes <= 9) q = `Q3 ${anio}`;
+    trimestresMap.set(q, (trimestresMap.get(q) ?? 0) + importe);
+  }
+
+  const carteraFechaSolicitada = [...trimestresMap.entries()].map(([label, importe]) => ({ label, importe }));
+
+  // Agrupación por cliente real
   const porCliente = new Map<string, { pedidos: number; pendiente: number }>();
   for (const p of pedidos) {
     const nombre = p.cliente_nombre || p.cliente_codigo || 'Cliente desconocido';
@@ -81,12 +102,7 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
     antiguedadMediaCartera: 15,
     plazoMedioEntrega: null,
     cumplimientoFecha: null,
-    carteraFechaSolicitada: [
-      { label: `Q1 ${anio}`, importe: importeCaptado * 0.3 },
-      { label: `Q2 ${anio}`, importe: importeCaptado * 0.3 },
-      { label: `Q3 ${anio}`, importe: importeCaptado * 0.2 },
-      { label: `Q4 ${anio}`, importe: importeCaptado * 0.2 },
-    ],
+    carteraFechaSolicitada,
     enCarteraCliente,
     porEstado: [
       { estado: 'pendiente', label: 'Pendiente', pedidos: captados, importe: importeCaptado },
