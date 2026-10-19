@@ -17,7 +17,19 @@
     "maestros:sf": "tsx --env-file=.env src/vuelo-maestros.ts --empresa SF",
     "maestros:fux": "tsx --env-file=.env src/vuelo-maestros.ts --empresa FUX",
     "maestros:dot": "tsx --env-file=.env src/vuelo-maestros.ts --empresa DOT",
-    "maestros:todos": "npm run maestros:sf && npm run maestros:fux && npm run maestros:dot"
+    "maestros:todos": "npm run maestros:sf && npm run maestros:fux && npm run maestros:dot",
+    "articulos:sf": "tsx --env-file=.env src/vuelo-articulos.ts --empresa SF",
+    "articulos:fux": "tsx --env-file=.env src/vuelo-articulos.ts --empresa FUX",
+    "articulos:dot": "tsx --env-file=.env src/vuelo-articulos.ts --empresa DOT",
+    "articulos:todos": "npm run articulos:sf && npm run articulos:fux && npm run articulos:dot",
+    "proveedores:sf": "tsx --env-file=.env src/vuelo-proveedores.ts --empresa SF",
+    "proveedores:fux": "tsx --env-file=.env src/vuelo-proveedores.ts --empresa FUX",
+    "proveedores:dot": "tsx --env-file=.env src/vuelo-proveedores.ts --empresa DOT",
+    "proveedores:todos": "npm run proveedores:sf && npm run proveedores:fux && npm run proveedores:dot",
+    "transporte:sf": "tsx --env-file=.env src/vuelo-transporte.ts --empresa SF",
+    "transporte:fux": "tsx --env-file=.env src/vuelo-transporte.ts --empresa FUX",
+    "transporte:dot": "tsx --env-file=.env src/vuelo-transporte.ts --empresa DOT",
+    "transporte:todos": "npm run transporte:sf && npm run transporte:fux && npm run transporte:dot"
   },
   "dependencies": {
     "mssql": "^11.0.1"
