@@ -128,7 +128,7 @@ export async function getCobros(codigoEmpresa: string, anio: number, filtros?: F
     .from('pedidos')
     .select('cliente_id, importe')
     .eq('empresa_id', empresa.id)
-    .in('estado', ['captado', 'aceptado', 'parcial']);
+    .eq('estado', 'pendiente');
   if (clienteId) pedidosQuery = pedidosQuery.eq('cliente_id', clienteId);
   const pedidos = await todasLasFilas<FilaPedido>((desde) => pedidosQuery.range(desde, desde + TAMANO_PAGINA - 1));
 

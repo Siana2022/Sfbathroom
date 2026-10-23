@@ -97,7 +97,7 @@ export async function getMiDia(codigoEmpresa: string, anio: number): Promise<MiD
     .eq('empresa_id', empresa.id)
     .eq('comercial_id', comercialId)
     .gte('fecha_entrada', `${anio}-01-01`)
-    .in('estado', ['captado', 'aceptado'])
+    .eq('estado', 'pendiente')
     .order('fecha_entrada', { ascending: true })
     .limit(8);
   const pendencias = ((pedidos ?? []) as { id: string; numero_erp: string | null; fecha_entrada: string; importe: number; cliente_id: string | null }[]).map((p) => ({

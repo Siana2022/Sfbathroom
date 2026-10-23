@@ -26,6 +26,8 @@ create table if not exists public.pedidos (
 alter table public.pedidos add column if not exists cliente_id uuid references public.clientes(id);
 alter table public.pedidos add column if not exists fecha_entrada date;
 alter table public.pedidos add column if not exists fecha_prometida date;
+alter table public.pedidos add column if not exists comercial_id uuid references public.comerciales(id);
+alter table public.pedidos add column if not exists importe numeric generated always as (coalesce(base_imponible, total)) stored;
 
 update public.pedidos p
 set cliente_id = c.id
@@ -41,6 +43,7 @@ where fecha_entrada is null;
 create index if not exists idx_pedidos_cliente on public.pedidos(cliente_id);
 create index if not exists idx_pedidos_fecha_entrada on public.pedidos(fecha_entrada);
 create index if not exists idx_pedidos_fecha on public.pedidos(fecha);
+create index if not exists idx_pedidos_comercial on public.pedidos(comercial_id);
 
 create or replace function public.pedidos_enlazar_cliente()
 returns trigger
