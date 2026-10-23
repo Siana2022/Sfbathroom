@@ -84,6 +84,18 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
   const enCartera = pendientesList.length;
   const enCarteraImporte = pendientesList.reduce((s, p) => s + Number(p.base_imponible ?? p.total ?? 0), 0);
 
+  const anuladosPorMotivo = new Map<string, { pedidos: number; importe: number }>();
+  for (const p of anuladosList) {
+    const motivo = (p as any).motivo_anulacion || (p as any).causa_anulacion || (p as any).observaciones || 'Sin motivo registrado';
+    const actual = anuladosPorMotivo.get(motivo) ?? { pedidos: 0, importe: 0 };
+    actual.pedidos += 1;
+    actual.importe += Number(p.base_imponible ?? p.total ?? 0);
+    anuladosPorMotivo.set(motivo, actual);
+  }
+  const anulacionesMotivo = [...anuladosPorMotivo.entries()]
+    .map(([motivo, v]) => ({ motivo, pedidos: v.pedidos, importe: v.importe }))
+    .sort((a, b) => b.pedidos - a.pedidos);
+
   // Trimestres reales por fecha para los pendientes
   const trimestresMap = new Map<string, number>([
     [`Q1 ${anio}`, 0],
@@ -145,7 +157,7 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
       { estado: 'servido', label: 'Servido', pedidos: servidos, importe: importeServido },
       { estado: 'anulado', label: 'Anulado', pedidos: anulados, importe: importeAnulado },
     ],
-    anulacionesMotivo: [],
+    anulacionesMotivo,
     modificados: [],
   };
 }
