@@ -15,7 +15,7 @@ export type MargenData = {
   margenPct: number;
   porFamilia: { familia: string; importe: number; coste: number; margen: number; margenPct: number }[];
   porArticulo: { articulo: string; unidades: number; importe: number; margen: number; margenPct: number; margenUnidad: number }[];
-  porComercial: { nombre: string; importe: number; margenPct: number }[];
+  porComercial: { nombre: string; importe: number; margenPct: number; secciones: { nombre: string; importe: number; margenPct: number }[] }[];
   porMarca: { nombre: string; importe: number; margenPct: number; marcaBlanca: boolean }[];
   porCanal: { nombre: string; importe: number; margenPct: number }[];
   porPais: { nombre: string; importe: number; margenPct: number }[];
@@ -227,7 +227,47 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
     .map(([, v]) => ({ articulo: v.nombre, unidades: v.unidades, importe: v.importe, margen: v.importe - v.coste, margenPct: margenPct(v.importe, v.coste), margenUnidad: v.unidades > 0 ? (v.importe - v.coste) / v.unidades : 0 }))
     .sort((a, b) => b.margen - a.margen)
     .slice(0, 10);
-  const porComercial = ordenar(mapear(porComercialRaw));
+  const sufijos = new Map<string, number>();
+  for (const nombre of porComercialRaw.keys()) {
+    const i = nombre.indexOf(' - ');
+    if (i > 0) {
+      const sufijo = nombre.slice(i + 3).trim();
+      sufijos.set(sufijo, (sufijos.get(sufijo) ?? 0) + 1);
+    }
+  }
+  const comercialAgrupado = new Map<string, { importe: number; coste: number; secciones: Map<string, { importe: number; coste: number }> }>();
+  for (const [nombre, v] of porComercialRaw.entries()) {
+    const i = nombre.indexOf(' - ');
+    let base = nombre;
+    let seccion: string | null = null;
+    if (i > 0) {
+      const sufijo = nombre.slice(i + 3).trim();
+      if ((sufijos.get(sufijo) ?? 0) > 1) {
+        base = sufijo;
+        seccion = nombre.slice(0, i).trim();
+      }
+    }
+    const agg = comercialAgrupado.get(base) ?? { importe: 0, coste: 0, secciones: new Map() };
+    agg.importe += v.importe;
+    agg.coste += v.coste;
+    if (seccion) {
+      const sec = agg.secciones.get(seccion) ?? { importe: 0, coste: 0 };
+      sec.importe += v.importe;
+      sec.coste += v.coste;
+      agg.secciones.set(seccion, sec);
+    }
+    comercialAgrupado.set(base, agg);
+  }
+  const porComercial = [...comercialAgrupado.entries()]
+    .map(([nombre, v]) => ({
+      nombre,
+      importe: v.importe,
+      margenPct: margenPct(v.importe, v.coste),
+      secciones: [...v.secciones.entries()]
+        .map(([seccion, sv]) => ({ nombre: seccion, importe: sv.importe, margenPct: margenPct(sv.importe, sv.coste) }))
+        .sort((a, b) => b.importe - a.importe),
+    }))
+    .sort((a, b) => b.importe - a.importe);
   const porCanal = ordenar(mapear(porCanalRaw));
   const porPais = ordenar(mapear(porPaisRaw));
   const porCliente = ordenar(mapear(porClienteRaw)).slice(0, 10);

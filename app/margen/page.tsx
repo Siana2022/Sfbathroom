@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { cookies } from 'next/headers';
 import { getMargen } from '@/lib/datos/margen';
 import { parseFiltros, getOpcionesFiltros, type SearchParams } from '@/lib/datos/filtros';
@@ -121,11 +122,20 @@ export default async function MargenPage({ searchParams }: { searchParams: Searc
           </thead>
           <tbody>
             {d.porComercial.map((c) => (
-              <tr key={c.nombre}>
-                <td>{c.nombre}</td>
-                <td className="td-num">{eur(c.importe)}</td>
-                <td className={`td-num ${c.margenPct >= 0 ? 'td-pos' : ''}`}>{decimal(c.margenPct)} %</td>
-              </tr>
+              <Fragment key={c.nombre}>
+                <tr>
+                  <td>{c.secciones.length > 0 ? <strong>{c.nombre}</strong> : c.nombre}</td>
+                  <td className="td-num">{eur(c.importe)}</td>
+                  <td className={`td-num ${c.margenPct >= 0 ? 'td-pos' : ''}`}>{decimal(c.margenPct)} %</td>
+                </tr>
+                {c.secciones.map((s) => (
+                  <tr key={`${c.nombre}-${s.nombre}`} style={{ color: 'var(--muted)' }}>
+                    <td style={{ paddingLeft: 24 }}>· {s.nombre}</td>
+                    <td className="td-num">{eur(s.importe)}</td>
+                    <td className="td-num">{decimal(s.margenPct)} %</td>
+                  </tr>
+                ))}
+              </Fragment>
             ))}
           </tbody>
         </table>
