@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { getFacturacion, getVariacion } from '@/lib/datos/facturacion';
 import { getVistasTemporales } from '@/lib/datos/vistas';
-import { getCosteTransporte } from '@/lib/datos/transporte';
+import { getCosteTransporte, getTransporteFacturadoPorCliente, type TransporteClienteMes } from '@/lib/datos/transporte';
 import { getDesvioPresupuesto } from '@/lib/datos/desvioPresupuesto';
 import { parseFiltros, getOpcionesFiltros, type SearchParams } from '@/lib/datos/filtros';
 import { decimal, eur, numero, pct } from '@/lib/formato';
@@ -47,6 +47,59 @@ function TablaDesvio({ filas }: { filas: { nombre: string; presupuesto: number; 
   );
 }
 
+
+function TablaTransporteCliente({ titulo, anio, filas, total }: { titulo: string; anio: number; filas: TransporteClienteMes[]; total: number }) {
+  return (
+    <div style={{ marginTop: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+        <h3 style={{ margin: 0 }}>{titulo}</h3>
+        <DescargarExcel
+          nombre={`transporte-${titulo.toLowerCase().replace(/\s+/g, '-')}-${anio}`}
+          columnas={['Cliente', ...NOMBRE_MES.slice(1), 'Total']}
+          registros={filas.map((f) => [f.cliente, ...f.meses, f.total])}
+        />
+      </div>
+      {filas.length === 0 ? (
+        <p style={{ color: 'var(--muted)' }}>Sin importes facturados en {anio}.</p>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                {NOMBRE_MES.slice(1).map((m) => (
+                  <th key={m} className="td-num">{m}</th>
+                ))}
+                <th className="td-num">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filas.map((f) => (
+                <tr key={f.cliente}>
+                  <td>{f.cliente}</td>
+                  {f.meses.map((v, i) => (
+                    <td key={i} className="td-num">{v === 0 ? '' : eur(v)}</td>
+                  ))}
+                  <td className="td-num"><strong>{eur(f.total)}</strong></td>
+                </tr>
+              ))}
+              <tr>
+                <td><strong>Total</strong></td>
+                {NOMBRE_MES.slice(1).map((_, i) => (
+                  <td key={i} className="td-num">
+                    <strong>{eur(filas.reduce((s, f) => s + f.meses[i], 0))}</strong>
+                  </td>
+                ))}
+                <td className="td-num"><strong>{eur(total)}</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default async function FacturacionPage({ searchParams }: { searchParams: SearchParams }) {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
   const filtros = parseFiltros(searchParams);
@@ -58,6 +111,7 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
 
   const v = await getVariacion(empresa, ANIO, filtros);
   const trans = await getCosteTransporte(empresa, ANIO);
+  const transCli = await getTransporteFacturadoPorCliente(empresa, ANIO);
   const desvio = await getDesvioPresupuesto(empresa, ANIO, filtros);
 
   const barras: Barra[] = d.series.map((s) => ({
@@ -107,6 +161,18 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
           <Kpi etiqueta="Aduana" valor={eur(trans.aduana)} nota="AEAT DUA" />
           <Kpi etiqueta="Transporte interior" valor={eur(trans.transporteInterior)} nota="distribución terrestre" />
         </ul>
+      </div>
+
+
+      <div className="card">
+        <h2>Transporte facturado por cliente y mes · {transCli.anio}</h2>
+        <p style={{ color: 'var(--muted)', maxWidth: 900 }}>
+          Importe de las líneas de factura de la familia TRANSPORTE, agrupado por cliente y mes. Interior, flete y
+          aduana se separan según el nombre del artículo facturado.
+        </p>
+        <TablaTransporteCliente titulo="Transporte interior" anio={transCli.anio} filas={transCli.interior.filas} total={transCli.interior.total} />
+        <TablaTransporteCliente titulo="Flete" anio={transCli.anio} filas={transCli.flete.filas} total={transCli.flete.total} />
+        <TablaTransporteCliente titulo="Aduana" anio={transCli.anio} filas={transCli.aduana.filas} total={transCli.aduana.total} />
       </div>
 
       <div className="card">
