@@ -7,13 +7,16 @@ create table if not exists public.stock_almacen (
   almacen_codigo text not null default '',
   almacen_nombre text,
   lote text not null default '',
-  unidades numeric(14,3) not null default 0,
-  coste_medio numeric(14,4),
+  unidades numeric(20,3) not null default 0,
+  coste_medio numeric(20,4),
   fecha_caducidad date,
   ubicacion text,
   actualizado_at timestamptz not null default now(),
   unique (empresa_id, almacen_codigo, articulo_codigo, lote)
 );
+
+alter table public.stock_almacen alter column unidades type numeric(20,3);
+alter table public.stock_almacen alter column coste_medio type numeric(20,4);
 
 create index if not exists idx_stock_almacen_empresa on public.stock_almacen(empresa_id);
 create index if not exists idx_stock_almacen_articulo on public.stock_almacen(articulo_codigo);
