@@ -25,8 +25,7 @@ export type ClientesData = {
 
 type FilaFactura = { id: string; cliente_id: string | null; fecha: string; base_imponible: number };
 type FilaCliente = { id: string; nombre: string; estado: string; fecha_primer_pedido: string | null };
-type FilaFamilia = { id: string; nombre: string };
-type FilaArticulo = { id: string; familia_id: string | null };
+type FilaArticulo = { id: string; familia: string | null };
 type FilaLinea = { factura_id: string; articulo_id: string | null };
 type FilaPedido = { cliente_id: string | null; fecha_entrada: string };
 
@@ -96,11 +95,13 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
     if (!prev || p.fecha_entrada > prev) ultimoPedido.set(p.cliente_id, p.fecha_entrada);
   }
 
-  const { data: clis } = await supabase
-    .from('clientes')
-    .select('id, nombre, estado, fecha_primer_pedido')
-    .eq('empresa_id', empresa.id);
-  const clientes = (clis ?? []) as FilaCliente[];
+  const clientes = await todasLasFilas<FilaCliente>((desde) =>
+    supabase
+      .from('clientes')
+      .select('id, nombre, estado, fecha_primer_pedido')
+      .eq('empresa_id', empresa.id)
+      .range(desde, desde + TAMANO_PAGINA - 1)
+  );
 
   const perdidos = clientes.filter((c) => c.estado === 'perdido' || c.estado === 'inactivo').length;
   // nuevos = compran este año y no compraron el año previo en la ventana
@@ -178,12 +179,15 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
     .sort((a, b) => b.neta - a.neta)
     .slice(0, 15);
 
-  const { data: familiasFilas } = await supabase.from('familias_articulo').select('id, nombre').eq('empresa_id', empresa.id).order('nombre');
-  const familias = (familiasFilas ?? []) as FilaFamilia[];
-  const familiasOrden = familias.map((f) => f.id);
-
-  const { data: articulosFilas } = await supabase.from('articulos').select('id, familia_id').eq('empresa_id', empresa.id);
-  const familiaDeArticulo = new Map<string, string | null>((articulosFilas ?? [] as FilaArticulo[]).map((a) => [a.id, a.familia_id]));
+  const articulosFilas = await todasLasFilas<FilaArticulo>((desde) =>
+    supabase
+      .from('articulos')
+      .select('id, familia')
+      .eq('empresa_id', empresa.id)
+      .range(desde, desde + TAMANO_PAGINA - 1)
+  );
+  const familiaDeArticulo = new Map<string, string | null>(articulosFilas.map((a) => [a.id, a.familia]));
+  const familiasOrden = [...new Set(articulosFilas.map((a) => a.familia).filter((f): f is string => Boolean(f)))].sort((a, b) => a.localeCompare(b, 'es'));
 
   const familiasCliente = new Map<string, Set<string>>();
   if (idsFacturasAnio.length) {
@@ -203,7 +207,7 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
       id,
       nombre: nombreCliente.get(id) ?? '—',
       neta: v.neta,
-      compradas: familiasOrden.map((fid) => familiasCliente.get(id)?.has(fid) ?? false),
+      compradas: familiasOrden.map((fam) => familiasCliente.get(id)?.has(fam) ?? false),
     }))
     .sort((a, b) => b.neta - a.neta)
     .slice(0, 12);
@@ -243,7 +247,7 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
     perdidos,
     retencion,
     tabla,
-    familias: familias.map((f) => f.nombre),
+    familias: familiasOrden,
     matriz,
     semaforo,
     noActivos,

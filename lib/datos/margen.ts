@@ -29,7 +29,7 @@ export type MargenData = {
 
 type FilaFactura = { id: string; cliente_id: string | null; comercial_id: string | null; fecha: string; tipo_documento: string; total: number };
 type FilaLinea = { factura_id: string; articulo_id: string | null; cantidad: number; precio_unitario: number | null; base_imponible: number | null; coste_unitario: number | null };
-type FilaArticulo = { id: string; nombre: string; familia: string | null; marca_id: string | null; marca_blanca_cliente_id: string | null; coste_unitario: number | null; precio_tarifa: number | null };
+type FilaArticulo = { id: string; nombre: string; familia: string | null; marca_id: string | null; marca_blanca_cliente_id: string | null; coste_unitario: number | null; precio_coste: number | null; precio_tarifa: number | null };
 type FilaCliente = { id: string; nombre: string; canal_id: string | null; pais_facturacion: string | null };
 type FilaEtiqueta = { id: string; nombre: string };
 
@@ -92,7 +92,7 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
     todasLasFilas<FilaArticulo>((desde) =>
       supabase
         .from('articulos')
-        .select('id, nombre, familia, marca_id, marca_blanca_cliente_id, coste_unitario, precio_tarifa')
+        .select('id, nombre, familia, marca_id, marca_blanca_cliente_id, coste_unitario, precio_coste, precio_tarifa')
         .eq('empresa_id', empresa.id)
         .range(desde, desde + TAMANO_PAGINA - 1)
     ),
@@ -164,7 +164,7 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
     if (costeUnit === 0 && l.articulo_id) {
       const llegada = costeLlegada.get(l.articulo_id);
       if (llegada && llegada.qty > 0) costeUnit = llegada.sum / llegada.qty;
-      else costeUnit = Number((a?.coste_unitario as number | undefined) ?? 0);
+      else costeUnit = Number(a?.coste_unitario ?? a?.precio_coste ?? 0);
     }
     const coste = Number(l.cantidad ?? 0) * costeUnit;
     importeVendido += importe;

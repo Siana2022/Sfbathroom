@@ -182,7 +182,7 @@ export async function getFacturacion(codigoEmpresa: string, anio: number, filtro
       .lte('fecha', `${anio}-12-31`)
       .range(desde, desde + TAMANO_PAGINA - 1)
   );
-  const presupuestoP = filtros?.marca
+  const presupuestoP = filtros?.marca || filtros?.familia
     ? Promise.resolve({ data: [] as unknown[] })
     : (() => {
         let pq = supabase
@@ -192,7 +192,6 @@ export async function getFacturacion(codigoEmpresa: string, anio: number, filtro
           .eq('ejercicio', anio);
         if (filtros?.cliente) pq = pq.eq('cliente_id', filtros.cliente);
         if (filtros?.comercial) pq = pq.eq('comercial_id', filtros.comercial);
-        if (filtros?.familia) pq = pq.eq('familia_id', filtros.familia);
         return pq;
       })();
   const vistaP = conFiltros

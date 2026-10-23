@@ -24,11 +24,12 @@ begin
   end if;
 
   insert into public.articulos (
-    codigo_erp, nombre, precio_coste, precio_base, referencia, codigo_barras, peso, volumen, familia, empresa_id
+    codigo_erp, nombre, coste_unitario, precio_coste, precio_base, referencia, codigo_barras, peso, volumen, familia, empresa_id
   )
   select
     nullif(trim(a.codigo), ''),
     coalesce(nullif(trim(a.nombre), ''), trim(a.codigo)),
+    a."precioCoste",
     a."precioCoste",
     a."precioBase",
     nullif(trim(a.referencia), ''),
@@ -51,6 +52,7 @@ begin
   where nullif(trim(a.codigo), '') is not null
   on conflict (codigo_erp, empresa_id) do update set
     nombre        = excluded.nombre,
+    coste_unitario = coalesce(excluded.coste_unitario, articulos.coste_unitario),
     precio_coste  = coalesce(excluded.precio_coste, articulos.precio_coste),
     precio_base   = coalesce(excluded.precio_base,  articulos.precio_base),
     referencia    = coalesce(excluded.referencia,   articulos.referencia),

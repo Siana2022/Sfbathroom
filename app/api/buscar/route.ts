@@ -54,14 +54,14 @@ export async function GET(req: Request) {
 
   const { data: articulos } = await supabase
     .from('articulos')
-    .select('id, nombre, codigo_erp, familias_articulo:familia_id(nombre)')
+    .select('id, nombre, codigo_erp, familia')
     .or(`nombre.ilike.${like},codigo_erp.ilike.${like}`)
     .limit(12);
   const arts = (articulos ?? []).map((a: any) => ({
     id: a.id as string,
     nombre: a.nombre as string,
     codigo: (a.codigo_erp as string | null) ?? null,
-    familia: (a.familias_articulo as any)?.nombre ?? null,
+    familia: (a.familia as string | null) ?? null,
   }));
 
   return NextResponse.json({

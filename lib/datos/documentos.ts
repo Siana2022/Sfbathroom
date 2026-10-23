@@ -162,16 +162,13 @@ export async function getDocumento(id: string): Promise<DocumentoDetalle | null>
   const lineas = lineasRes.data ?? [];
   const artIds = [...new Set(lineas.map((l) => l.articulo_id).filter(Boolean))] as string[];
   const artRes = artIds.length
-    ? await supabase.from('articulos').select('id, codigo_erp, nombre, familia_id, marca_id').in('id', artIds)
+    ? await supabase.from('articulos').select('id, codigo_erp, nombre, familia, marca_id').in('id', artIds)
     : { data: [] };
-  const articulos = new Map((artRes.data ?? []).map((a) => [a.id, a as { codigo_erp: string | null; nombre: string; familia_id: string | null; marca_id: string | null }]));
-  const familiaIds = [...new Set([...articulos.values()].map((a) => a.familia_id).filter(Boolean))] as string[];
+  const articulos = new Map((artRes.data ?? []).map((a) => [a.id, a as { codigo_erp: string | null; nombre: string; familia: string | null; marca_id: string | null }]));
   const marcaIds = [...new Set([...articulos.values()].map((a) => a.marca_id).filter(Boolean))] as string[];
-  const [famRes2, marRes2] = await Promise.all([
-    familiaIds.length ? supabase.from('familias_articulo').select('id, nombre').in('id', familiaIds) : Promise.resolve({ data: [] }),
-    marcaIds.length ? supabase.from('marcas').select('id, nombre').in('id', marcaIds) : Promise.resolve({ data: [] }),
-  ]);
-  const familiaNombre = new Map((famRes2.data ?? []).map((x) => [x.id, (x as { nombre: string }).nombre]));
+  const marRes2 = marcaIds.length
+    ? await supabase.from('marcas').select('id, nombre').in('id', marcaIds)
+    : { data: [] };
   const marcaNombre = new Map((marRes2.data ?? []).map((x) => [x.id, (x as { nombre: string }).nombre]));
 
   const lineaDetalle: LineaDocumento[] = lineas.map((l) => {
@@ -179,7 +176,7 @@ export async function getDocumento(id: string): Promise<DocumentoDetalle | null>
     return {
       codigo: art?.codigo_erp ?? '—',
       articulo: art?.nombre ?? '—',
-      familia: art?.familia_id ? familiaNombre.get(art.familia_id) ?? '—' : '—',
+      familia: art?.familia?.trim() || '—',
       marca: art?.marca_id ? marcaNombre.get(art.marca_id) ?? '—' : '—',
       cantidad: Number(l.cantidad ?? 0),
       precio: Number(l.precio_unitario ?? 0),

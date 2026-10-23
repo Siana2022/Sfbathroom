@@ -62,11 +62,14 @@ export async function getCalidad(codigoEmpresa: string, anio: number, filtros?: 
     }
   }
 
-  const { data: artRaw } = await supabase.from('articulos').select('id, nombre, familia_id').eq('empresa_id', empresa.id);
-  const articulos = (artRaw ?? []) as { id: string; nombre: string; familia_id: string | null }[];
+  const articulos = await todasLasFilas<{ id: string; nombre: string; familia: string | null }>((desde) =>
+    supabase
+      .from('articulos')
+      .select('id, nombre, familia')
+      .eq('empresa_id', empresa.id)
+      .range(desde, desde + TAMANO_PAGINA - 1)
+  );
   const articuloPorId = new Map(articulos.map((a) => [a.id, a]));
-  const { data: famRaw } = await supabase.from('familias_articulo').select('id, nombre');
-  const famNombre = new Map((famRaw ?? []).map((f) => [(f as { id: string }).id, (f as { nombre: string }).nombre]));
 
   const devArticulo = new Map<string, { unidades: number; importe: number }>();
   const devFamilia = new Map<string, { unidades: number; importe: number }>();
@@ -82,7 +85,7 @@ export async function getCalidad(codigoEmpresa: string, anio: number, filtros?: 
       dA.unidades += unidades;
       dA.importe += importeAbs;
       devArticulo.set(clave, dA);
-      const fam = (a?.familia_id && famNombre.get(a.familia_id)) ?? 'Sin familia';
+      const fam = a?.familia?.trim() || 'Sin familia';
       const dF = devFamilia.get(fam) ?? { unidades: 0, importe: 0 };
       dF.unidades += unidades;
       dF.importe += importeAbs;
@@ -92,11 +95,13 @@ export async function getCalidad(codigoEmpresa: string, anio: number, filtros?: 
     }
   }
 
-  const { data: incRaw } = await supabase
-    .from('incidencias')
-    .select('tipo, importe, estado, cliente_id, fecha, fecha_cierre')
-    .eq('empresa_id', empresa.id);
-  const incidencias = (incRaw ?? []) as (Fila & { fecha: string; fecha_cierre: string | null })[];
+  const incidencias = await todasLasFilas<Fila & { fecha: string; fecha_cierre: string | null }>((desde) =>
+    supabase
+      .from('incidencias')
+      .select('tipo, importe, estado, cliente_id, fecha, fecha_cierre')
+      .eq('empresa_id', empresa.id)
+      .range(desde, desde + TAMANO_PAGINA - 1)
+  );
 
   const tipoMap = new Map<string, { count: number; importe: number }>();
   const estadoMap = new Map<string, number>();

@@ -18,7 +18,7 @@ async function buscar(q: string) {
   const [clientes, facturas, articulos] = await Promise.all([
     supabase.from('clientes').select('id, nombre, codigo_erp').or(`nombre.ilike.${like},codigo_erp.ilike.${like},cif.ilike.${like}`).limit(20),
     supabase.from('facturas').select('id, numero_erp, fecha, cliente_id, clientes:cliente_id(nombre)').or(`numero_erp.ilike.${like}`).limit(20),
-    supabase.from('articulos').select('id, nombre, codigo_erp, familias_articulo:familia_id(nombre)').or(`nombre.ilike.${like},codigo_erp.ilike.${like}`).limit(20),
+    supabase.from('articulos').select('id, nombre, codigo_erp, familia').or(`nombre.ilike.${like},codigo_erp.ilike.${like}`).limit(20),
   ]);
 
   return {

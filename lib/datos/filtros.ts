@@ -83,14 +83,27 @@ export async function getOpcionesFiltros(
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
 
-  const [clientes, comerciales, familias, marcas] = await Promise.all([
-    supabase.from('clientes').select('id, nombre').eq('empresa_id', empresa.id).order('nombre'),
+  const [clientes, comerciales, articulosFam, marcas] = await Promise.all([
+    todasLasFilas<{ id: string; nombre: string }>((desde) =>
+      supabase
+        .from('clientes')
+        .select('id, nombre')
+        .eq('empresa_id', empresa.id)
+        .order('nombre')
+        .range(desde, desde + TAMANO_PAGINA - 1)
+    ),
     supabase.from('comerciales').select('id, nombre').eq('empresa_id', empresa.id).order('nombre'),
-    supabase.from('familias_articulo').select('id, nombre').eq('empresa_id', empresa.id).order('nombre'),
+    todasLasFilas<{ familia: string | null }>((desde) =>
+      supabase
+        .from('articulos')
+        .select('familia')
+        .eq('empresa_id', empresa.id)
+        .range(desde, desde + TAMANO_PAGINA - 1)
+    ),
     supabase.from('marcas').select('id, nombre').eq('empresa_id', empresa.id).order('nombre'),
   ]);
 
-  let opcionesClientes = (clientes.data ?? []).map((c) => ({ id: c.id, nombre: c.nombre }));
+  let opcionesClientes = clientes.map((c) => ({ id: c.id, nombre: c.nombre }));
   if (scopeClientes) {
     const conActividad = await clientesConDocumentos(supabase, empresa.id, scopeClientes);
     opcionesClientes = opcionesClientes.filter((c) => conActividad.has(c.id));
@@ -99,7 +112,9 @@ export async function getOpcionesFiltros(
   return {
     clientes: opcionesClientes,
     comerciales: (comerciales.data ?? []).map((c) => ({ id: c.id, nombre: c.nombre })),
-    familias: (familias.data ?? []).map((f) => ({ id: f.id, nombre: f.nombre })),
+    familias: [...new Set(articulosFam.map((a) => a.familia).filter((f): f is string => Boolean(f)))]
+      .sort((a, b) => a.localeCompare(b, 'es'))
+      .map((f) => ({ id: f, nombre: f })),
     marcas: (marcas.data ?? []).map((m) => ({ id: m.id, nombre: m.nombre })),
   };
 }
@@ -139,7 +154,7 @@ export async function getFacturaIdsFiltradas(
 
   if (porArticulo) {
     let aq = supabase.from('articulos').select('id').eq('empresa_id', empresaId);
-    if (familia) aq = aq.eq('familia_id', familia);
+    if (familia) aq = aq.eq('familia', familia);
     if (marca) aq = aq.eq('marca_id', marca);
     const artIds = (
       await todasLasFilas<{ id: string }>((desde) => aq.range(desde, desde + TAMANO_PAGINA - 1))
@@ -195,7 +210,7 @@ export async function getPedidoIdsFiltrados(
 
   if (porArticulo) {
     let aq = supabase.from('articulos').select('id').eq('empresa_id', empresaId);
-    if (familia) aq = aq.eq('familia_id', familia);
+    if (familia) aq = aq.eq('familia', familia);
     if (marca) aq = aq.eq('marca_id', marca);
     const artIds = (
       await todasLasFilas<{ id: string }>((desde) => aq.range(desde, desde + TAMANO_PAGINA - 1))
@@ -233,7 +248,7 @@ export async function getArticuloIdsFiltrados(
   if (!familia && !marca) return null;
 
   let aq = supabase.from('articulos').select('id').eq('empresa_id', empresaId);
-  if (familia) aq = aq.eq('familia_id', familia);
+  if (familia) aq = aq.eq('familia', familia);
   if (marca) aq = aq.eq('marca_id', marca);
   const filas = await todasLasFilas<{ id: string }>((desde) => aq.range(desde, desde + TAMANO_PAGINA - 1));
   return new Set(filas.map((f) => f.id));

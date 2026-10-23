@@ -33,10 +33,10 @@ export default async function CalidadPage({ searchParams }: { searchParams: Sear
         Devoluciones sobre facturación e incidencias registradas por {d.empresa.nombre} en {d.anio}.
       </p>
 
-      <Aviso tipo="demo">
-        Las <strong>devoluciones</strong> son reales (se calculan sobre los abonos de facturas de
-        A3ERP). Las <strong>incidencias y reclamaciones</strong> proceden todavía de datos de
-        demostración.
+      <Aviso tipo="info">
+        Las <strong>devoluciones</strong> se calculan sobre los abonos reales de A3ERP. Las
+        <strong> incidencias y reclamaciones</strong> son de registro manual (no vienen de A3ERP),
+        por lo que aparecerán a cero mientras no se den de alta.
       </Aviso>
 
       <Filtros opciones={opciones} />

@@ -93,7 +93,7 @@ export async function getVistasTemporales(codigoEmpresa: string, anio: number, f
   const proyectado = ritmoDiario * diasEnAnio;
 
   let presupuesto = 0;
-  if (filtros?.marca) {
+  if (filtros?.marca || filtros?.familia) {
     // el presupuesto no desglosa por marca
   } else {
     let pq = supabase
@@ -103,7 +103,6 @@ export async function getVistasTemporales(codigoEmpresa: string, anio: number, f
       .eq('ejercicio', anio);
     if (filtros?.cliente) pq = pq.eq('cliente_id', filtros.cliente);
     if (filtros?.comercial) pq = pq.eq('comercial_id', filtros.comercial);
-    if (filtros?.familia) pq = pq.eq('familia_id', filtros.familia);
     const { data: presupuestoRaw } = await pq;
     for (const p of presupuestoRaw ?? []) presupuesto += Number((p as { importe: number }).importe ?? 0);
   }

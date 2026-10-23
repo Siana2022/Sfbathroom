@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
+import { enLotes, todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 
 type Recomendacion = {
   familia: string;
@@ -8,8 +9,7 @@ type Recomendacion = {
 };
 
 type FilaLinea = { factura_id: string; articulo_id: string | null };
-type FilaArticulo = { id: string; familia_id: string | null };
-type FilaFamilia = { id: string; nombre: string };
+type FilaArticulo = { id: string; familia: string | null };
 
 /**
  * Cross-sell por afinidad de familias: para el cliente dado, detecta las familias que
@@ -20,30 +20,42 @@ export async function getCrossSell(codigoEmpresa: string, clienteId: string, ani
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
 
-  const { data: familiasFilas } = await supabase.from('familias_articulo').select('id, nombre').eq('empresa_id', empresa.id);
-  const familias = (familiasFilas ?? []) as FilaFamilia[];
-
-  const { data: articulosFilas } = await supabase.from('articulos').select('id, familia_id');
-  const familiaDeArticulo = new Map<string, string | null>((articulosFilas ?? [] as FilaArticulo[]).map((a) => [a.id, a.familia_id]));
+  const articulosFilas = await todasLasFilas<FilaArticulo>((desde) =>
+    supabase
+      .from('articulos')
+      .select('id, familia')
+      .eq('empresa_id', empresa.id)
+      .range(desde, desde + TAMANO_PAGINA - 1)
+  );
+  const familiaDeArticulo = new Map<string, string | null>(articulosFilas.map((a) => [a.id, a.familia]));
 
   // facturas del año con cliente
-  const { data: facturas } = await supabase
-    .from('facturas')
-    .select('id, cliente_id')
-    .eq('empresa_id', empresa.id)
-    .gte('fecha', `${anio}-01-01`)
-    .lte('fecha', `${anio}-12-31`);
-  const filasF = (facturas ?? []) as { id: string; cliente_id: string | null }[];
+  const filasF = await todasLasFilas<{ id: string; cliente_id: string | null }>((desde) =>
+    supabase
+      .from('facturas')
+      .select('id, cliente_id')
+      .eq('empresa_id', empresa.id)
+      .gte('fecha', `${anio}-01-01`)
+      .lte('fecha', `${anio}-12-31`)
+      .range(desde, desde + TAMANO_PAGINA - 1)
+  );
   const clienteDeFactura = new Map(filasF.filter((f) => f.cliente_id).map((f) => [f.id, f.cliente_id!]));
 
   // familias compradas por cliente (año actual, clientes con >= 2 facturas = "establecidos")
   const familiasPorCliente = new Map<string, Set<string>>();
   const facturasUnicasCliente = new Map<string, Set<string>>();
   const idsAnio = filasF.map((f) => f.id);
-  for (let i = 0; i < idsAnio.length; i += 150) {
-    const lote = idsAnio.slice(i, i + 150);
-    const { data: lineas } = await supabase.from('factura_lineas').select('factura_id, articulo_id').in('factura_id', lote);
-    for (const l of (lineas ?? []) as FilaLinea[]) {
+  {
+    const lineasAll = await enLotes<FilaLinea>(
+      (lote, desde) =>
+        supabase
+          .from('factura_lineas')
+          .select('factura_id, articulo_id')
+          .in('factura_id', lote)
+          .range(desde, desde + TAMANO_PAGINA - 1),
+      idsAnio,
+    );
+    for (const l of lineasAll) {
       const cli = clienteDeFactura.get(l.factura_id);
       const fam = l.articulo_id ? familiaDeArticulo.get(l.articulo_id) : null;
       if (!cli || !fam) continue;
@@ -77,8 +89,6 @@ export async function getCrossSell(codigoEmpresa: string, clienteId: string, ani
   const famsCliente = familiasPorCliente.get(clienteId) ?? new Set<string>();
   if (famsCliente.size === 0) return [];
 
-  const nombres = new Map(familias.map((f) => [f.id, f.nombre]));
-
   // afinidad: para cada familia target, cuántos clientes únicos que compran alguna
   // de las familias del cliente TARGET TAMBIÉN compran la familia target.
   // Base = compradoresFamilia[target] (denominador por familia, no acumulado).
@@ -98,7 +108,7 @@ export async function getCrossSell(codigoEmpresa: string, clienteId: string, ani
   }
 
   const candidatas = [...afinidadTarget.entries()]
-    .filter(([f]) => nombres.has(f))
+    .filter(([f]) => Boolean(f))
     .map(([fid, clientes]) => ({
       fid,
       afinidad: (compradoresFamilia.get(fid) ?? 0) > 0
@@ -109,10 +119,17 @@ export async function getCrossSell(codigoEmpresa: string, clienteId: string, ani
     .slice(0, 5);
 
   const articulosPorFamilia = new Map<string, Map<string, number>>();
-  for (let i = 0; i < idsAnio.length; i += 150) {
-    const lote = idsAnio.slice(i, i + 150);
-    const { data: lineas } = await supabase.from('factura_lineas').select('factura_id, articulo_id, cantidad').in('factura_id', lote);
-    for (const l of (lineas ?? []) as { factura_id: string; articulo_id: string | null; cantidad: number }[]) {
+  {
+    const lineasAll = await enLotes<{ factura_id: string; articulo_id: string | null; cantidad: number }>(
+      (lote, desde) =>
+        supabase
+          .from('factura_lineas')
+          .select('factura_id, articulo_id, cantidad')
+          .in('factura_id', lote)
+          .range(desde, desde + TAMANO_PAGINA - 1),
+      idsAnio,
+    );
+    for (const l of lineasAll) {
       const fam = l.articulo_id ? familiaDeArticulo.get(l.articulo_id) : null;
       if (!fam || !l.articulo_id) continue;
       const m = articulosPorFamilia.get(fam) ?? new Map<string, number>();
@@ -139,7 +156,7 @@ export async function getCrossSell(codigoEmpresa: string, clienteId: string, ani
           .slice(0, 3)
       : []) as Recomendacion['articulos'];
     recomendaciones.push({
-      familia: nombres.get(cand.fid) ?? cand.fid,
+      familia: cand.fid,
       afinidad: cand.afinidad,
       articulos: topArticulos,
     });

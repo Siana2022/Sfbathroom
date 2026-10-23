@@ -23,7 +23,7 @@ export type DesvioPresupuesto = {
 
 type FilaFactura = { id: string; cliente_id: string | null; comercial_id: string | null; base_imponible: number; tipo_documento: string };
 type FilaLinea = { factura_id: string; articulo_id: string | null; importe: number };
-type FilaArticulo = { id: string; familia_id: string | null };
+type FilaArticulo = { id: string; familia: string | null };
 
 export async function getDesvioPresupuesto(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<DesvioPresupuesto> {
   const supabase = createClient();
@@ -61,12 +61,12 @@ export async function getDesvioPresupuesto(codigoEmpresa: string, anio: number, 
         (lote, desde) =>
           supabase
             .from('articulos')
-            .select('id, familia_id')
+            .select('id, familia')
             .in('id', lote)
             .range(desde, desde + TAMANO_PAGINA - 1),
         artIds,
       );
-      for (const a of articulosRaw) familiaDeArticulo.set(a.id, a.familia_id);
+      for (const a of articulosRaw) familiaDeArticulo.set(a.id, a.familia);
     }
     for (const l of lineas) {
       const fam = l.articulo_id ? familiaDeArticulo.get(l.articulo_id) : null;
@@ -80,7 +80,13 @@ export async function getDesvioPresupuesto(codigoEmpresa: string, anio: number, 
     supabase.from('presupuesto').select('cliente_id, importe').eq('empresa_id', empresa.id).eq('ejercicio', anio),
     supabase.from('presupuesto').select('comercial_id, importe').eq('empresa_id', empresa.id).eq('ejercicio', anio),
     supabase.from('presupuesto').select('familia_id, importe').eq('empresa_id', empresa.id).eq('ejercicio', anio),
-    supabase.from('clientes').select('id, nombre').eq('empresa_id', empresa.id),
+    todasLasFilas<{ id: string; nombre: string }>((desde) =>
+      supabase
+        .from('clientes')
+        .select('id, nombre')
+        .eq('empresa_id', empresa.id)
+        .range(desde, desde + TAMANO_PAGINA - 1)
+    ),
     supabase.from('comerciales').select('id, nombre'),
     supabase.from('familias_articulo').select('id, nombre'),
   ]);
@@ -96,7 +102,13 @@ export async function getDesvioPresupuesto(codigoEmpresa: string, anio: number, 
   };
   const presCliMap = suma(presCli.data, 'cliente_id');
   const presComMap = suma(presCom.data, 'comercial_id');
-  const presFamMap = suma(presFam.data, 'familia_id');
+  const famNombrePres = new Map(((fam.data ?? []) as { id: string; nombre: string }[]).map((f) => [f.id, f.nombre]));
+  const presFamMap = new Map<string, number>();
+  for (const f of (presFam.data ?? []) as { familia_id: string | null; importe: number }[]) {
+    const nombreFam = f.familia_id ? famNombrePres.get(f.familia_id) : null;
+    if (!nombreFam) continue;
+    presFamMap.set(nombreFam, (presFamMap.get(nombreFam) ?? 0) + Number(f.importe ?? 0));
+  }
 
   const nombre = (filas: { id: string; nombre: string }[] | null) => new Map((filas ?? []).map((f) => [f.id, f.nombre]));
 
@@ -127,7 +139,7 @@ export async function getDesvioPresupuesto(codigoEmpresa: string, anio: number, 
     anio,
     sinPresupuesto,
     porComercial: construir(netaComercial, presComMap, nombre(com.data)),
-    porCliente: construir(netaCliente, presCliMap, nombre(cli.data)),
+    porCliente: construir(netaCliente, presCliMap, new Map(cli.map((c) => [c.id, c.nombre]))),
     porFamilia: construir(netaFamilia, presFamMap, nombre(fam.data)),
   };
 }
