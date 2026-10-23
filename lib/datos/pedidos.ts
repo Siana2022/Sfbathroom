@@ -50,7 +50,10 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
       .lte('fecha', `${anio}-12-31`)
       .range(offset, offset + pageSize - 1);
 
-    if (error || !filas || filas.length === 0) {
+    if (error) {
+      throw new Error(`pedidos: ${error.message}`);
+    }
+    if (!filas || filas.length === 0) {
       fetching = false;
     } else {
       todosLosPedidos = todosLosPedidos.concat(filas);
