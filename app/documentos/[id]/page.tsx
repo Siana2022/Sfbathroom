@@ -21,7 +21,7 @@ export default async function DocumentoPage({ params }: { params: { id: string }
 
   return (
     <div>
-      <p className="breadcrumb">Cuadro de mando · Documentos origen · {d.tipo}</p>
+      <p className="breadcrumb">Cuadro mando comercial · Documentos origen · {d.tipo}</p>
       <Link className="doc-volver" href="/documentos">
         ← Volver a documentos
       </Link>

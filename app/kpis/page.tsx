@@ -20,7 +20,7 @@ export default async function KpisPage() {
 
   return (
     <div>
-      <p className="breadcrumb">Cuadro de mando · KPIs personalizados</p>
+      <p className="breadcrumb">Cuadro mando comercial · KPIs personalizados</p>
       <h1>Mis KPIs personalizados</h1>
       {!esAdmin && (
         <div className="card">

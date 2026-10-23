@@ -27,7 +27,7 @@ export default async function CalidadPage({ searchParams }: { searchParams: Sear
 
   return (
     <div>
-      <p className="breadcrumb">Cuadro de mando · Bloque 10</p>
+      <p className="breadcrumb">Cuadro mando comercial · Bloque 10</p>
       <h1>Calidad y devoluciones</h1>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
         Devoluciones sobre facturación e incidencias registradas por {d.empresa.nombre} en {d.anio}.

@@ -33,7 +33,7 @@ export default async function MarketingPage() {
 
   return (
     <div>
-      <p className="breadcrumb">Cuadro de mando · Bloque Marketing</p>
+      <p className="breadcrumb">Cuadro mando comercial · Bloque Marketing</p>
       <h1>Marketing Mix Modeling</h1>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
         Solo canales offline (comerciales, call center, ferias). El histórico está en Excel

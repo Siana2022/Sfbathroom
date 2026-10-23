@@ -69,7 +69,7 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
 
   return (
     <div>
-      <p className="breadcrumb">Cuadro de mando · Bloque 1</p>
+      <p className="breadcrumb">Cuadro mando comercial · Bloque 1</p>
       <h1>Facturación</h1>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
         Facturación neta de {d.empresa.nombre} ({d.empresa.codigo}). Neta = facturas + notas de

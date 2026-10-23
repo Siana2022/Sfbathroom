@@ -15,7 +15,7 @@ export default async function FinancieroPage() {
 
   return (
     <div>
-      <p className="breadcrumb">Cuadro de mando · Bloque Financiero</p>
+      <p className="breadcrumb">Cuadro mando comercial · Bloque Financiero</p>
       <h1>Financiero</h1>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
         Cuentas anuales, flujo de caja y balance. Sin API disponible — la carga prevista es

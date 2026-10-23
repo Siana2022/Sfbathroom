@@ -33,7 +33,7 @@ export default async function CanalMarcaPage({ searchParams }: { searchParams: S
 
   return (
     <div>
-      <p className="breadcrumb">Cuadro de mando · Bloque 6</p>
+      <p className="breadcrumb">Cuadro mando comercial · Bloque 6</p>
       <h1>Canal y marca</h1>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
         Starbath Plus frente a marca blanca, y facturación por canal de {d.empresa.nombre} en {d.anio}.

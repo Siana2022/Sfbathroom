@@ -43,7 +43,7 @@ export default async function Home() {
   if (rol === 'comercial' && mix) {
     return (
       <div>
-        <p className="breadcrumb">Cuadro de mando · Mi día</p>
+        <p className="breadcrumb">Cuadro mando comercial · Mi día</p>
         <h1>Mi día · {mix.comercial.nombre ?? 'Comercial'}</h1>
         <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
           {mix.clientesCargo} clientes de tu cartera. Ejercicio {mix.anio}.
@@ -168,7 +168,7 @@ export default async function Home() {
 
   return (
     <div>
-      <p className="breadcrumb">Cuadro de mando · Resumen</p>
+      <p className="breadcrumb">Cuadro mando comercial · Resumen</p>
       <h1>Resumen · {d.empresa.nombre}</h1>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
         Ejercicio {d.anio}. Los indicadores leen de Supabase con la RLS del rol conectado y de la

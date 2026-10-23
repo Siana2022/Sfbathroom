@@ -57,7 +57,7 @@ export default async function CuadrosPage() {
 
   return (
     <div>
-      <p className="breadcrumb">Cuadro de mando · Bloque 12</p>
+      <p className="breadcrumb">Cuadro mando comercial · Bloque 12</p>
       <h1>Cuadros por perfil y cadencia</h1>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
         Cuatro formas de mirar el mismo modelo de datos, según quién mira y cada cuánto. Todas

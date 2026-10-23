@@ -19,7 +19,7 @@ export default async function ConcentracionPage({ searchParams }: { searchParams
 
   return (
     <div>
-      <p className="breadcrumb">Cuadro de mando · Bloque 7</p>
+      <p className="breadcrumb">Cuadro mando comercial · Bloque 7</p>
       <h1>Concentración y riesgo</h1>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
         Concentración de clientes de {d.empresa.nombre} en {d.anio}: peso de los grandes clientes,

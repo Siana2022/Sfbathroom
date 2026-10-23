@@ -19,7 +19,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: Sea
 
   return (
     <div>
-      <p className="breadcrumb">Cuadro de mando · Bloque 5</p>
+      <p className="breadcrumb">Cuadro mando comercial · Bloque 5</p>
       <h1>Comportamiento de cliente</h1>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
         Clientes activos, nuevos y perdidos de {d.empresa.nombre}, retención entre {ANIO - 1} y

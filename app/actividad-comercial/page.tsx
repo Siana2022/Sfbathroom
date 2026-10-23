@@ -46,7 +46,7 @@ export default async function ActividadComercialPage({ searchParams }: { searchP
 
   return (
     <div>
-      <p className="breadcrumb">Cuadro de mando · Bloque 9</p>
+      <p className="breadcrumb">Cuadro mando comercial · Bloque 9</p>
       <h1>Actividad comercial</h1>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
         Carga por persona de {d.empresa.nombre} en {d.anio}: facturación gestionada, clientes

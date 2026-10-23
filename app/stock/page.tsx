@@ -16,7 +16,7 @@ export default async function StockPage({ searchParams }: { searchParams: Search
 
   return (
     <div>
-      <p className="breadcrumb">Cuadro de mando · Bloque 4</p>
+      <p className="breadcrumb">Cuadro mando comercial · Bloque 4</p>
       <h1>Stock y cobertura</h1>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
         Cobertura en días por artículo y almacén, stock disponible real, en tránsito, roturas y

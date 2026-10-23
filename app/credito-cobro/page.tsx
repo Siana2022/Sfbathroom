@@ -19,7 +19,7 @@ export default async function CreditoCobroPage({ searchParams }: { searchParams:
 
   return (
     <div>
-      <p className="breadcrumb">Cuadro de mando · Bloque 8</p>
+      <p className="breadcrumb">Cuadro mando comercial · Bloque 8</p>
       <h1>Crédito y cobro</h1>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
         Saldo de clientes, DSO, aging de la deuda y vencidos de {d.empresa.nombre}.

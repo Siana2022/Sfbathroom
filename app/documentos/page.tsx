@@ -32,7 +32,7 @@ export default async function DocumentosPage({ searchParams }: { searchParams: S
 
   return (
     <div>
-      <p className="breadcrumb">Cuadro de mando · Transversal</p>
+      <p className="breadcrumb">Cuadro mando comercial · Transversal</p>
       <h1>Documentos origen</h1>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
         Listado de facturas, abonos y notas de cargo de {d.empresa.nombre} en {d.anio}. Entra en un

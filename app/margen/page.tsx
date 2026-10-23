@@ -5,7 +5,6 @@ import { decimal, eur, eur2, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
 import Filtros from '@/components/Filtros';
-import Aviso from '@/components/Aviso';
 import { ANIO_ACTUAL } from '@/lib/ejercicio';
 
 
@@ -20,7 +19,7 @@ export default async function MargenPage({ searchParams }: { searchParams: Searc
   if (d.sinAcceso) {
     return (
       <div>
-        <p className="breadcrumb">Cuadro de mando · Bloque 3</p>
+        <p className="breadcrumb">Cuadro mando comercial · Bloque 3</p>
         <h1>Margen y rentabilidad</h1>
         <div className="card">
           <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
@@ -34,7 +33,7 @@ export default async function MargenPage({ searchParams }: { searchParams: Searc
 
   return (
     <div>
-      <p className="breadcrumb">Cuadro de mando · Bloque 3</p>
+      <p className="breadcrumb">Cuadro mando comercial · Bloque 3</p>
       <h1>Margen y rentabilidad</h1>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
         Margen de {d.empresa.nombre} en {d.anio}, calculado sobre el coste unitario de cada línea y
@@ -111,40 +110,25 @@ export default async function MargenPage({ searchParams }: { searchParams: Searc
       </div>
 
       <div className="card">
-        <h2>Margen por comercial, marca y canal</h2>
+        <h2>Margen por comercial</h2>
         <table className="tabla">
           <thead>
             <tr>
               <th>Comercial</th>
               <th className="td-num">Importe</th>
               <th className="td-num">Margen %</th>
-              <th>Marca</th>
-              <th className="td-num">Importe</th>
-              <th className="td-num">Margen %</th>
-              <th>Canal</th>
-              <th className="td-num">Importe</th>
-              <th className="td-num">Margen %</th>
             </tr>
           </thead>
           <tbody>
-            {d.porComercial.map((c, i) => (
+            {d.porComercial.map((c) => (
               <tr key={c.nombre}>
                 <td>{c.nombre}</td>
                 <td className="td-num">{eur(c.importe)}</td>
                 <td className={`td-num ${c.margenPct >= 0 ? 'td-pos' : ''}`}>{decimal(c.margenPct)} %</td>
-                <td>{d.porMarca[i]?.nombre ?? ''}</td>
-                <td className="td-num">{d.porMarca[i] ? eur(d.porMarca[i].importe) : ''}</td>
-                <td className="td-num">{d.porMarca[i] ? `${decimal(d.porMarca[i].margenPct)} %` : ''}</td>
-                <td>{d.porCanal[i]?.nombre ?? ''}</td>
-                <td className="td-num">{d.porCanal[i] ? eur(d.porCanal[i].importe) : ''}</td>
-                <td className="td-num">{d.porCanal[i] ? `${decimal(d.porCanal[i].margenPct)} %` : ''}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        <p style={{ color: 'var(--muted)', fontSize: '0.85rem', marginTop: 8 }}>
-          Marcas con etiqueta “MB”: marca blanca (fabricada para un cliente concreto).
-        </p>
       </div>
 
       <div className="card">
@@ -305,42 +289,6 @@ export default async function MargenPage({ searchParams }: { searchParams: Searc
         </div>
       </div>
 
-      <div className="card">
-        <h2>Coste completo de llegada · últimos lotes</h2>
-        <Aviso tipo="demo">
-          Los lotes y sus costes de llegada (flete, aduana, seguro) proceden de datos de
-          demostración: A3ERP aún no carga compras. El margen de arriba sí usa el coste real de
-          cada línea de factura.
-        </Aviso>
-        {d.ultimosLotes.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>Sin lotes de compra cargados.</p>
-        ) : (
-          <table className="tabla">
-            <thead>
-              <tr>
-                <th>Lote</th>
-                <th>Artículo</th>
-                <th className="td-num">Fecha</th>
-                <th className="td-num">Coste compra</th>
-                <th className="td-num">+ reparto</th>
-                <th className="td-num">Coste completo llegada</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.ultimosLotes.map((l) => (
-                <tr key={l.lote + l.articulo}>
-                  <td>{l.lote}</td>
-                  <td>{l.articulo}</td>
-                  <td className="td-num">{l.fecha}</td>
-                  <td className="td-num">{eur2(l.costeCompra)}</td>
-                  <td className="td-num">{eur2(l.costeRepartido)}</td>
-                  <td className="td-num">{eur2(l.costeCompleto)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
     </div>
   );
 }

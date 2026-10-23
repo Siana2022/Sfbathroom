@@ -30,7 +30,7 @@ export default async function AlertasPage() {
 
   return (
     <div>
-      <p className="breadcrumb">Cuadro de mando · Bloque 11</p>
+      <p className="breadcrumb">Cuadro mando comercial · Bloque 11</p>
       <h1>Alertas</h1>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
         Avisos por umbral sobre los datos de {d.empresa.nombre}: fuga y clientes no activos, rotura

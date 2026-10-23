@@ -26,7 +26,7 @@ export default function Nav({ userEmail }: { userEmail?: string }) {
         <span className="sidebar-logo">SF</span>
         <span className="sidebar-marca-txt">
           <b>Bathroom</b>
-          <span>Cuadro de mando</span>
+          <span>Cuadro mando comercial</span>
         </span>
       </div>
       <Link key="/" href="/" className={activo('/')}>
@@ -36,7 +36,7 @@ export default function Nav({ userEmail }: { userEmail?: string }) {
         Mi panel
       </Link>
 
-      <p className="nav-group">Cuadro de mando</p>
+      <p className="nav-group">Cuadro mando comercial</p>
       {bloques.map((b) => (
         <Link key={b.slug} href={b.slug} className={activo(b.slug)}>
           <span className="nav-numero">{b.numero}</span> {b.titulo}

@@ -18,7 +18,7 @@ export default function PaginaBloque({ slugHref }: Props) {
 
   return (
     <div>
-      <p className="breadcrumb">Cuadro de mando · Bloque {bloque.numero}</p>
+      <p className="breadcrumb">Cuadro mando comercial · Bloque {bloque.numero}</p>
       <h1>{bloque.titulo}</h1>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>{bloque.resumen}</p>
 

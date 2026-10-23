@@ -36,7 +36,7 @@ export async function POST(req: Request) {
       <p style="color:#65768a;margin-top:0">Resumen automático ${new Date().toLocaleDateString('es-ES')}</p>
       ${criticas.length ? `<h3>Críticas (${criticas.length})</h3><table border="1" cellpadding="8" style="border-collapse:collapse;width:100%"><tbody>${filas(criticas)}</tbody></table>` : ''}
       ${avisos.length ? `<h3>Avisos (${avisos.length})</h3><table border="1" cellpadding="8" style="border-collapse:collapse;width:100%"><tbody>${filas(avisos)}</tbody></table>` : ''}
-      <p style="color:#65768a;font-size:12px;margin-top:24px">Cuadro de mando sfbathroom. Umbrales editables en Configuración.</p>
+      <p style="color:#65768a;font-size:12px;margin-top:24px">Cuadro mando comercial sfbathroom. Umbrales editables en Configuración.</p>
     </div>`;
 
   const texto = [

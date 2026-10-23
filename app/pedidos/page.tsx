@@ -27,7 +27,7 @@ export default async function PedidosPage({ searchParams }: { searchParams: Sear
 
   return (
     <div>
-      <p className="breadcrumb">Cuadro de mando · Bloque 2</p>
+      <p className="breadcrumb">Cuadro mando comercial · Bloque 2</p>
       <h1>Pedidos y cartera</h1>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
         Captación de pedidos de {d.empresa.nombre}, cartera y distribución por cliente extraídos en tiempo real de A3ERP.

@@ -8,7 +8,7 @@ export default async function ConfiguracionPage() {
 
   return (
     <div>
-      <p className="breadcrumb">Cuadro de mando · Configuración</p>
+      <p className="breadcrumb">Cuadro mando comercial · Configuración</p>
       <h1>Configuración</h1>
 
       <div className="card">
