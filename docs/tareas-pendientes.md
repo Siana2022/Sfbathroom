@@ -235,3 +235,10 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
 - [ ] Evaluar si en algún momento compensa activar "Link API | a3ERP" (tiempo real, de pago)
       en vez del workflow n8n nocturno — no es necesario mientras la actualización diaria
       sea suficiente para el cliente.
+
+## 8. Rentabilidad real por lote / contenedor (idea aparcada)
+- [ ] Cruzar compra → stock → venta por `LOTE` (nº de contenedor) para calcular el coste
+      real de traer cada lote (compra + flete + aduana + transporte interior) y su margen.
+- Estado: lote vacío en A3ERP a día de hoy. No implementar hasta que el cliente empiece a
+  rellenarlo. Antes hay que validar con `diag-lotes.mjs` que compras (`LINEFACC`),
+  ventas (`LINEFACT`) y stock (`STOCKALM`) guardan el mismo lote.
