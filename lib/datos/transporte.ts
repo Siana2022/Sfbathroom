@@ -171,3 +171,70 @@ export async function getTransporteFacturadoPorCliente(
     aduana: construir(acumulado.aduana),
   };
 }
+
+export type TransporteProveedorMes = { proveedor: string; meses: number[]; total: number };
+
+export type CosteTransportePorProveedor = {
+  anio: number;
+  interior: { total: number; filas: TransporteProveedorMes[] };
+  flete: { total: number; filas: TransporteProveedorMes[] };
+  aduana: { total: number; filas: TransporteProveedorMes[] };
+};
+
+export async function getCosteTransportePorProveedor(
+  codigoEmpresa: string,
+  anio: number,
+): Promise<CosteTransportePorProveedor> {
+  const supabase = createClient();
+  const empresa = await getEmpresaPorCodigo(codigoEmpresa);
+
+  const gastos = await todasLasFilas<{
+    fecha: string;
+    proveedor_nombre: string | null;
+    proveedor_codigo: string;
+    categoria: string;
+    base_imponible: number | null;
+    total: number | null;
+  }>((desde) =>
+    supabase
+      .from('gastos_logistica')
+      .select('fecha, proveedor_nombre, proveedor_codigo, categoria, base_imponible, total')
+      .eq('empresa_id', empresa.id)
+      .gte('fecha', `${anio}-01-01`)
+      .lte('fecha', `${anio}-12-31`)
+      .order('fecha')
+      .range(desde, desde + TAMANO_PAGINA - 1),
+  );
+
+  const acumulado: Record<'interior' | 'flete' | 'aduana', Map<string, number[]>> = {
+    interior: new Map(),
+    flete: new Map(),
+    aduana: new Map(),
+  };
+
+  for (const g of gastos) {
+    const categoria =
+      g.categoria === 'fletes' ? 'flete' : g.categoria === 'aduanas' ? 'aduana' : 'interior';
+    const mes = Number(g.fecha.slice(5, 7));
+    if (mes < 1 || mes > 12) continue;
+    const nombre = (g.proveedor_nombre || g.proveedor_codigo || 'Sin proveedor').trim();
+    const meses = acumulado[categoria].get(nombre) ?? new Array(12).fill(0);
+    meses[mes - 1] += Number(g.total ?? g.base_imponible ?? 0);
+    acumulado[categoria].set(nombre, meses);
+  }
+
+  const construir = (mapa: Map<string, number[]>) => {
+    const filas = [...mapa.entries()]
+      .map(([proveedor, meses]) => ({ proveedor, meses, total: meses.reduce((s, v) => s + v, 0) }))
+      .filter((f) => Math.abs(f.total) > 0.005)
+      .sort((a, b) => b.total - a.total);
+    return { total: filas.reduce((s, f) => s + f.total, 0), filas };
+  };
+
+  return {
+    anio,
+    interior: construir(acumulado.interior),
+    flete: construir(acumulado.flete),
+    aduana: construir(acumulado.aduana),
+  };
+}
