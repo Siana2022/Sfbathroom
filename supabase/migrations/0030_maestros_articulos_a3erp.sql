@@ -14,6 +14,7 @@ returns void
 language plpgsql
 security definer
 set search_path = public
+set statement_timeout = '300s'
 as $$
 declare
   _eid uuid;

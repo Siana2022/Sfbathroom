@@ -52,9 +52,13 @@ export function normalizarArticulos(rows: any[], empresaCodigo: string): Maestro
 }
 
 export async function cargarArticulosMaestros(opts: { empresaCodigo: string; articulos: MaestroArticulo[] }) {
-  await supabaseRpc('aplicar_articulos_maestros', {
-    _empresa: opts.empresaCodigo,
-    _articulos: opts.articulos,
-  });
+  const chunk = 2000;
+  for (let i = 0; i < opts.articulos.length; i += chunk) {
+    const lote = opts.articulos.slice(i, i + chunk);
+    await supabaseRpc('aplicar_articulos_maestros', {
+      _empresa: opts.empresaCodigo,
+      _articulos: lote,
+    });
+  }
   return { ok: true, count: opts.articulos.length };
 }
