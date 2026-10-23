@@ -7,6 +7,7 @@ alter table public.articulos add column if not exists referencia      text;
 alter table public.articulos add column if not exists codigo_barras   text;
 alter table public.articulos add column if not exists peso            numeric(10,3);
 alter table public.articulos add column if not exists volumen         numeric(10,3);
+alter table public.articulos add column if not exists familia         text;
 
 create or replace function public.aplicar_articulos_maestros(_empresa text, _articulos jsonb)
 returns void
@@ -23,7 +24,7 @@ begin
   end if;
 
   insert into public.articulos (
-    codigo_erp, nombre, precio_coste, precio_base, referencia, codigo_barras, peso, volumen, empresa_id
+    codigo_erp, nombre, precio_coste, precio_base, referencia, codigo_barras, peso, volumen, familia, empresa_id
   )
   select
     nullif(trim(a.codigo), ''),
@@ -34,6 +35,7 @@ begin
     nullif(trim(a."codigoBarras"), ''),
     a.peso,
     a.volumen,
+    nullif(trim(a."familiaReal"), ''),
     _eid
   from jsonb_to_recordset(_articulos) as a(
     codigo text,
@@ -43,7 +45,8 @@ begin
     referencia text,
     "codigoBarras" text,
     peso numeric,
-    volumen numeric
+    volumen numeric,
+    "familiaReal" text
   )
   where nullif(trim(a.codigo), '') is not null
   on conflict (codigo_erp, empresa_id) do update set
@@ -53,6 +56,7 @@ begin
     referencia    = coalesce(excluded.referencia,   articulos.referencia),
     codigo_barras = coalesce(excluded.codigo_barras, articulos.codigo_barras),
     peso          = coalesce(excluded.peso,         articulos.peso),
-    volumen       = coalesce(excluded.volumen,      articulos.volumen);
+    volumen       = coalesce(excluded.volumen,      articulos.volumen),
+    familia       = coalesce(excluded.familia,      articulos.familia);
 end;
 $$;

@@ -25,7 +25,6 @@ export type MargenData = {
   erosionMedia: number | null;
   matrizMargenRotacion: { tramoMargen: string; baja: number; media: number; alta: number }[];
   mensual: { mes: string; unidades: number; bruto: number; descuento: number; neto: number; coste: number; margen: number; margenPct: number }[];
-  ultimosLotes: { lote: string; articulo: string; fecha: string; costeCompra: number; costeRepartido: number; costeCompleto: number }[];
 };
 
 type FilaFactura = { id: string; cliente_id: string | null; comercial_id: string | null; fecha: string; tipo_documento: string; total: number };
@@ -75,11 +74,10 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
       erosionMedia: null,
       matrizMargenRotacion: [],
       mensual: [],
-      ultimosLotes: [],
     };
   }
 
-  const [idsFiltrados, facturasRes, articulosRes, marcasRes, canalesRes, clientesRes, comercialesRes, costeLlegadaRes, lotesRes] = await Promise.all([
+  const [idsFiltrados, facturasRes, articulos, marcasRes, canalesRes, clientes, comercialesRes, costeLlegadaFilas] = await Promise.all([
     getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anio}-01-01`, `${anio}-12-31`),
     todasLasFilas<FilaFactura>((desde) =>
       supabase
@@ -91,20 +89,30 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
         .lte('fecha', `${anio}-12-31`)
         .range(desde, desde + TAMANO_PAGINA - 1)
     ),
-    supabase
-      .from('articulos')
-      .select('id, nombre, familia, marca_id, marca_blanca_cliente_id, coste_unitario, precio_tarifa')
-      .eq('empresa_id', empresa.id),
+    todasLasFilas<FilaArticulo>((desde) =>
+      supabase
+        .from('articulos')
+        .select('id, nombre, familia, marca_id, marca_blanca_cliente_id, coste_unitario, precio_tarifa')
+        .eq('empresa_id', empresa.id)
+        .range(desde, desde + TAMANO_PAGINA - 1)
+    ),
     supabase.from('marcas').select('id, nombre'),
     supabase.from('canales').select('id, nombre'),
-    supabase.from('clientes').select('id, nombre, canal_id, pais_facturacion').eq('empresa_id', empresa.id),
+    todasLasFilas<FilaCliente>((desde) =>
+      supabase
+        .from('clientes')
+        .select('id, nombre, canal_id, pais_facturacion')
+        .eq('empresa_id', empresa.id)
+        .range(desde, desde + TAMANO_PAGINA - 1)
+    ),
     supabase.from('comerciales').select('id, nombre'),
-    supabase.from('v_coste_completo_por_lote').select('articulo_id, coste_completo_unitario, cantidad').eq('empresa_id', empresa.id),
-    supabase
-      .from('v_coste_completo_por_lote')
-      .select('lote_id, articulo, fecha_compra, coste_unitario_compra, coste_repartido_unitario, coste_completo_unitario')
-      .eq('empresa_id', empresa.id)
-      .order('fecha_compra', { ascending: false }),
+    todasLasFilas<{ articulo_id: string; coste_completo_unitario: number | null; cantidad: number | null }>((desde) =>
+      supabase
+        .from('v_coste_completo_por_lote')
+        .select('articulo_id, coste_completo_unitario, cantidad')
+        .eq('empresa_id', empresa.id)
+        .range(desde, desde + TAMANO_PAGINA - 1)
+    ),
   ]);
 
   const facturas = filtrarPorIds(facturasRes, idsFiltrados);
@@ -112,7 +120,7 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
 
   const filasLineas = await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, articulo_id, cantidad, precio_unitario, base_imponible, coste_unitario', ids);
 
-  const articuloPorId = new Map<string, FilaArticulo>((articulosRes.data ?? []).map((a) => [a.id, a as FilaArticulo]));
+  const articuloPorId = new Map<string, FilaArticulo>(articulos.map((a) => [a.id, a as FilaArticulo]));
 
   const marcasMap = new Map<string, string>();
   for (const m of (marcasRes.data ?? []) as FilaEtiqueta[]) marcasMap.set(m.id, m.nombre);
@@ -120,13 +128,13 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
   for (const c of (canalesRes.data ?? []) as FilaEtiqueta[]) canalesMap.set(c.id, c.nombre);
 
   const clientesPorId = new Map<string, FilaCliente>();
-  for (const c of (clientesRes.data ?? []) as FilaCliente[]) clientesPorId.set(c.id, c);
+  for (const c of clientes as FilaCliente[]) clientesPorId.set(c.id, c);
   const comercialesMap = new Map<string, string>();
   for (const c of (comercialesRes.data ?? []) as FilaEtiqueta[]) comercialesMap.set(c.id, c.nombre);
 
   const facturaPorId = new Map(facturas.map((f) => [f.id, f]));
   const costeLlegada = new Map<string, { sum: number; qty: number }>();
-  for (const l of (costeLlegadaRes.data ?? []) as { articulo_id: string; coste_completo_unitario: number | null; cantidad: number | null }[]) {
+  for (const l of costeLlegadaFilas as { articulo_id: string; coste_completo_unitario: number | null; cantidad: number | null }[]) {
     const v = costeLlegada.get(l.articulo_id) ?? { sum: 0, qty: 0 };
     v.sum += Number(l.coste_completo_unitario ?? 0) * Number(l.cantidad ?? 0);
     v.qty += Number(l.cantidad ?? 0);
@@ -292,17 +300,6 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
     }))
     .sort((a, b) => (a.mes < b.mes ? -1 : 1));
 
-  const ultimosLotes = ((lotesRes.data ?? []) as { lote_id: string; articulo: string; fecha_compra: string; coste_unitario_compra: number; coste_repartido_unitario: number; coste_completo_unitario: number }[])
-    .slice(0, 8)
-    .map((l) => ({
-      lote: l.lote_id.slice(0, 8),
-      articulo: l.articulo,
-      fecha: l.fecha_compra,
-      costeCompra: Number(l.coste_unitario_compra),
-      costeRepartido: Number(l.coste_repartido_unitario),
-      costeCompleto: Number(l.coste_completo_unitario),
-    }));
-
   const margen = importeVendido - costeVenta;
   return {
     empresa,
@@ -324,6 +321,5 @@ export async function getMargen(codigoEmpresa: string, anio: number, filtros?: F
     erosionMedia,
     matrizMargenRotacion,
     mensual,
-    ultimosLotes,
   };
 }
