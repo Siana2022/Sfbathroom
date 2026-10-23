@@ -32,24 +32,32 @@ export type FilaStock = {
 };
 
 export function normalizarStock(rows: any[]): FilaStock[] {
-  const salida: FilaStock[] = [];
+  const porClave = new Map<string, FilaStock>();
   for (const r of rows) {
     const codigo = String(r.CODART ?? '').trim();
     if (!codigo) continue;
+    const almacen = String(r.CODALM ?? '').trim();
+    const lote = String(r.LOTE ?? '').trim();
+    const clave = `${almacen}|${codigo}|${lote}`;
     const fecha = r.FECCADUC ? new Date(r.FECCADUC) : null;
-    salida.push({
+    const actual = porClave.get(clave);
+    if (actual) {
+      actual.unidades += Number(r.UNIDADESSTOCK ?? 0);
+      continue;
+    }
+    porClave.set(clave, {
       codigo,
       nombre: String(r.NOMBRE ?? '').trim(),
-      almacen: String(r.CODALM ?? '').trim(),
+      almacen,
       almacenNombre: String(r.NOMALM ?? '').trim(),
-      lote: String(r.LOTE ?? '').trim(),
+      lote,
       unidades: Number(r.UNIDADESSTOCK ?? 0),
       costeMedio: r.PRCMEDIO == null ? null : Number(r.PRCMEDIO),
       fechaCaducidad: fecha && !Number.isNaN(fecha.getTime()) ? fecha.toISOString().slice(0, 10) : '',
       ubicacion: String(r.UBICACION ?? '').trim(),
     });
   }
-  return salida;
+  return [...porClave.values()];
 }
 
 export async function cargarStock(opts: { empresaCodigo: string; filas: FilaStock[] }) {
