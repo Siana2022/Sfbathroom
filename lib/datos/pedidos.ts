@@ -44,7 +44,7 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
   while (fetching) {
     const { data: filas, error } = await supabase
       .from('pedidos')
-      .select('id, numero_erp, serie, fecha, cliente_codigo, cliente_nombre, estado, situacion, base_imponible, total')
+      .select('id, numero_erp, serie, fecha, cliente_codigo, cliente_nombre, estado, situacion, base_imponible, total, motivo_anulacion, causa_anulacion, observaciones')
       .eq('empresa_id', empresa.id)
       .gte('fecha', `${anio}-01-01`)
       .lte('fecha', `${anio}-12-31`)
