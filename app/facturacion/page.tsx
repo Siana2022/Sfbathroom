@@ -167,8 +167,8 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
       <div className="card">
         <h2>Transporte facturado por cliente y mes · {transCli.anio}</h2>
         <p style={{ color: 'var(--muted)', maxWidth: 900 }}>
-          Importe de las líneas de factura de la familia TRANSPORTE, agrupado por cliente y mes. Interior, flete y
-          aduana se separan según el nombre del artículo facturado.
+          Importe de las líneas de factura de transporte (artículos ZZ TRANSP / ZZADTRANSPORTE), agrupado por
+          cliente y mes. Interior, flete y aduana se separan según el nombre del artículo facturado.
         </p>
         <TablaTransporteCliente titulo="Transporte interior" anio={transCli.anio} filas={transCli.interior.filas} total={transCli.interior.total} />
         <TablaTransporteCliente titulo="Flete" anio={transCli.anio} filas={transCli.flete.filas} total={transCli.flete.total} />

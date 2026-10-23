@@ -69,12 +69,11 @@ export async function getTransporteFacturadoPorCliente(
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
 
-  const articulos = await todasLasFilas<{ id: string; nombre: string; familia: string | null }>((desde) =>
+  const articulos = await todasLasFilas<{ id: string; codigo_erp: string; nombre: string; familia: string | null }>((desde) =>
     supabase
       .from('articulos')
-      .select('id, nombre, familia')
+      .select('id, codigo_erp, nombre, familia')
       .eq('empresa_id', empresa.id)
-      .eq('familia', 'TRANSPORTE')
       .range(desde, desde + TAMANO_PAGINA - 1),
   );
 
@@ -88,8 +87,12 @@ export async function getTransporteFacturadoPorCliente(
 
   const categoriaPorArticulo = new Map<string, 'interior' | 'flete' | 'aduana'>();
   for (const a of articulos) {
+    const codigo = (a.codigo_erp ?? '').toUpperCase();
     const nombre = a.nombre ?? '';
-    const categoria = RE_ADUANA.test(nombre) ? 'aduana' : RE_FLETE.test(nombre) ? 'flete' : 'interior';
+    const texto = `${codigo} ${nombre}`;
+    const esTransporte = codigo.startsWith('ZZ') && /TRANSP|ADUAN|FLETE|DUA/.test(texto.toUpperCase());
+    if (!esTransporte) continue;
+    const categoria = RE_ADUANA.test(texto) ? 'aduana' : RE_FLETE.test(texto) ? 'flete' : 'interior';
     categoriaPorArticulo.set(a.id, categoria);
   }
 
