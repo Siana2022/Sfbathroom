@@ -29,7 +29,11 @@
     "transporte:sf": "tsx --env-file=.env src/vuelo-transporte.ts --empresa SF",
     "transporte:fux": "tsx --env-file=.env src/vuelo-transporte.ts --empresa FUX",
     "transporte:dot": "tsx --env-file=.env src/vuelo-transporte.ts --empresa DOT",
-    "transporte:todos": "npm run transporte:sf && npm run transporte:fux && npm run transporte:dot"
+    "transporte:todos": "npm run transporte:sf && npm run transporte:fux && npm run transporte:dot",
+    "stock:sf": "tsx --env-file=.env src/vuelo-stock.ts --empresa SF",
+    "stock:fux": "tsx --env-file=.env src/vuelo-stock.ts --empresa FUX",
+    "stock:dot": "tsx --env-file=.env src/vuelo-stock.ts --empresa DOT",
+    "stock:todos": "npm run stock:sf && npm run stock:fux && npm run stock:dot"
   },
   "dependencies": {
     "mssql": "^11.0.1"

@@ -1,303 +1,157 @@
 import { cookies } from 'next/headers';
-import { getStock, DIAS_SEGURIDAD, PLAZO_REPOSICION_DIAS } from '@/lib/datos/stock';
-import { parseFiltros, getOpcionesFiltros, type SearchParams } from '@/lib/datos/filtros';
-import { decimal, eur, numero } from '@/lib/formato';
+import { getStockAlmacen } from '@/lib/datos/stockAlmacen';
+import { eur, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
-import Filtros from '@/components/Filtros';
-import Aviso from '@/components/Aviso';
+import type { SearchParams } from '@/lib/datos/filtros';
 
+const TAMANO_PAGINA_VISTA = 100;
+
+function valorParam(sp: SearchParams, clave: string): string {
+  const v = sp[clave];
+  return typeof v === 'string' ? v : '';
+}
 
 export default async function StockPage({ searchParams }: { searchParams: SearchParams }) {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
-  const filtros = parseFiltros(searchParams);
-  const opciones = await getOpcionesFiltros(empresa);
-  const d = await getStock(empresa, filtros);
+  const q = valorParam(searchParams, 'q');
+  const estado = valorParam(searchParams, 'estado');
+  const almacen = valorParam(searchParams, 'almacen');
+  const pagina = Math.max(1, Number(valorParam(searchParams, 'pagina') || '1') || 1);
+
+  const d = await getStockAlmacen(empresa, { q, estado, almacen });
+  const totalPaginas = Math.max(1, Math.ceil(d.filas.length / TAMANO_PAGINA_VISTA));
+  const paginaActual = Math.min(pagina, totalPaginas);
+  const inicio = (paginaActual - 1) * TAMANO_PAGINA_VISTA;
+  const visibles = d.filas.slice(inicio, inicio + TAMANO_PAGINA_VISTA);
+  const conFiltro = Boolean(q || d.filtros.estado !== 'todos' || almacen);
+
+  const enlacePagina = (n: number) => {
+    const p = new URLSearchParams();
+    if (q) p.set('q', q);
+    if (d.filtros.estado !== 'todos') p.set('estado', d.filtros.estado);
+    if (almacen) p.set('almacen', almacen);
+    if (n > 1) p.set('pagina', String(n));
+    const s = p.toString();
+    return s ? `/stock?${s}` : '/stock';
+  };
 
   return (
     <div>
       <p className="breadcrumb">Cuadro mando comercial · Bloque 4</p>
       <h1>Stock y cobertura</h1>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
-        Cobertura en días por artículo y almacén, stock disponible real, en tránsito, roturas y
-        referencias bajo el punto de pedido de {d.empresa.nombre}.
+        Existencias reales de {d.empresa.nombre} por artículo, almacén y lote (contenedor), extraídas de A3ERP.
       </p>
 
-      <Aviso tipo="demo">
-        El stock, las compras y los proveedores siguen siendo datos de demostración: la ingesta
-        de A3ERP aún no carga almacén. La cobertura y las roturas no reflejan el stock real.
-      </Aviso>
-
-      <Filtros opciones={opciones} />
-
       <ul className="grid-kpis">
-        <Kpi etiqueta="Valor de stock disponible" valor={eur(d.valorStock)} nota="a coste de artículo" />
-        <Kpi etiqueta="Valor en tránsito" valor={eur(d.valorTrasito)} nota="ya en compra, aún no llegado" />
-        <Kpi etiqueta="Cobertura media" valor={d.coberturaMedia > 0 ? `${decimal(d.coberturaMedia)} días` : '—'} nota="sobre consumo medio último 90 días" />
-        <Kpi etiqueta="Roturas" valor={numero(d.roturas)} nota="referencias sin stock disponible" />
-        <Kpi etiqueta="Bajo punto de pedido" valor={numero(d.bajoPuntoPedido)} nota="stock disponible inferior al punto" />
-        <Kpi etiqueta="Referencias a aprovisionar" valor={numero(d.aprovisionamiento.length)} nota="propuesta de compra con dato de consumo" />
-        <Kpi etiqueta="Rotación anual media" valor={d.rotacionMedia === null ? '—' : `${decimal(d.rotacionMedia)} veces`} nota="ventas 12 meses / stock disponible" />
-        <Kpi etiqueta="Fill rate" valor={d.fillRate === null ? '—' : `${decimal(d.fillRate)} %`} nota="líneas servidas frente a pedidas" />
-        <Kpi etiqueta="Venta perdida" valor={eur(d.ventaPerdida.reduce((a, v) => a + v.importe, 0))} nota="demanda no servida a precio de venta" />
-        <Kpi etiqueta="Stock muerto / inmovilizado" valor={eur(d.stockMuerto.reduce((a, s) => a + s.valor, 0))} nota="sin ventas en 90 días o cobertura > 365" />
+        <Kpi etiqueta="Referencias con stock" valor={numero(d.refsConStock)} nota={`de ${numero(d.referencias)} referencias`} />
+        <Kpi etiqueta="Referencias sin stock" valor={numero(d.refsSinStock)} nota="a cero en todos los almacenes" />
+        <Kpi etiqueta="Unidades en stock" valor={numero(d.unidades)} nota="suma de todos los almacenes y lotes" />
+        <Kpi etiqueta="Valor de stock" valor={eur(d.valor)} nota="a coste medio de A3ERP" />
       </ul>
 
       <div className="card">
-        <h2>Referencias bajo punto de pedido</h2>
-        {d.bajoPunto.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>Todas las referencias están por encima de su punto de pedido.</p>
-        ) : (
-          <table className="tabla">
-            <thead>
-              <tr>
-                <th>Artículo</th>
-                <th>Almacén</th>
-                <th className="td-num">Disponible</th>
-                <th className="td-num">Punto de pedido</th>
-                <th className="td-num">Cobertura</th>
-                <th className="td-num">En tránsito</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.bajoPunto.map((r) => (
-                <tr key={r.articulo + r.almacen}>
-                  <td>{r.articulo}</td>
-                  <td>{r.almacen}</td>
-                  <td className="td-num">{numero(r.disponible)}</td>
-                  <td className="td-num">{numero(r.punto)}</td>
-                  <td className="td-num">{r.cobertura === null ? '—' : `${decimal(r.cobertura)} días`}</td>
-                  <td className="td-num">{numero(r.transito)}</td>
-                </tr>
+        <h2>Existencias por artículo</h2>
+        <form method="get" action="/stock" style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'end', marginBottom: 16 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span>Buscar</span>
+            <input name="q" defaultValue={q} placeholder="Código, artículo, lote o almacén" style={{ minWidth: 260 }} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span>Stock</span>
+            <select name="estado" defaultValue={d.filtros.estado}>
+              <option value="todos">Todos</option>
+              <option value="con">Con stock</option>
+              <option value="sin">Sin stock</option>
+            </select>
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span>Almacén</span>
+            <select name="almacen" defaultValue={almacen}>
+              <option value="">Todos</option>
+              {d.almacenes.map((a) => (
+                <option key={a.codigo} value={a.codigo}>
+                  {a.codigo} · {a.nombre}
+                </option>
               ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+            </select>
+          </label>
+          <button type="submit">Filtrar</button>
+          {conFiltro && (
+            <a href="/stock" style={{ alignSelf: 'center' }}>
+              Limpiar
+            </a>
+          )}
+          <div style={{ marginLeft: 'auto' }}>
+            <DescargarExcel
+              nombre={`stock-${d.empresa.codigo.toLowerCase()}`}
+              columnas={['Artículo', 'Nombre', 'Almacén', 'Almacén nombre', 'Lote', 'Stock', 'Coste medio', 'Valor', 'Ubicación', 'Caducidad']}
+              registros={d.filas.map((f) => [
+                f.articulo_codigo,
+                f.articulo_nombre ?? '',
+                f.almacen_codigo,
+                f.almacen_nombre ?? '',
+                f.lote,
+                f.unidades,
+                f.coste_medio ?? '',
+                f.unidades * Number(f.coste_medio ?? 0),
+                f.ubicacion ?? '',
+                f.fecha_caducidad ?? '',
+              ])}
+            />
+          </div>
+        </form>
 
-      <div className="card">
-        <h2>Peor cobertura (días)</h2>
-        {d.peorCobertura.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>Sin datos de cobertura.</p>
-        ) : (
-          <table className="tabla">
-            <thead>
-              <tr>
-                <th>Artículo</th>
-                <th>Almacén</th>
-                <th className="td-num">Disponible</th>
-                <th className="td-num">Cobertura</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.peorCobertura.map((r) => (
-                <tr key={r.articulo + r.almacen}>
-                  <td>{r.articulo}</td>
-                  <td>{r.almacen}</td>
-                  <td className="td-num">{numero(r.disponible)}</td>
-                  <td className={`td-num ${r.cobertura !== null && r.cobertura < 20 ? 'td-pos' : ''}`}>{r.cobertura === null ? '—' : `${decimal(r.cobertura)} días`}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2>Propuesta de aprovisionamiento</h2>
-          <DescargarExcel
-            nombre={`stock-aprovisionamiento`}
-            columnas={['Artículo', 'Almacén', 'Consumo medio diario', 'Stock disponible', 'En tránsito', 'Propuesta de compra']}
-            registros={d.aprovisionamiento.map((r) => [r.articulo, r.almacen, r.mediaDiaria, r.disponible, r.transito, r.propuesta])}
-          />
-        </div>
-        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
-          Cantidad sugerida para cubrir el plazo de reposición de {PLAZO_REPOSICION_DIAS} días
-          más {DIAS_SEGURIDAD} días de seguridad, descontando stock disponible y en tránsito.
-          Umbrales orientativos hasta que dirección los fije.
+        <p style={{ color: 'var(--muted)' }}>
+          {numero(d.totalFilas)} líneas · mostrando {visibles.length === 0 ? 0 : inicio + 1}–{inicio + visibles.length}
         </p>
-        {d.aprovisionamiento.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>Ninguna referencia con consumo requiere reposición.</p>
-        ) : (
-          <table className="tabla">
-            <thead>
-              <tr>
-                <th>Artículo</th>
-                <th>Almacén</th>
-                <th className="td-num">Consumo medio diario</th>
-                <th className="td-num">Stock disponible</th>
-                <th className="td-num">En tránsito</th>
-                <th className="td-num">Propuesta de compra</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.aprovisionamiento.map((r) => (
-                <tr key={r.articulo + r.almacen}>
-                  <td>{r.articulo}</td>
-                  <td>{r.almacen}</td>
-                  <td className="td-num">{numero(r.mediaDiaria)}</td>
-                  <td className="td-num">{numero(r.disponible)}</td>
-                  <td className="td-num">{numero(r.transito)}</td>
-                  <td className="td-num">{numero(r.propuesta)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    <div className="card">
-        <h2>Rotación por referencia</h2>
-        {d.rotacionTop.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>Sin referencias con ventas y stock suficiente para calcular rotación.</p>
-        ) : (
-          <table className="tabla">
-            <thead>
-              <tr>
-                <th>Artículo</th>
-                <th className="td-num">Unidades vendidas (12M)</th>
-                <th className="td-num">Stock disponible</th>
-                <th className="td-num">Rotación anual</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.rotacionTop.map((r) => (
-                <tr key={r.articulo}>
-                  <td>{r.articulo}</td>
-                  <td className="td-num">{numero(r.unidadesVendidas)}</td>
-                  <td className="td-num">{numero(r.stockMedio)}</td>
-                  <td className="td-num">{decimal(r.rotacion)} veces</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
 
-      <div className="card">
-        <h2>Venta perdida por rotura</h2>
-        {d.ventaPerdida.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>Sin demanda servida por debajo de lo pedido.</p>
+        {visibles.length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>No hay existencias que cumplan el filtro.</p>
         ) : (
-          <table className="tabla">
-            <thead>
-              <tr>
-                <th>Artículo</th>
-                <th className="td-num">Unidades no servidas</th>
-                <th className="td-num">Importe perdido</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.ventaPerdida.map((v) => (
-                <tr key={v.articulo}>
-                  <td>{v.articulo}</td>
-                  <td className="td-num">{numero(v.unidades)}</td>
-                  <td className={`td-num ${v.importe > 0 ? 'td-pos' : ''}`}>{eur(v.importe)}</td>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="tabla">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Artículo</th>
+                  <th>Almacén</th>
+                  <th>Lote</th>
+                  <th className="td-num">Stock</th>
+                  <th className="td-num">Coste medio</th>
+                  <th className="td-num">Valor</th>
+                  <th>Ubicación</th>
+                  <th>Caducidad</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {visibles.map((f) => (
+                  <tr key={`${f.articulo_codigo}|${f.almacen_codigo}|${f.lote}`}>
+                    <td>{f.articulo_codigo}</td>
+                    <td>{f.articulo_nombre ?? '—'}</td>
+                    <td>{f.almacen_codigo}{f.almacen_nombre ? ` · ${f.almacen_nombre}` : ''}</td>
+                    <td>{f.lote || '—'}</td>
+                    <td className="td-num">{numero(f.unidades)}</td>
+                    <td className="td-num">{f.coste_medio === null ? '—' : eur(f.coste_medio)}</td>
+                    <td className="td-num">{eur(f.unidades * Number(f.coste_medio ?? 0))}</td>
+                    <td>{f.ubicacion || '—'}</td>
+                    <td>{f.fecha_caducidad || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-      </div>
 
-      <div className="card">
-        <h2>Stock muerto y baja rotación</h2>
-        {d.stockMuerto.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>Sin referencias sin consumo destacado.</p>
-        ) : (
-          <table className="tabla">
-            <thead>
-              <tr>
-                <th>Artículo</th>
-                <th>Almacén</th>
-                <th className="td-num">Unidades</th>
-                <th className="td-num">Valor inmovilizado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.stockMuerto.map((s) => (
-                <tr key={s.articulo + s.almacen}>
-                  <td>{s.articulo}</td>
-                  <td>{s.almacen}</td>
-                  <td className="td-num">{numero(s.disponible)}</td>
-                  <td className={`td-num ${s.valor > 0 ? 'td-pos' : ''}`}>{eur(s.valor)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      <div className="card">
-        <h2>Riesgo de cobertura frente a cartera de pedidos</h2>
-        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
-          Cruce entre el stock disponible y lo que los pedidos abiertos demandan aún por servir.
-          Marca riesgo cuando la cartera pendiente supera el stock disponible del artículo.
-        </p>
-        {d.cruceCoberturaCartera.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>Sin cartera pendiente que cruzar.</p>
-        ) : (
-          <table className="tabla">
-            <thead>
-              <tr>
-                <th>Artículo</th>
-                <th className="td-num">Stock disponible</th>
-                <th className="td-num">Cobertura (días)</th>
-                <th className="td-num">Cartera pendiente</th>
-                <th className="td-num">Riesgo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.cruceCoberturaCartera.map((c) => (
-                <tr key={c.articulo}>
-                  <td>{c.articulo}</td>
-                  <td className="td-num">{numero(c.disponible)}</td>
-                  <td className="td-num">{c.cubiertoDias === null ? '—' : `${decimal(c.cubiertoDias)} días`}</td>
-                  <td className="td-num">{numero(c.carteraPendiente)}</td>
-                  <td className={`td-num ${c.riesgo ? 'td-pos' : ''}`}>{c.riesgo ? 'No cubre cartera' : 'Cubre cartera'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      <div className="card">
-        <h2>Predicción de rotura de stock</h2>
-        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
-          Artículos cuya cobertura (días de stock al consumo medio) es menor o igual que el
-          plazo de entrega del proveedor: probablemente se agote antes de que llegue la
-          reposición. No incluye tránsito.
-        </p>
-        {d.prediccionRotura.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>Sin artículos en riesgo: cubren el plazo de su proveedor.</p>
-        ) : (
-          <table className="tabla">
-            <thead>
-              <tr>
-                <th>Artículo</th>
-                <th>Almacén</th>
-                <th className="td-num">Stock</th>
-                <th className="td-num">Cobertura (días)</th>
-                <th className="td-num">Plazo proveedor</th>
-                <th>Proveedor</th>
-                <th>Rotura prevista</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.prediccionRotura.map((r, i) => (
-                <tr key={`${r.articulo}-${r.almacen}-${i}`}>
-                  <td>{r.articulo}</td>
-                  <td>{r.almacen}</td>
-                  <td className="td-num">{numero(r.disponible)}</td>
-                  <td className="td-num td-pos">{r.coberturaDias}</td>
-                  <td className="td-num">{r.plazoProveedor}</td>
-                  <td>{r.proveedor ?? '—'}</td>
-                  <td>{r.fechaEstimada}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {totalPaginas > 1 && (
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 16 }}>
+            {paginaActual > 1 ? <a href={enlacePagina(paginaActual - 1)}>← Anterior</a> : <span />}
+            <span>
+              Página {paginaActual} de {totalPaginas}
+            </span>
+            {paginaActual < totalPaginas ? <a href={enlacePagina(paginaActual + 1)}>Siguiente →</a> : <span />}
+          </div>
         )}
       </div>
     </div>
