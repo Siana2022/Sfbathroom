@@ -87,6 +87,7 @@ export const bloques: Bloque[] = [
 ];
 
 export const otrosModulos = [
+  { slug: '/rentabilidad-clientes', titulo: 'Rentabilidad por cliente' },
   { slug: '/kpis', titulo: 'KPIs personalizados' },
   { slug: '/marketing', titulo: 'Marketing (MMM)' },
   { slug: '/financiero', titulo: 'Financiero' },
