@@ -132,7 +132,7 @@ export type ColumnaOrden =
   | 'diasSinPedir'
   | 'pedidosPeriodo'
   | 'importePeriodo'
-  | 'contactos'
+  | 'contactoHabitual'
   | 'estado';
 
 export const COLUMNAS_ORDEN: ColumnaOrden[] = [
@@ -142,7 +142,7 @@ export const COLUMNAS_ORDEN: ColumnaOrden[] = [
   'diasSinPedir',
   'pedidosPeriodo',
   'importePeriodo',
-  'contactos',
+  'contactoHabitual',
   'estado',
 ];
 
@@ -156,7 +156,7 @@ export type FilaOrdenable = FilaFiltrable & {
   diasSinPedir: number | null;
   pedidosPeriodo: number;
   importePeriodo: number;
-  contactos: number;
+  contactoHabitual: string | null;
   estadoCrm: EstadoCrm | null;
 };
 
@@ -233,8 +233,8 @@ export function ordenarCartera<T extends FilaOrdenable>(filas: T[], orden: Orden
         return comparar(a.pedidosPeriodo, b.pedidosPeriodo, direccion);
       case 'importePeriodo':
         return comparar(a.importePeriodo, b.importePeriodo, direccion);
-      case 'contactos':
-        return comparar(a.contactos, b.contactos, direccion);
+      case 'contactoHabitual':
+        return texto(a.contactoHabitual, b.contactoHabitual, direccion);
       case 'estado': {
         const ia = a.estadoCrm === null ? null : ORDEN_ESTADO[a.estadoCrm] ?? 99;
         const ib = b.estadoCrm === null ? null : ORDEN_ESTADO[b.estadoCrm] ?? 99;

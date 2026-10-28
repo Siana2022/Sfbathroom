@@ -25,7 +25,7 @@ const f = (nombre: string, vencido: boolean, ratio: number | null): FilaPanel =>
   vencido,
   pedidosPeriodo: 0,
   importePeriodo: 0,
-  contactos: 0,
+  contactoHabitual: null,
   ultimaInteraccion: null,
   estadoComercial: null,
   estadoCrm: null,

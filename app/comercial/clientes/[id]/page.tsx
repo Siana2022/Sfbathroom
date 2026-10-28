@@ -67,7 +67,13 @@ export default async function FichaComercialPage({ params }: { params: { id: str
         <Kpi etiqueta="Interacciones" valor={numero(d.interacciones.length)} />
       </ul>
 
-      <ListaContactos clienteId={d.cliente.id} empresaCodigo={empresa} contactos={d.contactos} />
+      <ListaContactos
+        clienteId={d.cliente.id}
+        empresaCodigo={empresa}
+        contactos={d.contactos}
+        contactoHabitualId={d.cliente.contactoHabitualId}
+        editable={contexto.puedeEscribir}
+      />
 
       <ListaHitos
         clienteId={d.cliente.id}

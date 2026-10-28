@@ -62,6 +62,7 @@ type FilaCliente = {
   fecha_primer_pedido: string | null;
   estado_crm: string | null;
   motivo_perdida: string | null;
+  contacto_habitual_id: string | null;
 };
 
 /**
@@ -88,15 +89,15 @@ export async function getPanelComercial(
       todasLasFilas<FilaCliente>((desde) => {
         let q = supabase
           .from('clientes')
-          .select('id, nombre, provincia, pais_facturacion, fecha_primer_pedido, estado_crm, motivo_perdida, comercial_id')
+          .select('id, nombre, provincia, pais_facturacion, fecha_primer_pedido, estado_crm, motivo_perdida, comercial_id, contacto_habitual_id')
           .eq('empresa_id', empresa.id);
         if (filtroComercial) q = q.eq('comercial_id', filtroComercial);
         return q.range(desde, desde + TAMANO_PAGINA - 1);
       }),
-      todasLasFilas<{ cliente_id: string }>((desde) =>
+      todasLasFilas<{ id: string; cliente_id: string; nombre: string; apellidos: string | null }>((desde) =>
         supabase
           .from('contactos')
-          .select('cliente_id')
+          .select('id, cliente_id, nombre, apellidos')
           .eq('empresa_id', empresa.id)
           .eq('activo', true)
           .range(desde, desde + TAMANO_PAGINA - 1),
@@ -191,8 +192,13 @@ export async function getPanelComercial(
   }
 
   // --- Índices por cliente ---
-  const contactosPorCliente = new Map<string, number>();
-  for (const c of contactos) contactosPorCliente.set(c.cliente_id, (contactosPorCliente.get(c.cliente_id) ?? 0) + 1);
+  // Solo interesa la persona marcada como habitual en la ficha, asi que se
+  // indexa por id y se busca al construir la fila.
+  const contactoPorId = new Map(contactos.map((c) => [c.id, c]));
+  const nombreContacto = (id: string | null): string | null => {
+    const c = id ? contactoPorId.get(id) : null;
+    return c ? [c.nombre, c.apellidos].filter(Boolean).join(' ') : null;
+  };
 
   const interaccionPorCliente = new Map<string, { n: number; ultima: string }>();
   for (const i of interacciones) {
@@ -274,7 +280,7 @@ export async function getPanelComercial(
       vencido: cad.vencido,
       pedidosPeriodo: per?.n ?? 0,
       importePeriodo: per?.importe ?? 0,
-      contactos: contactosPorCliente.get(c.id) ?? 0,
+      contactoHabitual: nombreContacto(c.contacto_habitual_id),
       ultimaInteraccion: inter?.ultima ?? null,
       estadoComercial,
       estadoCrm: (c.estado_crm as FilaPanel['estadoCrm']) ?? null,

@@ -36,15 +36,15 @@ function fila(
     diasSinPedir: 10,
     pedidosPeriodo: 1,
     importePeriodo: 1000,
-    contactos: 1,
+    contactoHabitual: 'Ana Pérez',
     ...opts,
   };
 }
 
 const muestra: FilaOrdenable[] = [
-  fila('Zeta Baños', { provincia: 'Madrid', cadenciaDias: 60, diasSinPedir: 90, pedidosPeriodo: 2, importePeriodo: 500, contactos: 3, estadoCrm: 'perdido' }),
-  fila('Alfa Sanitarios', { provincia: null, cadenciaDias: 15, diasSinPedir: 5, pedidosPeriodo: 9, importePeriodo: 9000, contactos: 1, estadoCrm: 'nuevo' }),
-  fila('Media Grifos', { provincia: 'Barcelona', cadenciaDias: 30, diasSinPedir: null, pedidosPeriodo: 0, importePeriodo: 0, contactos: 0, estadoCrm: null }),
+  fila('Zeta Baños', { provincia: 'Madrid', cadenciaDias: 60, diasSinPedir: 90, pedidosPeriodo: 2, importePeriodo: 500, contactoHabitual: 'Zoe Ruiz', estadoCrm: 'perdido' }),
+  fila('Alfa Sanitarios', { provincia: null, cadenciaDias: 15, diasSinPedir: 5, pedidosPeriodo: 9, importePeriodo: 9000, contactoHabitual: 'Ana Pérez', estadoCrm: 'nuevo' }),
+  fila('Media Grifos', { provincia: 'Barcelona', cadenciaDias: 30, diasSinPedir: null, pedidosPeriodo: 0, importePeriodo: 0, contactoHabitual: null, estadoCrm: null }),
 ];
 
 const nombres = (filas: FilaOrdenable[]) => filas.map((f) => f.cliente).join(', ');
@@ -79,7 +79,8 @@ comprobar('sin pedidos sigue al final en asc', ordenarCartera(muestra, { columna
 comprobar('por cadencia asc', ordenarCartera(muestra, { columna: 'cadencia', direccion: 'asc' })[0].cliente === 'Alfa Sanitarios');
 comprobar('por pedidos desc', ordenarCartera(muestra, { columna: 'pedidosPeriodo', direccion: 'desc' })[0].cliente === 'Alfa Sanitarios');
 comprobar('por importe desc', ordenarCartera(muestra, { columna: 'importePeriodo', direccion: 'desc' })[0].importePeriodo === 9000);
-comprobar('por contactos desc', ordenarCartera(muestra, { columna: 'contactos', direccion: 'desc' })[0].contactos === 3);
+comprobar('por contacto habitual A→Z', ordenarCartera(muestra, { columna: 'contactoHabitual', direccion: 'asc' })[0].contactoHabitual === 'Ana Pérez');
+comprobar('sin persona habitual al final', ordenarCartera(muestra, { columna: 'contactoHabitual', direccion: 'asc' })[2].contactoHabitual === null);
 
 // Estado sigue el orden del desplegable: habitual, nuevo, seguimiento, ganado, perdido.
 const porEstado = ordenarCartera(muestra, { columna: 'estado', direccion: 'asc' });

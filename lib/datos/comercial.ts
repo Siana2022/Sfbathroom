@@ -336,6 +336,7 @@ export type FichaComercial = {
     email: string | null;
     estadoCrm: EstadoCrm | null;
     motivoPerdida: string | null;
+    contactoHabitualId: string | null;
   };
   contactos: Contacto[];
   interacciones: Interaccion[];
@@ -351,7 +352,7 @@ export async function getFichaComercial(codigoEmpresa: string, clienteId: string
 
   const { data: cli } = await supabase
     .from('clientes')
-    .select('id, nombre, codigo_erp, provincia, pais_facturacion, comercial_id, telefono, email, estado_crm, motivo_perdida')
+    .select('id, nombre, codigo_erp, provincia, pais_facturacion, comercial_id, telefono, email, estado_crm, motivo_perdida, contacto_habitual_id')
     .eq('id', clienteId)
     .eq('empresa_id', empresa.id)
     .maybeSingle();
@@ -368,6 +369,7 @@ export async function getFichaComercial(codigoEmpresa: string, clienteId: string
     email: string | null;
     estado_crm: string | null;
     motivo_perdida: string | null;
+    contacto_habitual_id: string | null;
   };
 
   const [contactos, interacciones, pedidos, hitosRes] = await Promise.all([
@@ -448,6 +450,7 @@ export async function getFichaComercial(codigoEmpresa: string, clienteId: string
       telefono: c.telefono,
       email: c.email,
       estadoCrm: (c.estado_crm as EstadoCrm | null) ?? null,
+      contactoHabitualId: c.contacto_habitual_id,
       motivoPerdida: c.motivo_perdida,
     },
     contactos,

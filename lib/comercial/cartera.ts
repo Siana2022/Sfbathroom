@@ -22,7 +22,8 @@ export type FilaPanel = {
   vencido: boolean;
   pedidosPeriodo: number;
   importePeriodo: number;
-  contactos: number;
+  /** Persona habitual de contacto, si el cliente la tiene marcada en su ficha. */
+  contactoHabitual: string | null;
   ultimaInteraccion: string | null;
   /** 'ganado' si su primer pedido cae en el periodo; 'perdido' si dejó de pedir. */
   estadoComercial: 'ganado' | 'perdido' | null;

@@ -187,7 +187,7 @@ export default async function ComercialPage({ searchParams }: { searchParams: Se
                     <CabeceraOrdenable columna="diasSinPedir" numerica>Días sin pedir</CabeceraOrdenable>
                     <CabeceraOrdenable columna="pedidosPeriodo" numerica>Pedidos periodo</CabeceraOrdenable>
                     <CabeceraOrdenable columna="importePeriodo" numerica>Importe periodo</CabeceraOrdenable>
-                    <CabeceraOrdenable columna="contactos" numerica>Contactos</CabeceraOrdenable>
+                    <CabeceraOrdenable columna="contactoHabitual">Contacto habitual</CabeceraOrdenable>
                     <CabeceraOrdenable columna="estado">Estado</CabeceraOrdenable>
                     <th />
                   </tr>
@@ -207,7 +207,7 @@ export default async function ComercialPage({ searchParams }: { searchParams: Se
                       </td>
                       <td className="td-num">{f.pedidosPeriodo === 0 ? '—' : numero(f.pedidosPeriodo)}</td>
                       <td className="td-num">{f.importePeriodo === 0 ? '—' : eur(f.importePeriodo)}</td>
-                      <td className="td-num">{f.contactos === 0 ? '—' : numero(f.contactos)}</td>
+                      <td>{f.contactoHabitual ?? <span style={{ color: 'var(--muted)' }}>sin asignar</span>}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                           <Distintivo fila={f} />
