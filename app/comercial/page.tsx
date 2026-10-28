@@ -183,7 +183,7 @@ export default async function ComercialPage({ searchParams }: { searchParams: Se
                   <tr>
                     <CabeceraOrdenable columna="cliente">Cliente</CabeceraOrdenable>
                     <CabeceraOrdenable columna="provincia">Provincia</CabeceraOrdenable>
-                    <CabeceraOrdenable columna="cadencia">Cadencia</CabeceraOrdenable>
+                    <CabeceraOrdenable columna="cadencia">Días entre pedidos</CabeceraOrdenable>
                     <CabeceraOrdenable columna="diasSinPedir" numerica>Días sin pedir</CabeceraOrdenable>
                     <CabeceraOrdenable columna="pedidosPeriodo" numerica>Pedidos periodo</CabeceraOrdenable>
                     <CabeceraOrdenable columna="importePeriodo" numerica>Importe periodo</CabeceraOrdenable>

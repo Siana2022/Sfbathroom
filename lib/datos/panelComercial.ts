@@ -268,7 +268,7 @@ export async function getPanelComercial(
       provincia: normalizarProvincia(c.provincia),
       pais: c.pais_facturacion,
       cadenciaDias: cad.dias,
-      cadenciaTexto: cad.dias === null ? (cad.pedidos === 1 ? '1 pedido' : 'sin histórico') : `cada ~${Math.round(cad.dias)} d`,
+      cadenciaTexto: cad.dias === null ? (cad.pedidos === 1 ? '1 pedido' : 'sin histórico') : `${Math.round(cad.dias)} d`,
       diasSinPedir: cad.diasSinPedir,
       ratio: cad.ratio,
       vencido: cad.vencido,
