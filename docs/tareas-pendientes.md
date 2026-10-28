@@ -247,9 +247,22 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
 - [ ] **Roles `lectura`, `financiero`, `administracion` y `almacen` no pueden escribir** el
       estado CRM ni la persona habitual (por coherencia con `contactos`, `reuniones` y
       `hitos`). Decidir si alguno debe poder.
-- [ ] **La cartera es por empresa** (cookie `sfb_empresa`, por defecto `SF`) y un usuario
-      tiene **una sola** cartera (`profiles.comercial_id`). Si alguien lleva dos, hoy no se
-      puede.
+- [x] **Un comercial puede llevar varias carteras** (migración `0044` +
+      `docs/asignar-carteras-comercial.sql`). Necesario porque en A3ERP la misma persona es
+      un comercial distinto en cada empresa: Carlos Tarazona son 9 carteras y 1.922 clientes
+      (SF 718, DOT 496, FUX 708). Verificado con él en las tres empresas.
+- [ ] **SEGURIDAD · `profiles_self_update_datos` (0004) deja a cualquier usuario cambiar su
+      `comercial_id`.** La política es `using (id = auth.uid()) with check (id = auth.uid()
+      and role = auth_role())`: bloquea el cambio de `rol` (la escalada que se cerró en 0004)
+      pero NO el de `comercial_id`, y `auth_comercial_id()`/`auth_comercial_ids()` leen esa
+      columna. Efecto: un autenticado cualquiera puede ponerse la cartera de otro con un
+      `update` desde el navegador y ver sus clientes, facturas y pedidos. Con 0044 hay dos
+      sitios donde asignar cartera, así que importa más. Arreglo pendiente de decidir: el
+      camino natural es un `with check` que congele `comercial_id` salvo para admin (que ya
+      tiene `profiles_admin_update`) o que solo permita tocar `full_name`. No aplicado.
+- [ ] **La cartera es por empresa** (cookie `sfb_empresa`, por defecto `SF`): no hay vista
+      consolidada de las tres, se cambia de empresa con el selector. Si Carlos quiere un
+      total de sus 1.922 clientes de una vez, es trabajo aparte.
 - [ ] **Datos a revisar con el cliente:** en `comerciales` hay agrupaciones que no son
       personas (`PARTICULARES` 139 clientes en SF, `PROVEEDORES`, `BIGMAT`, `MARKETPLACES`,
       `CONTRACT`, y `SF 77 "77"`). Si se enlaza un usuario con una de ellas, su "cartera"
