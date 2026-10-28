@@ -4,6 +4,7 @@ import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 import { calcularCadencia, type Cadencia } from '@/lib/comercial/cadencia';
 import { normalizarRango, rangoAnterior, rangoPorDefecto, hoyISO, type RangoFechas } from '@/lib/comercial/periodos';
 import { ordenarPorUrgencia, type FilaPanel } from '@/lib/comercial/cartera';
+import { normalizarProvincia } from '@/lib/comercial/provincias';
 import { ventanaAgenda } from '@/lib/comercial/agenda';
 import type { EstadoCrm, Hito, HitoConAutor, ReunionConContexto } from '@/lib/comercial/tipos';
 
@@ -146,6 +147,7 @@ export async function getPanelComercial(
         id: string;
         cliente_id: string;
         contacto_id: string | null;
+        contacto_nombre: string | null;
         comercial_id: string | null;
         usuario_id: string | null;
         fecha_hora: string;
@@ -161,7 +163,7 @@ export async function getPanelComercial(
         supabase
           .from('reuniones')
           .select(
-            'id, cliente_id, contacto_id, comercial_id, usuario_id, fecha_hora, duracion_min, asunto, modalidad, modalidad_otro, estado, notas, interaccion_id, created_at',
+            'id, cliente_id, contacto_id, contacto_nombre, comercial_id, usuario_id, fecha_hora, duracion_min, asunto, modalidad, modalidad_otro, estado, notas, interaccion_id, created_at',
           )
           .eq('empresa_id', empresa.id)
           // Ventana acotada: todo el futuro más los últimos meses. Sin esto el
@@ -263,7 +265,7 @@ export async function getPanelComercial(
     return {
       cliente_id: c.id,
       cliente: c.nombre,
-      provincia: c.provincia,
+      provincia: normalizarProvincia(c.provincia),
       pais: c.pais_facturacion,
       cadenciaDias: cad.dias,
       cadenciaTexto: cad.dias === null ? (cad.pedidos === 1 ? '1 pedido' : 'sin histórico') : `cada ~${Math.round(cad.dias)} d`,
@@ -304,6 +306,7 @@ export async function getPanelComercial(
     id: r.id,
     cliente_id: r.cliente_id,
     contacto_id: r.contacto_id,
+    contacto_nombre: r.contacto_nombre ?? null,
     comercial_id: r.comercial_id,
     usuario_id: r.usuario_id,
     fecha_hora: r.fecha_hora,
@@ -316,7 +319,9 @@ export async function getPanelComercial(
     interaccion_id: r.interaccion_id,
     created_at: r.created_at,
     cliente: nombreCliente.get(r.cliente_id) ?? '—',
-    contacto: r.contacto_id ? contactoNombre.get(r.contacto_id) ?? null : null,
+    // El contacto dado de alta manda; si no lo hay, se enseña el nombre escrito
+    // a mano al agendar.
+    contacto: (r.contacto_id ? contactoNombre.get(r.contacto_id) ?? null : null) ?? r.contacto_nombre ?? null,
     comercial: r.comercial_id ? comercialNombre.get(r.comercial_id) ?? null : null,
   }));
 
@@ -362,7 +367,7 @@ export async function getReunionesCliente(codigoEmpresa: string, clienteId: stri
     supabase
       .from('reuniones')
       .select(
-        'id, cliente_id, contacto_id, comercial_id, usuario_id, fecha_hora, duracion_min, asunto, modalidad, modalidad_otro, estado, notas, interaccion_id, created_at',
+        'id, cliente_id, contacto_id, contacto_nombre, comercial_id, usuario_id, fecha_hora, duracion_min, asunto, modalidad, modalidad_otro, estado, notas, interaccion_id, created_at',
       )
       .eq('empresa_id', empresa.id)
       .eq('cliente_id', clienteId)
@@ -383,7 +388,7 @@ export async function getReunionesCliente(codigoEmpresa: string, clienteId: stri
   return ((data ?? []) as ReunionConContexto[]).map((r) => ({
     ...r,
     cliente: nombreCliente,
-    contacto: r.contacto_id ? nombreContacto.get(r.contacto_id) ?? null : null,
+    contacto: (r.contacto_id ? nombreContacto.get(r.contacto_id) ?? null : null) ?? r.contacto_nombre ?? null,
     comercial: null,
   }));
 }
@@ -442,7 +447,7 @@ export async function getSeguimiento(codigoEmpresa: string, desdeISO: string): P
   const { data } = await supabase
     .from('reuniones')
     .select(
-      'id, cliente_id, contacto_id, comercial_id, usuario_id, fecha_hora, duracion_min, asunto, modalidad, modalidad_otro, estado, notas, interaccion_id, created_at',
+      'id, cliente_id, contacto_id, contacto_nombre, comercial_id, usuario_id, fecha_hora, duracion_min, asunto, modalidad, modalidad_otro, estado, notas, interaccion_id, created_at',
     )
     .eq('empresa_id', empresa.id)
     .neq('estado', 'programada')

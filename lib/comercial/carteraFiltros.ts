@@ -1,13 +1,13 @@
 /**
- * Filtrado y paginación de la cartera. Puro, sin React ni Supabase.
+ * Filtrado, orden y paginación de la cartera. Puro, sin React ni Supabase.
  *
  * El listado de cartera del panel comercial crece con la cartera real (una
  * cartera mediana son cientos de clientes), así que necesita filtrar por
- * territorio y cliente y paginar. Se hace aquí, no en el componente, para
- * poder testear los bordes: página fuera de rango, filtros que no dejan nada,
- * provincia ausente.
+ * territorio y cliente, ordenar por cualquier columna y paginar. Se hace aquí,
+ * no en el componente, para poder testear los bordes: página fuera de rango,
+ * filtros que no dejan nada, provincia ausente, columnas con huecos.
  */
-import type { EstadoCrm } from './tipos';
+import { ESTADOS_CRM, type EstadoCrm } from './tipos';
 
 export const POR_PAGINA = 50;
 
@@ -120,4 +120,126 @@ export function opcionesDe<T extends FilaFiltrable>(
   return [...cuenta.entries()]
     .map(([valor, n]) => ({ valor, n }))
     .sort((a, b) => b.n - a.n || a.valor.localeCompare(b.valor, 'es'));
+}
+
+// ---------------- Orden por columnas ----------------
+
+/** Columnas por las que se puede ordenar la cartera. */
+export type ColumnaOrden =
+  | 'cliente'
+  | 'provincia'
+  | 'cadencia'
+  | 'diasSinPedir'
+  | 'pedidosPeriodo'
+  | 'importePeriodo'
+  | 'contactos'
+  | 'estado';
+
+export const COLUMNAS_ORDEN: ColumnaOrden[] = [
+  'cliente',
+  'provincia',
+  'cadencia',
+  'diasSinPedir',
+  'pedidosPeriodo',
+  'importePeriodo',
+  'contactos',
+  'estado',
+];
+
+export type Direccion = 'asc' | 'desc';
+
+export type Orden = { columna: ColumnaOrden; direccion: Direccion };
+
+/** Campos que hacen falta para ordenar. Los mismos que pinta la tabla. */
+export type FilaOrdenable = FilaFiltrable & {
+  cadenciaDias: number | null;
+  diasSinPedir: number | null;
+  pedidosPeriodo: number;
+  importePeriodo: number;
+  contactos: number;
+  estadoCrm: EstadoCrm | null;
+};
+
+/** Posición canónica de cada estado, para que el orden sea el del desplegable. */
+const ORDEN_ESTADO: Record<string, number> = Object.fromEntries(
+  ESTADOS_CRM.map((e, i) => [e.valor, i]),
+);
+
+/**
+ * Lee el orden de la URL. Una columna desconocida cae al orden por defecto en
+ * lugar de romper: los enlaces viejos siguen funcionando.
+ */
+export function normalizarOrden(
+  columna: string | string[] | undefined,
+  direccion: string | string[] | undefined,
+): Orden | null {
+  const c = limpiarFiltro(columna);
+  if (!c || !COLUMNAS_ORDEN.includes(c as ColumnaOrden)) return null;
+  const d = limpiarFiltro(direccion);
+  // Si no se dice dirección, un texto empieza de A a Z y un número de mayor a
+  // menor: es lo que uno espera al pinchar una columna por primera vez.
+  const porDefecto: Direccion = c === 'cliente' || c === 'provincia' || c === 'estado' ? 'asc' : 'desc';
+  return { columna: c as ColumnaOrden, direccion: d === 'asc' || d === 'desc' ? d : porDefecto };
+}
+
+/**
+ * Dirección que toca al pinchar una cabecera: si ya se ordena por esa columna,
+ * se invierte; si no, se estrena con la dirección natural de esa columna.
+ */
+export function alternarOrden(actual: Orden | null, columna: ColumnaOrden): Orden {
+  if (actual?.columna === columna) {
+    return { columna, direccion: actual.direccion === 'asc' ? 'desc' : 'asc' };
+  }
+  const natural: Direccion = columna === 'cliente' || columna === 'provincia' || columna === 'estado' ? 'asc' : 'desc';
+  return { columna, direccion: natural };
+}
+
+/** Compara dos valores que pueden faltar. Los huecos van siempre al final. */
+function comparar(a: number | null, b: number | null, dir: Direccion): number {
+  if (a === null && b === null) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  return dir === 'asc' ? a - b : b - a;
+}
+
+function texto(a: string | null, b: string | null, dir: Direccion): number {
+  // Un cliente sin provincia no es "menor que" los demás: se va al final para
+  // no encabezar la lista con huecos.
+  if (a === null && b === null) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  const r = a.localeCompare(b, 'es', { sensitivity: 'base' });
+  return dir === 'asc' ? r : -r;
+}
+
+/**
+ * Ordena por la columna pedida. Es un `sort` estable: a igualdad de valor se
+ * mantiene el orden de entrada (el de urgencia), así que dos filas empatadas no
+ * bailan entre recargas. Los nulos van al final en ambas direcciones.
+ */
+export function ordenarCartera<T extends FilaOrdenable>(filas: T[], orden: Orden): T[] {
+  const { columna, direccion } = orden;
+  return [...filas].sort((a, b) => {
+    switch (columna) {
+      case 'cliente':
+        return texto(a.cliente, b.cliente, direccion);
+      case 'provincia':
+        return texto(a.provincia, b.provincia, direccion);
+      case 'cadencia':
+        return comparar(a.cadenciaDias, b.cadenciaDias, direccion);
+      case 'diasSinPedir':
+        return comparar(a.diasSinPedir, b.diasSinPedir, direccion);
+      case 'pedidosPeriodo':
+        return comparar(a.pedidosPeriodo, b.pedidosPeriodo, direccion);
+      case 'importePeriodo':
+        return comparar(a.importePeriodo, b.importePeriodo, direccion);
+      case 'contactos':
+        return comparar(a.contactos, b.contactos, direccion);
+      case 'estado': {
+        const ia = a.estadoCrm === null ? null : ORDEN_ESTADO[a.estadoCrm] ?? 99;
+        const ib = b.estadoCrm === null ? null : ORDEN_ESTADO[b.estadoCrm] ?? 99;
+        return comparar(ia, ib, direccion);
+      }
+    }
+  });
 }

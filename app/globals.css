@@ -707,6 +707,26 @@ table.tabla .td-num { text-align: right; font-variant-numeric: tabular-nums; whi
 
 table.tabla .td-pos { color: var(--verde); }
 
+/* Cabecera que ordena al pincharla. Se ve como una cabecera normal hasta que
+   pasas por encima, para no llenar la tabla de botones. */
+.th-orden {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+.th-orden:hover { color: var(--accent); }
+.th-orden.activa { color: var(--accent); }
+.th-orden .th-flecha { font-size: 9px; line-height: 1; }
+table.tabla th.td-num .th-orden { width: 100%; justify-content: flex-end; }
+
 .enlace { color: var(--accent); font-weight: 600; }
 .enlace:hover { text-decoration: underline; }
 

@@ -6,7 +6,7 @@ Guía de trabajo para este repositorio. Plataforma BI de sfbathroom: Next.js 14
 ## Comandos
 
 ```bash
-npm test           # 4 ficheros, 74 tests (compila con tsc y ejecuta con node)
+npm test           # 9 ficheros (compila con tsc y ejecuta con node)
 npm run build      # build de producción
 ./node_modules/.bin/tsc --noEmit   # typecheck rápido, sin generar nada
 npm run start      # servidor de producción en :3000
@@ -55,6 +55,14 @@ ningún sitio, pero sí que sea un módulo con efectos en el nivel superior.
   RLS) pidiéndola por HTTP: un 401 significa que existe y pide autenticación.
 - **Un 401 al consultar una tabla es la señal de que existe.** No lo confundas
   con un fallo de despliegue.
+- **Un `select` con una columna que no existe rompe la consulta entera.** Si
+  añades un campo a `reuniones` en el código, la migración tiene que estar
+  aplicada o la página falla en runtime, no solo en el build. No hay credenciales
+  de base de datos en el entorno: la migración la aplica el usuario en el SQL
+  Editor, y hasta entonces el smoke test contra Supabase no es posible.
+- **Los usuarios demo de `docs/crear-usuarios-prueba.sql` no están creados** en
+  el proyecto Supabase actual: el login por password da `invalid_credentials`.
+  No sirven para verificar en vivo.
 
 ## Flujo de trabajo
 

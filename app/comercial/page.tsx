@@ -10,7 +10,7 @@ import {
   type FilaPanel,
 } from '@/lib/datos/panelComercial';
 import { contarPorModalidad, normalizarFiltroModalidad, porDefectoReunion, ventanaAgenda } from '@/lib/comercial/agenda';
-import { filtrarCartera, normalizarFiltros, normalizarPagina, opcionesDe, paginar, hayFiltros } from '@/lib/comercial/carteraFiltros';
+import { filtrarCartera, normalizarFiltros, normalizarOrden, normalizarPagina, opcionesDe, ordenarCartera, paginar, hayFiltros } from '@/lib/comercial/carteraFiltros';
 import { filtrarContactos, hayFiltrosContactos, normalizarFiltrosContactos, opcionesTerritorio } from '@/lib/comercial/contactosFiltros';
 import { getContactos, getContextoComercial } from '@/lib/datos/comercial';
 import { puedeElegirComercial } from '@/lib/comercial/roles';
@@ -27,6 +27,7 @@ import Pestanas, { type Pestana } from '@/components/Pestanas';
 import SelectorEstadoCrm from '@/components/SelectorEstadoCrm';
 import SelectorComercial from '@/components/SelectorComercial';
 import FormReunion from '@/components/FormReunion';
+import CabeceraOrdenable from '@/components/CabeceraOrdenable';
 
 export const dynamic = 'force-dynamic';
 
@@ -92,8 +93,13 @@ export default async function ComercialPage({ searchParams }: { searchParams: Se
   const paginaContactos = paginar(contactosFiltrados, normalizarPagina(searchParams.pagina));
 
   const filtros = normalizarFiltros(searchParams);
+  // Base: el orden de trabajo (urgencia). Si el usuario pide otra columna se
+  // ordena sobre esa base, así los empates conservan el orden por urgencia en
+  // vez de quedar en orden arbitrario.
   const filtradas = ordenarPorUrgencia(filtrarCartera(d.filas, filtros));
-  const pagina = paginar(filtradas, normalizarPagina(searchParams.pagina));
+  const orden = normalizarOrden(searchParams.orden, searchParams.dir);
+  const ordenadas = orden ? ordenarCartera(filtradas, orden) : filtradas;
+  const pagina = paginar(ordenadas, normalizarPagina(searchParams.pagina));
 
   const k = d.kpis;
   const filtroModalidad = normalizarFiltroModalidad(searchParams.modalidad);
@@ -175,14 +181,14 @@ export default async function ComercialPage({ searchParams }: { searchParams: Se
               <table className="tabla">
                 <thead>
                   <tr>
-                    <th>Cliente</th>
-                    <th>Provincia</th>
-                    <th>Cadencia</th>
-                    <th className="td-num">Días sin pedir</th>
-                    <th className="td-num">Pedidos periodo</th>
-                    <th className="td-num">Importe periodo</th>
-                    <th className="td-num">Contactos</th>
-                    <th>Estado</th>
+                    <CabeceraOrdenable columna="cliente">Cliente</CabeceraOrdenable>
+                    <CabeceraOrdenable columna="provincia">Provincia</CabeceraOrdenable>
+                    <CabeceraOrdenable columna="cadencia">Cadencia</CabeceraOrdenable>
+                    <CabeceraOrdenable columna="diasSinPedir" numerica>Días sin pedir</CabeceraOrdenable>
+                    <CabeceraOrdenable columna="pedidosPeriodo" numerica>Pedidos periodo</CabeceraOrdenable>
+                    <CabeceraOrdenable columna="importePeriodo" numerica>Importe periodo</CabeceraOrdenable>
+                    <CabeceraOrdenable columna="contactos" numerica>Contactos</CabeceraOrdenable>
+                    <CabeceraOrdenable columna="estado">Estado</CabeceraOrdenable>
                     <th />
                   </tr>
                 </thead>

@@ -3,6 +3,7 @@ import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 import { callLLM } from '@/lib/agente/llm';
 import type { Contacto, EstadoCrm, Hito, HitoConAutor, Interaccion, TipoInteraccion } from '@/lib/comercial/tipos';
+import { normalizarProvincia } from '@/lib/comercial/provincias';
 
 export type { Contacto, Interaccion, TipoInteraccion };
 export { TIPOS_INTERACCION, RESULTADOS_INTERACCION, ETIQUETA_TIPO } from '@/lib/comercial/tipos';
@@ -198,7 +199,7 @@ export async function getCartera(codigoEmpresa: string, opts?: { soloSinPedir60?
       cliente_id: c.id,
       cliente: c.nombre,
       codigoErp: c.codigo_erp,
-      provincia: c.provincia,
+      provincia: normalizarProvincia(c.provincia),
       pais: c.pais_facturacion,
       comercial: c.comercial_id ? comercialNombre.get(c.comercial_id) ?? null : null,
       contactos: contactoPorCliente.get(c.id) ?? 0,
@@ -285,10 +286,15 @@ export async function getContactos(
 
   const nombreCliente = new Map(clientes.map((c) => [c.id, c.nombre]));
 
-  let lista = contactos;
-  if (filtros?.pais) lista = lista.filter((c) => c.pais === filtros.pais);
-  if (filtros?.provincia) lista = lista.filter((c) => c.provincia === filtros.provincia);
-  if (filtros?.sinEmail) lista = lista.filter((c) => !c.email);
+  // La provincia se normaliza ANTES de filtrar: el filtro llega como nombre
+  // ("Valencia") y en la base puede estar como código ("46"). Normalizando
+  // primero, el filtro por nombre encuentra la fila, y el desplegable de
+  // opciones no parte la misma provincia en dos entradas.
+  const lista = contactos.map((c) => ({ ...c, provincia: normalizarProvincia(c.provincia) }));
+  let filtrada = lista;
+  if (filtros?.pais) filtrada = filtrada.filter((c) => c.pais === filtros.pais);
+  if (filtros?.provincia) filtrada = filtrada.filter((c) => c.provincia === filtros.provincia);
+  if (filtros?.sinEmail) filtrada = filtrada.filter((c) => !c.email);
 
   const cuenta = <T extends string>(valores: (T | null)[]) => {
     const m = new Map<T, number>();
@@ -301,7 +307,7 @@ export async function getContactos(
 
   return {
     empresa: { codigo: empresa.codigo, nombre: empresa.nombre },
-    filas: lista.map((c) => ({
+    filas: filtrada.map((c) => ({
       id: c.id,
       cliente_id: c.cliente_id,
       cliente: nombreCliente.get(c.cliente_id) ?? '—',
@@ -313,8 +319,8 @@ export async function getContactos(
       pais: c.pais,
       provincia: c.provincia,
     })),
-    porPais: cuenta(lista.map((c) => c.pais)).map((x) => ({ pais: x.k, n: x.n })),
-    porProvincia: cuenta(lista.map((c) => c.provincia)).map((x) => ({ provincia: x.k, n: x.n })),
+    porPais: cuenta(filtrada.map((c) => c.pais)).map((x) => ({ pais: x.k, n: x.n })),
+    porProvincia: cuenta(filtrada.map((c) => c.provincia)).map((x) => ({ provincia: x.k, n: x.n })),
   };
 }
 
@@ -436,7 +442,7 @@ export async function getFichaComercial(codigoEmpresa: string, clienteId: string
       id: c.id,
       nombre: c.nombre,
       codigoErp: c.codigo_erp,
-      provincia: c.provincia,
+      provincia: normalizarProvincia(c.provincia),
       pais: c.pais_facturacion,
       comercial,
       telefono: c.telefono,
