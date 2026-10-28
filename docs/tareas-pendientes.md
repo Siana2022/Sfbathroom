@@ -236,7 +236,40 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
       en vez del workflow n8n nocturno — no es necesario mientras la actualización diaria
       sea suficiente para el cliente.
 
-## 8. Rentabilidad real por lote / contenedor (idea aparcada)
+## 8. Acceso comercial (Fase 3) — pendiente de cerrar
+
+- [ ] **PR #3 en revisión.** Rama `feat/acceso-comercial`. Antes de mergear, comprobar
+      que las migraciones `0041`, `0042` y `0043` están aplicadas en Supabase.
+- [ ] **Decidir si los estados CRM hacen algo fuera de la cartera.** El reparto por estado
+      (chips encima del listado, `components/ResumenEstados.tsx`) es de momento informativo
+      y para filtrar. El cliente ha dicho que "ya veremos qué hacen en el futuro porque
+      trabajarán en otras secciones": no ampliar hasta que lo definan.
+- [ ] **Roles `lectura`, `financiero`, `administracion` y `almacen` no pueden escribir** el
+      estado CRM ni la persona habitual (por coherencia con `contactos`, `reuniones` y
+      `hitos`). Decidir si alguno debe poder.
+- [x] **Un comercial puede llevar varias carteras** (migración `0044` +
+      `docs/asignar-carteras-comercial.sql`). Necesario porque en A3ERP la misma persona es
+      un comercial distinto en cada empresa: Carlos Tarazona son 9 carteras y 1.922 clientes
+      (SF 718, DOT 496, FUX 708). Verificado con él en las tres empresas.
+- [x] **SEGURIDAD · escalada de cartera en `profiles` — cerrado en `0045` y VERIFICADO.** La política `profiles_self_update_datos` (0004) bloquea el cambio
+      de `role` pero no el de `comercial_id`, que es la columna que decide el aislamiento
+      (`auth_comercial_ids()`). Un autenticado cualquiera podía ponerse la cartera de otro
+      desde la consola del navegador y leer/escribir su CRM. No se cierra con RLS (una
+      política no ve el valor anterior de la fila), así que `0045` lo hace con un trigger
+      BEFORE UPDATE que compara `old`/`new` y protege `role` y `comercial_id` salvo para
+      admin y service_role. La app no escribe en `profiles`, así que no rompe nada.
+      Comprobado con la cuenta `comercial.b`: el `PATCH` de `comercial_id` da 42501, un
+      cambio inocuo pasa (204), un cliente de otra cartera devuelve `[]` y el suyo sí sale.
+      Sigue en pie que es un parche: si aparece otra vía de escritura en `profiles`, revisar.
+- [ ] **La cartera es por empresa** (cookie `sfb_empresa`, por defecto `SF`): no hay vista
+      consolidada de las tres, se cambia de empresa con el selector. Si Carlos quiere un
+      total de sus 1.922 clientes de una vez, es trabajo aparte.
+- [ ] **Datos a revisar con el cliente:** en `comerciales` hay agrupaciones que no son
+      personas (`PARTICULARES` 139 clientes en SF, `PROVEEDORES`, `BIGMAT`, `MARKETPLACES`,
+      `CONTRACT`, y `SF 77 "77"`). Si se enlaza un usuario con una de ellas, su "cartera"
+      es en realidad una categoría del ERP.
+
+## 9. Rentabilidad real por lote / contenedor (idea aparcada)
 - [ ] Cruzar compra → stock → venta por `LOTE` (nº de contenedor) para calcular el coste
       real de traer cada lote (compra + flete + aduana + transporte interior) y su margen.
 - Estado: lote vacío en A3ERP a día de hoy. No implementar hasta que el cliente empiece a

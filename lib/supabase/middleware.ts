@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { puedeEntrar } from '@/lib/comercial/roles';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://dgbxualxhrbbqglvxtxq.supabase.co';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? 'sb_publishable_0GvTeBiMy4pbE6hZGn5eaw_2xa3W-bi';
@@ -58,6 +59,22 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = '/';
     return NextResponse.redirect(url);
+  }
+
+  // Guarda por rol. Ocultar el menú no basta: sin esto, un comercial que
+  // escribiera /margen a mano vería la página (vacía, porque el RLS no le da
+  // filas, pero con la estructura y los rótulos del cuadro de mando). Se
+  // aplica solo a páginas: las rutas /api ya comprueban sesión y rol.
+  if (user && !path.startsWith('/api/')) {
+    const { data: perfil } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
+    const rol = (perfil?.role as string | null) ?? null;
+
+    if (!puedeEntrar(rol, path)) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/comercial';
+      url.search = '';
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;

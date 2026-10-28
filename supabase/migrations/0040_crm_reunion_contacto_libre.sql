@@ -1,0 +1,22 @@
+-- ============================================================
+-- Módulo "Acceso comercial" · Fase 3 · Contacto de la reunión en texto libre
+--
+-- Al agendar una reunión el comercial puede elegir un contacto de la ficha, pero
+-- a veces la persona con la que queda (el encargado de obra, un comercial nuevo
+-- del cliente…) todavía no está dado de alta. Antes solo se podía dejar el
+-- contacto en blanco.
+--
+-- `contacto_nombre` guarda ese nombre escrito a mano, SOLO para el seguimiento
+-- de la agenda. No crea un contacto en `contactos`: eso arrastraría datos que no
+-- se conocen (email, teléfono, cargo) y ensuciaría la ficha del cliente con
+-- registros a medias. Si algún día se quiere convertir en contacto de verdad, el
+-- texto está ahí para hacerlo a mano.
+--
+-- Es aditivo: `contacto_id` sigue mandando cuando existe. `contacto_nombre` es
+-- solo el respaldo para cuando no hay contacto dado de alta.
+--
+-- Mismo criterio de RLS que 0038 (la tabla no cambia de dueño).
+-- Idempotente. Se aplica en Supabase SQL Editor.
+-- ============================================================
+
+alter table public.reuniones add column if not exists contacto_nombre text;
