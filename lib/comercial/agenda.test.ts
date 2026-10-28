@@ -41,6 +41,7 @@ function reu(
     duracion_min: 60,
     asunto: id,
     modalidad,
+    modalidad_otro: null,
     estado,
     notas: null,
     interaccion_id: null,

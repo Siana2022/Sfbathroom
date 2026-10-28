@@ -6,7 +6,7 @@
  * la misma lógica de conteo y filtrado en dos sitios.
  */
 
-import type { ModalidadReunion, ReunionConContexto } from './tipos';
+import { MODALIDADES_REUNION, type ModalidadReunion, type ReunionConContexto } from './tipos';
 
 /** Filtro de modalidad del tablero. `todas` no filtra. */
 export type FiltroModalidad = ModalidadReunion | 'todas';
@@ -63,12 +63,8 @@ export function filtrarPorModalidad(
  * la magnitud de lo que el filtro oculta, sin tener que quitarlo para averiguarlo.
  */
 export function contarPorModalidad(reuniones: ReunionConContexto[]): Record<FiltroModalidad, number> {
-  const cuenta: Record<FiltroModalidad, number> = {
-    todas: reuniones.length,
-    presencial: 0,
-    telefono: 0,
-    videollamada: 0,
-  };
+  const cuenta = { todas: reuniones.length } as Record<FiltroModalidad, number>;
+  for (const m of MODALIDADES_REUNION) cuenta[m.valor] = 0;
   for (const r of reuniones) {
     if (r.modalidad && r.modalidad in cuenta) cuenta[r.modalidad] += 1;
   }
@@ -97,7 +93,7 @@ export function contarPorColumna(
 export function normalizarFiltroModalidad(valor: string | string[] | undefined): FiltroModalidad {
   const v = Array.isArray(valor) ? valor[0] : valor;
   if (!v) return 'todas';
-  const validas: FiltroModalidad[] = ['presencial', 'telefono', 'videollamada'];
+  const validas: FiltroModalidad[] = ['todas', ...MODALIDADES_REUNION.map((m) => m.valor)];
   return validas.includes(v as FiltroModalidad) ? (v as FiltroModalidad) : 'todas';
 }
 

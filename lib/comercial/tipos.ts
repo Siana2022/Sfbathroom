@@ -67,13 +67,48 @@ export const ESTADOS_REUNION: { valor: EstadoReunion; etiqueta: string }[] = [
   { valor: 'cancelada', etiqueta: 'Cancelada' },
 ];
 
-export type ModalidadReunion = 'presencial' | 'telefono' | 'videollamada';
+export type ModalidadReunion = 'presencial' | 'telefono' | 'videollamada' | 'email' | 'otros';
 
 export const MODALIDADES_REUNION: { valor: ModalidadReunion; etiqueta: string }[] = [
-  { valor: 'presencial', etiqueta: 'Presencial' },
-  { valor: 'telefono', etiqueta: 'Teléfono' },
   { valor: 'videollamada', etiqueta: 'Videollamada' },
+  { valor: 'telefono', etiqueta: 'Llamada telefónica' },
+  { valor: 'email', etiqueta: 'Email' },
+  { valor: 'presencial', etiqueta: 'Presencial' },
+  { valor: 'otros', etiqueta: 'Otros' },
 ];
+
+/**
+ * Estados del cliente en el CRM. Deliberadamente separados de
+ * `clientes.estado` (activo/inactivo/perdido), que lo calcula el ERP y
+ * alimenta el semáforo de fuga: son dos cosas distintas y mezclarlas
+ * rompería esos avisos.
+ */
+export type EstadoCrm = 'habitual' | 'nuevo' | 'seguimiento' | 'ganado' | 'perdido';
+
+export const ESTADOS_CRM: { valor: EstadoCrm; etiqueta: string }[] = [
+  { valor: 'habitual', etiqueta: 'Cliente habitual' },
+  { valor: 'nuevo', etiqueta: 'Nuevo cliente' },
+  { valor: 'seguimiento', etiqueta: 'En seguimiento' },
+  { valor: 'ganado', etiqueta: 'Cliente ganado' },
+  { valor: 'perdido', etiqueta: 'Cliente perdido' },
+];
+
+export const ETIQUETA_ESTADO_CRM: Record<string, string> = Object.fromEntries(
+  ESTADOS_CRM.map((e) => [e.valor, e.etiqueta]),
+);
+
+export type Hito = {
+  id: string;
+  cliente_id: string;
+  comercial_id: string | null;
+  usuario_id: string | null;
+  fecha: string;
+  titulo: string;
+  detalle: string | null;
+  created_at: string;
+};
+
+export type HitoConAutor = Hito & { autor: string | null };
 
 export const ETIQUETA_ESTADO_REUNION: Record<string, string> = Object.fromEntries(
   ESTADOS_REUNION.map((e) => [e.valor, e.etiqueta]),
@@ -93,6 +128,8 @@ export type Reunion = {
   duracion_min: number | null;
   asunto: string | null;
   modalidad: ModalidadReunion | null;
+  /** Texto libre cuando `modalidad` es 'otros'. */
+  modalidad_otro: string | null;
   estado: EstadoReunion;
   notas: string | null;
   interaccion_id: string | null;

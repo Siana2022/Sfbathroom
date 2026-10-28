@@ -140,6 +140,7 @@ export async function getPanelComercial(
         duracion_min: number | null;
         asunto: string | null;
         modalidad: string | null;
+        modalidad_otro: string | null;
         estado: string;
         notas: string | null;
         interaccion_id: string | null;
@@ -148,7 +149,7 @@ export async function getPanelComercial(
         supabase
           .from('reuniones')
           .select(
-            'id, cliente_id, contacto_id, comercial_id, usuario_id, fecha_hora, duracion_min, asunto, modalidad, estado, notas, interaccion_id, created_at',
+            'id, cliente_id, contacto_id, comercial_id, usuario_id, fecha_hora, duracion_min, asunto, modalidad, modalidad_otro, estado, notas, interaccion_id, created_at',
           )
           .eq('empresa_id', empresa.id)
           // Ventana acotada: todo el futuro más los últimos meses. Sin esto el
@@ -279,6 +280,7 @@ export async function getPanelComercial(
     duracion_min: r.duracion_min,
     asunto: r.asunto,
     modalidad: (r.modalidad as ReunionConContexto['modalidad']) ?? null,
+    modalidad_otro: r.modalidad_otro ?? null,
     estado: r.estado as ReunionConContexto['estado'],
     notas: r.notas,
     interaccion_id: r.interaccion_id,
@@ -326,7 +328,7 @@ export async function getReunionesCliente(codigoEmpresa: string, clienteId: stri
     supabase
       .from('reuniones')
       .select(
-        'id, cliente_id, contacto_id, comercial_id, usuario_id, fecha_hora, duracion_min, asunto, modalidad, estado, notas, interaccion_id, created_at',
+        'id, cliente_id, contacto_id, comercial_id, usuario_id, fecha_hora, duracion_min, asunto, modalidad, modalidad_otro, estado, notas, interaccion_id, created_at',
       )
       .eq('empresa_id', empresa.id)
       .eq('cliente_id', clienteId)

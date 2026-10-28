@@ -37,7 +37,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <RegistrarPWA />
         {user ? (
           <div className="layout">
-            <Nav userEmail={user.email} />
+              <Nav userEmail={user.email} rol={rol} />
             <div className="cuerpo">
               <Header rol={rol} />
               <main className="content">{children}</main>
