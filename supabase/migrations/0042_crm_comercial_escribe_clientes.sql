@@ -146,11 +146,15 @@ end;
 $$;
 
 -- ---------- Permisos ----------
--- Solo se exponen las dos funciones de escritura. La de autorización se deja
--- sin execute para que no se pueda invocar suelta por RPC.
-revoke all on function public.crm_autorizar_cliente(uuid) from public;
-revoke all on function public.crm_set_estado_cliente(uuid, text, text) from public;
-revoke all on function public.crm_set_contacto_habitual(uuid, uuid) from public;
+-- Solo se exponen las dos funciones de escritura, y solo a `authenticated`.
+--
+-- OJO: en Supabase hay que revocar de `anon` EXPLÍCITAMENTE. Supabase concede
+-- execute a anon/authenticated por defecto en el esquema public, y un
+-- `revoke ... from public` NO quita esa concesión explícita: la función queda
+-- ejecutable sin sesión. Comprobado contra el proyecto real (0043).
+revoke all on function public.crm_autorizar_cliente(uuid) from public, anon, authenticated;
+revoke all on function public.crm_set_estado_cliente(uuid, text, text) from public, anon;
+revoke all on function public.crm_set_contacto_habitual(uuid, uuid) from public, anon;
 
 grant execute on function public.crm_set_estado_cliente(uuid, text, text) to authenticated;
 grant execute on function public.crm_set_contacto_habitual(uuid, uuid) to authenticated;

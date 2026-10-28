@@ -82,6 +82,12 @@ ningún sitio, pero sí que sea un módulo con efectos en el nivel superior.
   cómo se guarda `estado_crm`, mira los dos.
 - **Los errores de las funciones de 0042 se traducen con `errorDeFuncion`.** Un
   42501 (cliente fuera de la cartera) tiene que salir 403, no 400.
+- **En Supabase, `revoke ... from public` NO cierra una función a `anon`.** El
+  esquema public trae execute concedido a anon/authenticated por defecto, y esa
+  concesión explícita sobrevive al revoke de `public`. Hay que revocar de `anon`
+  por su nombre. Cómo se detecta por PostgREST: si la función responde 401 con
+  un mensaje que has escrito tú dentro, el cuerpo se está ejecutando (mal); una
+  función que no existe da 404 `PGRST202`.
 
 ## Flujo de trabajo
 
