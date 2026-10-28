@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { contextoDePeticion, noAutenticado, sinPermiso } from '@/lib/supabase/sesion';
-import { MODALIDADES_REUNION, ESTADOS_REUNION, RESULTADOS_INTERACCION } from '@/lib/comercial/tipos';
+import { MODALIDADES_REUNION, ESTADOS_REUNION, RESULTADOS_INTERACCION, ESTADOS_CRM } from '@/lib/comercial/tipos';
 
 const MODALIDADES = MODALIDADES_REUNION.map((m) => m.valor);
 const ESTADOS = ESTADOS_REUNION.map((e) => e.valor);
@@ -37,6 +37,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       return NextResponse.json({ error: 'Modalidad no válida.' }, { status: 400 });
     }
     update.modalidad = m;
+    // El texto libre acompaña a "otros": si se cambia de modalidad, se limpia.
+    update.modalidad_otro =
+      m === 'otros' && typeof body.modalidad_otro === 'string' && body.modalidad_otro.trim() !== ''
+        ? body.modalidad_otro.trim()
+        : null;
   }
   for (const k of ['asunto', 'notas', 'contacto_id'] as const) {
     if (k in body) {
@@ -63,6 +68,14 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
   const volcar = body.volcar_interaccion === true;
   const estadoFinal = (update.estado as string | undefined) ?? actual.estado;
+
+  // La pestaña de seguimiento revisa una reunión cerrada y, en el mismo gesto,
+  // fija el estado CRM del cliente. Se admite aquí para que el comercial no
+  // tenga que hacer dos peticiones para una sola decisión.
+  const estadoCrm = typeof body.estado_crm === 'string' && body.estado_crm !== '' ? body.estado_crm : null;
+  if (estadoCrm && !ESTADOS_CRM.map((e) => e.valor).includes(estadoCrm as never)) {
+    return NextResponse.json({ error: `Estado CRM no válido: ${estadoCrm}` }, { status: 400 });
+  }
 
   // Solo se vuelca al histórico al cerrar como realizada, y una sola vez.
   if (volcar && estadoFinal === 'realizada' && !actual.interaccion_id) {
@@ -101,6 +114,21 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
   const { data, error } = await supabase.from('reuniones').update(update).eq('id', params.id).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  // El estado CRM del cliente se aplica después de guardar la reunión: si algo
+  // falla en la reunión, no se queda un estado cambiado a medias.
+  if (estadoCrm) {
+    const motivo = typeof body.motivo_perdida === 'string' ? body.motivo_perdida.trim() : '';
+    const { error: errCli } = await supabase
+      .from('clientes')
+      .update({
+        estado_crm: estadoCrm,
+        motivo_perdida: estadoCrm === 'perdido' && motivo !== '' ? motivo : null,
+      })
+      .eq('id', actual.cliente_id);
+    if (errCli) return NextResponse.json({ error: errCli.message }, { status: 400 });
+  }
+
   return NextResponse.json(data);
 }
 

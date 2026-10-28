@@ -5,6 +5,8 @@
  * `lib/datos/panelComercial.ts` porque ese importa `next/headers`.
  */
 
+import type { EstadoCrm } from './tipos';
+
 export type FilaPanel = {
   cliente_id: string;
   cliente: string;
@@ -24,6 +26,14 @@ export type FilaPanel = {
   ultimaInteraccion: string | null;
   /** 'ganado' si su primer pedido cae en el periodo; 'perdido' si dejó de pedir. */
   estadoComercial: 'ganado' | 'perdido' | null;
+  /**
+   * Estado que el comercial fija a mano. Es independiente de `estadoComercial`,
+   * que se deduce de los pedidos: uno es lo que dicen los datos, el otro lo que
+   * decide el comercial.
+   */
+  estadoCrm: EstadoCrm | null;
+  /** Motivo, solo cuando el estado es 'perdido'. */
+  motivoPerdida: string | null;
 };
 
 /**

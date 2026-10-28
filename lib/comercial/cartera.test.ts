@@ -28,6 +28,8 @@ const f = (nombre: string, vencido: boolean, ratio: number | null): FilaPanel =>
   contactos: 0,
   ultimaInteraccion: null,
   estadoComercial: null,
+  estadoCrm: null,
+  motivoPerdida: null,
 });
 
 console.log('orden por urgencia');

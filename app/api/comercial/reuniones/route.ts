@@ -26,6 +26,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `Modalidad no válida: ${modalidad}` }, { status: 400 });
   }
 
+  // El texto libre solo se guarda cuando la modalidad es "otros": si el
+  // comercial elige otro tipo después, no debe quedar un texto huérfano.
+  const modalidadOtro =
+    modalidad === 'otros' && typeof body.modalidad_otro === 'string' && body.modalidad_otro.trim() !== ''
+      ? body.modalidad_otro.trim()
+      : null;
+
   const estado = typeof body.estado === 'string' && body.estado !== '' ? body.estado : 'programada';
   if (!ESTADOS.includes(estado as never)) {
     return NextResponse.json({ error: `Estado no válido: ${estado}` }, { status: 400 });
@@ -50,6 +57,7 @@ export async function POST(req: Request) {
       duracion_min: duracion !== null && !Number.isNaN(duracion) ? duracion : null,
       asunto: typeof body.asunto === 'string' && body.asunto.trim() !== '' ? body.asunto.trim() : null,
       modalidad,
+      modalidad_otro: modalidadOtro,
       estado,
       notas: typeof body.notas === 'string' && body.notas.trim() !== '' ? body.notas.trim() : null,
     })

@@ -5,7 +5,7 @@ import { calcularCadencia, type Cadencia } from '@/lib/comercial/cadencia';
 import { normalizarRango, rangoAnterior, rangoPorDefecto, hoyISO, type RangoFechas } from '@/lib/comercial/periodos';
 import { ordenarPorUrgencia, type FilaPanel } from '@/lib/comercial/cartera';
 import { ventanaAgenda } from '@/lib/comercial/agenda';
-import type { ReunionConContexto } from '@/lib/comercial/tipos';
+import type { EstadoCrm, Hito, HitoConAutor, ReunionConContexto } from '@/lib/comercial/tipos';
 
 /**
  * Panel de trabajo del comercial (Fase 2).
@@ -55,6 +55,8 @@ type FilaCliente = {
   provincia: string | null;
   pais_facturacion: string | null;
   fecha_primer_pedido: string | null;
+  estado_crm: string | null;
+  motivo_perdida: string | null;
 };
 
 /**
@@ -76,7 +78,7 @@ export async function getPanelComercial(
       todasLasFilas<FilaCliente>((desde) =>
         supabase
           .from('clientes')
-          .select('id, nombre, provincia, pais_facturacion, fecha_primer_pedido')
+          .select('id, nombre, provincia, pais_facturacion, fecha_primer_pedido, estado_crm, motivo_perdida')
           .eq('empresa_id', empresa.id)
           .range(desde, desde + TAMANO_PAGINA - 1),
       ),
@@ -247,6 +249,8 @@ export async function getPanelComercial(
       contactos: contactosPorCliente.get(c.id) ?? 0,
       ultimaInteraccion: inter?.ultima ?? null,
       estadoComercial,
+      estadoCrm: (c.estado_crm as FilaPanel['estadoCrm']) ?? null,
+      motivoPerdida: c.motivo_perdida,
     };
   });
 
@@ -352,5 +356,92 @@ export async function getReunionesCliente(codigoEmpresa: string, clienteId: stri
     contacto: r.contacto_id ? nombreContacto.get(r.contacto_id) ?? null : null,
     comercial: null,
   }));
+}
+
+/**
+ * Hitos de un cliente: acuerdos, cambios de responsable, altas en programas.
+ *
+ * Ordenados del más reciente al más antiguo, que es como se leen: lo último
+ * que pasó es lo que hay que tener presente antes de una llamada.
+ */
+export async function getHitosCliente(codigoEmpresa: string, clienteId: string): Promise<HitoConAutor[]> {
+  const supabase = createClient();
+  const empresa = await getEmpresaPorCodigo(codigoEmpresa);
+
+  const { data } = await supabase
+    .from('hitos')
+    .select('id, cliente_id, comercial_id, usuario_id, fecha, titulo, detalle, created_at')
+    .eq('empresa_id', empresa.id)
+    .eq('cliente_id', clienteId)
+    .order('fecha', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  const hitos = (data ?? []) as Hito[];
+  if (hitos.length === 0) return [];
+
+  const comerciales = await todasLasFilas<{ id: string; nombre: string }>((desde) =>
+    supabase
+      .from('comerciales')
+      .select('id, nombre')
+      .eq('empresa_id', empresa.id)
+      .range(desde, desde + TAMANO_PAGINA - 1),
+  );
+  const porId = new Map(comerciales.map((c) => [c.id, c.nombre]));
+
+  return hitos.map((h) => ({ ...h, autor: h.comercial_id ? porId.get(h.comercial_id) ?? null : null }));
+}
+
+/** Una reunión ya cerrada, tal como se revisa en la pestaña de seguimiento. */
+export type ReunionSeguimiento = ReunionConContexto & {
+  /** Cliente al que pertenece, para el desplegable de estado. */
+  estadoCrm: EstadoCrm | null;
+  motivoPerdida: string | null;
+};
+
+/**
+ * Reuniones cerradas (realizadas o canceladas) dentro de la ventana de la
+ * agenda, para revisarlas una a una y fijar el estado del cliente.
+ *
+ * Solo las que aún no se han volcado al histórico o las recientes: la idea es
+ * que sea una bandeja de trabajo, no un archivo muerto.
+ */
+export async function getSeguimiento(codigoEmpresa: string, desdeISO: string): Promise<ReunionSeguimiento[]> {
+  const supabase = createClient();
+  const empresa = await getEmpresaPorCodigo(codigoEmpresa);
+
+  const { data } = await supabase
+    .from('reuniones')
+    .select(
+      'id, cliente_id, contacto_id, comercial_id, usuario_id, fecha_hora, duracion_min, asunto, modalidad, modalidad_otro, estado, notas, interaccion_id, created_at',
+    )
+    .eq('empresa_id', empresa.id)
+    .neq('estado', 'programada')
+    .gte('fecha_hora', desdeISO)
+    .order('fecha_hora', { ascending: false });
+
+  const reuniones = (data ?? []) as ReunionConContexto[];
+  if (reuniones.length === 0) return [];
+
+  const idsCliente = [...new Set(reuniones.map((r) => r.cliente_id))];
+  const clientes = await todasLasFilas<{ id: string; nombre: string; estado_crm: string | null; motivo_perdida: string | null }>(
+    (desde) =>
+      supabase
+        .from('clientes')
+        .select('id, nombre, estado_crm, motivo_perdida')
+        .eq('empresa_id', empresa.id)
+        .in('id', idsCliente)
+        .range(desde, desde + TAMANO_PAGINA - 1),
+  );
+  const porCliente = new Map(clientes.map((c) => [c.id, c]));
+
+  return reuniones.map((r) => {
+    const c = porCliente.get(r.cliente_id);
+    return {
+      ...r,
+      cliente: c?.nombre ?? '—',
+      estadoCrm: (c?.estado_crm as EstadoCrm | null) ?? null,
+      motivoPerdida: c?.motivo_perdida ?? null,
+    };
+  });
 }
 
