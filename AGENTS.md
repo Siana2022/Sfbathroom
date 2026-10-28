@@ -63,6 +63,14 @@ ningún sitio, pero sí que sea un módulo con efectos en el nivel superior.
 - **Los usuarios demo de `docs/crear-usuarios-prueba.sql` no están creados** en
   el proyecto Supabase actual: el login por password da `invalid_credentials`.
   No sirven para verificar en vivo.
+- **Verificar una migración sin credenciales de base de datos.** Pide la columna
+  nueva por PostgREST con la publishable key: si existe, responde 401
+  `permission denied for function auth_role` (la fila está protegida por RLS);
+  si no existe, responde 400 `42703 column does not exist`. Ese contraste es la
+  comprobación de que el SQL está aplicado.
+- **`getCarteraComercial` (en `lib/datos/comercial.ts`) es código muerto.** La
+  cartera real sale de `getPanelComercial`. Al tocar la cartera, mira cuál de las
+  dos está en uso o te dejarás columnas sin cambiar.
 
 ## Flujo de trabajo
 
