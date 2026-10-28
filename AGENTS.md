@@ -98,6 +98,10 @@ ningún sitio, pero sí que sea un módulo con efectos en el nivel superior.
   NO compara contra un uuid sino contra `auth_comercial_ids()` (conjunto): si
   escribes una política nueva para una tabla del comercial, usa
   `comercial_id in (select public.auth_comercial_ids())`, no `= auth_comercial_id()`.
+- **Verificar políticas por `pg_policies.qual` da de menos.** Una política
+  `for insert` no tiene `using`, así que su expresión vive en `with_check` y
+  `qual` queda NULL. Para contar políticas hay que mirar las dos columnas, o
+  las de insert no aparecen.
 - **En Supabase, `revoke ... from public` NO cierra una función a `anon`.** El
   esquema public trae execute concedido a anon/authenticated por defecto, y esa
   concesión explícita sobrevive al revoke de `public`. Hay que revocar de `anon`

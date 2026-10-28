@@ -17,9 +17,20 @@
 -- `auth_role() in (...)` y solo se reescribe la rama del comercial.
 --
 -- Las 19 politicas de abajo estan REGENERADAS a partir de su ultima definicion
--- real, no reescritas a mano. Al ejecutarlo conviene contrastar el numero:
+-- real, no reescritas a mano. Para comprobar que han entrado las 19 hay que
+-- mirar LAS DOS columnas: en pg_policies, una politica `for insert` guarda su
+-- expresion en `with_check` y deja `qual` a NULL. Contando solo `qual` salen 15
+-- (las 4 de insert -contactos, interacciones, reuniones, hitos- no aparecen):
 --   select count(*) from pg_policies where schemaname='public'
---     and qual like '%auth_comercial_ids%';
+--     and (coalesce(qual,'') like '%auth_comercial_ids%'
+--          or coalesce(with_check,'') like '%auth_comercial_ids%');   -- 19
+--
+-- Y lo que de verdad importa, restos que se quedaron con una sola cartera
+-- (debe salir vacio; el patron no coincide con auth_comercial_ids() porque
+-- entre el id y el parentesis va una s):
+--   select tablename, policyname from pg_policies where schemaname='public'
+--     and (coalesce(qual,'') like '%auth_comercial_id()%'
+--          or coalesce(with_check,'') like '%auth_comercial_id()%');
 --
 -- Idempotente.
 -- ============================================================
