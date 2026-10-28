@@ -110,7 +110,13 @@ create trigger profiles_proteger_columnas
 --
 -- 2b. Y el control: el mismo token con un cambio inocuo debe PASAR, para
 --     demostrar que la guarda es selectiva y no bloquea todo.
---   -d '{"full_name":"<el mismo valor que ya tiene>"}'   -- debe dar 200
+--   -d '{"full_name":"<el mismo valor que ya tiene>"}'   -- debe dar 204
+--   (204 y no 200: PostgREST no devuelve cuerpo en un PATCH salvo que se pida
+--    con Prefer: return=representation.)
+--
+-- VERIFICADO el 2026-10-23 con la cuenta comercial.b: el ataque da 42501 (403),
+-- el control 204, un cliente ajeno devuelve [] y el suyo sale. El aislamiento
+-- de la cartera (0044) sigue intacto.
 --
 -- 3. NO SE HA ROTO NADA (esto es lo que hay que probar sí o sí). Desde el
 --    SQL Editor, que corre como postgres y debe seguir pudiendo asignar:

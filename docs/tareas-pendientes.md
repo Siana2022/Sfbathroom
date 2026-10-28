@@ -251,15 +251,16 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
       `docs/asignar-carteras-comercial.sql`). Necesario porque en A3ERP la misma persona es
       un comercial distinto en cada empresa: Carlos Tarazona son 9 carteras y 1.922 clientes
       (SF 718, DOT 496, FUX 708). Verificado con él en las tres empresas.
-- [ ] **SEGURIDAD · escalada de cartera en `profiles` — arreglo en `0045`, pendiente de
-      aplicar y verificar.** La política `profiles_self_update_datos` (0004) bloquea el cambio
+- [x] **SEGURIDAD · escalada de cartera en `profiles` — cerrado en `0045` y VERIFICADO.** La política `profiles_self_update_datos` (0004) bloquea el cambio
       de `role` pero no el de `comercial_id`, que es la columna que decide el aislamiento
       (`auth_comercial_ids()`). Un autenticado cualquiera podía ponerse la cartera de otro
       desde la consola del navegador y leer/escribir su CRM. No se cierra con RLS (una
       política no ve el valor anterior de la fila), así que `0045` lo hace con un trigger
       BEFORE UPDATE que compara `old`/`new` y protege `role` y `comercial_id` salvo para
       admin y service_role. La app no escribe en `profiles`, así que no rompe nada.
-      Falta: aplicar `0045` y ejecutar la comprobación del paso 2 del propio archivo.
+      Comprobado con la cuenta `comercial.b`: el `PATCH` de `comercial_id` da 42501, un
+      cambio inocuo pasa (204), un cliente de otra cartera devuelve `[]` y el suyo sí sale.
+      Sigue en pie que es un parche: si aparece otra vía de escritura en `profiles`, revisar.
 - [ ] **La cartera es por empresa** (cookie `sfb_empresa`, por defecto `SF`): no hay vista
       consolidada de las tres, se cambia de empresa con el selector. Si Carlos quiere un
       total de sus 1.922 clientes de una vez, es trabajo aparte.
