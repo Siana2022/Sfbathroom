@@ -89,13 +89,28 @@ create trigger profiles_proteger_columnas
 --   select tgname from pg_trigger
 --   where tgrelid = 'public.profiles'::regclass and not tgisinternal;
 --
--- 2. El agujero está cerrado. Con la sesión de un COMERCIAL, desde la consola
---    del navegador (F12). Debe dar error 42501:
---   const { data: { user } } = await supabase.auth.getUser();
---   const { error } = await supabase.from('profiles')
---     .update({ comercial_id: '00000000-0000-0000-0000-000000000000' })
---     .eq('id', user.id);
---   console.log(error?.code, error?.message);
+-- 2. El agujero está cerrado. NO vale hacerlo desde la consola del navegador:
+--    la app no expone `supabase` como global (cada modulo crea su cliente con
+--    createBrowserClient), asi que no hay nada que invocar ahi. Se prueba contra
+--    la API con el token de un comercial real, que ademas comprueba el rechazo
+--    en el servidor y no en la interfaz:
+--
+--   TOKEN=$(curl -s -X POST "https://<proyecto>.supabase.co/auth/v1/token?grant_type=password" \
+--     -H "apikey: <publishable>" -H "Content-Type: application/json" \
+--     -d '{"email":"comercial.b@sfbathroom.com","password":"<su password>"}' \
+--     | grep -o '"access_token":"[^"]*' | cut -d'"' -f4)
+--
+--   curl -s -w "\nHTTP %{http_code}\n" -X PATCH \
+--     "https://<proyecto>.supabase.co/rest/v1/profiles?id=eq.<su uid>" \
+--     -H "apikey: <publishable>" -H "Authorization: Bearer $TOKEN" \
+--     -H "Content-Type: application/json" \
+--     -d '{"comercial_id":"00000000-0000-0000-0000-000000000000"}'
+--
+--   Debe responder 42501 "Solo admin puede cambiar la cartera de un perfil."
+--
+-- 2b. Y el control: el mismo token con un cambio inocuo debe PASAR, para
+--     demostrar que la guarda es selectiva y no bloquea todo.
+--   -d '{"full_name":"<el mismo valor que ya tiene>"}'   -- debe dar 200
 --
 -- 3. NO SE HA ROTO NADA (esto es lo que hay que probar sí o sí). Desde el
 --    SQL Editor, que corre como postgres y debe seguir pudiendo asignar:
