@@ -91,6 +91,13 @@ ningún sitio, pero sí que sea un módulo con efectos en el nivel superior.
   cómo se guarda `estado_crm`, mira los dos.
 - **Los errores de las funciones de 0042 se traducen con `errorDeFuncion`.** Un
   42501 (cliente fuera de la cartera) tiene que salir 403, no 400.
+- **Un comercial puede llevar VARIAS carteras (0044).** `profiles.comercial_id` es
+  una sola; las demás van en `perfiles_comerciales`. En A3ERP la misma persona
+  aparece como un comercial distinto en cada empresa (Carlos Tarazona = SF 5/6/18/10,
+  DOT 4/8/10, FUX 5/6/17/18), cada uno con su trozo de cartera. Por eso el RLS ya
+  NO compara contra un uuid sino contra `auth_comercial_ids()` (conjunto): si
+  escribes una política nueva para una tabla del comercial, usa
+  `comercial_id in (select public.auth_comercial_ids())`, no `= auth_comercial_id()`.
 - **En Supabase, `revoke ... from public` NO cierra una función a `anon`.** El
   esquema public trae execute concedido a anon/authenticated por defecto, y esa
   concesión explícita sobrevive al revoke de `public`. Hay que revocar de `anon`

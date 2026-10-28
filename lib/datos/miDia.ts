@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
+import { getCarterasDeUsuario } from '@/lib/datos/comercial';
 import { netaDeDocumento } from '@/lib/datos/neta';
 
 export type MiDia = {
@@ -23,18 +24,23 @@ export async function getMiDia(codigoEmpresa: string, anio: number): Promise<MiD
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const { data: perfil } = await supabase.from('profiles').select('role, comercial_id').eq('id', user.id).maybeSingle();
+  const { data: perfil } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
   if (perfil?.role !== 'comercial') return null;
-  const comercialId = perfil.comercial_id as string | null;
-  if (!comercialId) return null;
 
-  const { data: comercial } = await supabase.from('comerciales').select('nombre').eq('id', comercialId).maybeSingle();
+  // Un comercial puede llevar varias carteras (una por empresa en A3ERP), así
+  // que "su cartera" es la unión. `comercial` se queda con el nombre de la
+  // cartera de la empresa que se está mirando, que es lo que tiene sentido
+  // enseñar en pantalla.
+  const carteras = await getCarterasDeUsuario(user.id);
+  if (carteras.length === 0) return null;
+  const idsCartera = carteras.map((c) => c.id);
+  const comercial = carteras.find((c) => c.empresa === codigoEmpresa) ?? carteras[0];
 
   const { data: clientes } = await supabase
     .from('clientes')
     .select('id, nombre')
     .eq('empresa_id', empresa.id)
-    .eq('comercial_id', comercialId);
+    .in('comercial_id', idsCartera);
   const clientesCargo = (clientes ?? []) as { id: string; nombre: string }[];
   const ids = clientesCargo.map((c) => c.id);
 
@@ -95,7 +101,7 @@ export async function getMiDia(codigoEmpresa: string, anio: number): Promise<MiD
     .from('pedidos')
     .select('id, numero_erp, fecha_entrada, importe, cliente_id')
     .eq('empresa_id', empresa.id)
-    .eq('comercial_id', comercialId)
+    .in('comercial_id', idsCartera)
     .gte('fecha_entrada', `${anio}-01-01`)
     .eq('estado', 'pendiente')
     .order('fecha_entrada', { ascending: true })

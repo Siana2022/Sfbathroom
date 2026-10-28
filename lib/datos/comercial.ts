@@ -71,13 +71,12 @@ export async function getContextoComercial(): Promise<ContextoComercial> {
     .maybeSingle();
 
   const rol = (perfil?.role as string | null) ?? null;
-  const comercialId = (perfil?.comercial_id as string | null) ?? null;
 
-  let comercialNombre: string | null = null;
-  if (comercialId) {
-    const { data: com } = await supabase.from('comerciales').select('nombre').eq('id', comercialId).maybeSingle();
-    comercialNombre = (com?.nombre as string | null) ?? null;
-  }
+  // La cartera principal (la primera) es la que da nombre al contexto. Con
+  // varias carteras el ámbito por defecto del listado sigue siendo una sola.
+  const carteras = await getCarterasDeUsuario(user.id);
+  const comercialId = carteras[0]?.id ?? null;
+  const comercialNombre = carteras[0]?.nombre ?? null;
 
   const puedeVerTodo = rol !== null && ROLES_VEN_TODO.includes(rol);
   return {
@@ -89,6 +88,68 @@ export async function getContextoComercial(): Promise<ContextoComercial> {
     puedeVerTodo,
     puedeEscribir: puedeVerTodo || rol === 'comercial',
   };
+}
+
+/**
+ * Todas las carteras de un usuario (no solo la principal).
+ *
+ * Un comercial puede llevar varias: en A3ERP cada empresa tiene su propio
+ * código de comercial, así que la misma persona aparece como varias filas de
+ * `comerciales` con su trozo de cartera cada una. La tabla
+ * `perfiles_comerciales` guarda esas asignaciones y `profiles.comercial_id`
+ * sigue siendo la principal.
+ *
+ * Se devuelven también los nombres porque quien llama suele tener que
+ * distinguirlas ("SF - Carlos Tarazona" frente a "DOT - Carlos Tarazona").
+ */
+export async function getCarterasDeUsuario(
+  userId: string,
+): Promise<{ id: string; nombre: string; codigoErp: string | null; empresa: string | null }[]> {
+  const supabase = createClient();
+
+  const { data: asignadas } = await supabase
+    .from('perfiles_comerciales')
+    .select('comercial_id')
+    .eq('profile_id', userId);
+
+  const { data: perfil } = await supabase
+    .from('profiles')
+    .select('comercial_id')
+    .eq('id', userId)
+    .maybeSingle();
+
+  const ids = [
+    ...new Set([
+      ...((asignadas ?? []) as { comercial_id: string }[]).map((a) => a.comercial_id),
+      ...(perfil?.comercial_id ? [perfil.comercial_id as string] : []),
+    ]),
+  ];
+  if (ids.length === 0) return [];
+
+  const { data } = await supabase
+    .from('comerciales')
+    .select('id, nombre, codigo_erp, empresa_id')
+    .in('id', ids);
+  const comerciales = (data ?? []) as {
+    id: string;
+    nombre: string;
+    codigo_erp: string | null;
+    empresa_id: string | null;
+  }[];
+
+  const { data: empresas } = await supabase.from('empresas').select('id, codigo');
+  const codigoEmpresa = new Map(((empresas ?? []) as { id: string; codigo: string }[]).map((e) => [e.id, e.codigo]));
+
+  // El orden de `ids` manda: la cartera principal va primero.
+  return ids
+    .map((id) => comerciales.find((c) => c.id === id))
+    .filter((c): c is NonNullable<typeof c> => Boolean(c))
+    .map((c) => ({
+      id: c.id,
+      nombre: c.nombre,
+      codigoErp: c.codigo_erp,
+      empresa: c.empresa_id ? codigoEmpresa.get(c.empresa_id) ?? null : null,
+    }));
 }
 
 type FilaClienteBase = {
