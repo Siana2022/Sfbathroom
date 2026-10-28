@@ -21,6 +21,7 @@ import SelectorFechas from '@/components/SelectorFechas';
 import FiltroModalidad from '@/components/FiltroModalidad';
 import TableroAgenda from '@/components/TableroAgenda';
 import FiltrosCartera from '@/components/FiltrosCartera';
+import ResumenEstados from '@/components/ResumenEstados';
 import FiltrosContactos from '@/components/FiltrosContactos';
 import Paginacion from '@/components/Paginacion';
 import Pestanas, { type Pestana } from '@/components/Pestanas';
@@ -172,6 +173,8 @@ export default async function ComercialPage({ searchParams }: { searchParams: Se
         <Kpi etiqueta="Clientes perdidos" valor={numero(k.perdidos)} nota="+90 días sin pedir" />
         <Kpi etiqueta="Reuniones próximas" valor={numero(k.reunionesProximas)} nota="en agenda" />
       </ul>
+
+      {vista === 'cartera' && <ResumenEstados reparto={{ total: k.clientes, ...k.estados }} />}
 
       <Pestanas
         cuenta={{

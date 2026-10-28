@@ -31,6 +31,15 @@ export type KpisPanel = {
   ganados: number;
   perdidos: number;
   vencidos: number;
+  /** Reparto de la cartera por estado CRM. */
+  estados: {
+    habitual: number;
+    nuevo: number;
+    seguimiento: number;
+    ganado: number;
+    perdido: number;
+    sinEstado: number;
+  };
   reunionesProximas: number;
 };
 
@@ -352,6 +361,14 @@ export async function getPanelComercial(
       ganados,
       perdidos,
       vencidos: filas.filter((f) => f.vencido).length,
+      estados: {
+        habitual: filas.filter((f) => f.estadoCrm === 'habitual').length,
+        nuevo: filas.filter((f) => f.estadoCrm === 'nuevo').length,
+        seguimiento: filas.filter((f) => f.estadoCrm === 'seguimiento').length,
+        ganado: filas.filter((f) => f.estadoCrm === 'ganado').length,
+        perdido: filas.filter((f) => f.estadoCrm === 'perdido').length,
+        sinEstado: filas.filter((f) => !f.estadoCrm).length,
+      },
       reunionesProximas: agenda.length,
     },
     filas,

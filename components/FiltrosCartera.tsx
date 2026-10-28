@@ -30,6 +30,11 @@ function FiltrosCarteraInner({ provincias, paises }: Props) {
   const pais = sp.get('pais') ?? '';
   const estado = sp.get('estado') ?? '';
   const llamar = sp.get('llamar') === '1';
+  const sinEstado = sp.get('sinestado') === '1';
+  // El desplegable cubre los cinco estados CRM más "sin estado", que no es un
+  // estado sino su ausencia: sin esa opción no habría forma de listar los
+  // clientes que aún no se han clasificado.
+  const estadoSeleccion = sinEstado ? 'sinestado' : estado;
 
   function setUrl(patch: Record<string, string | undefined>) {
     const params = new URLSearchParams(sp.toString());
@@ -43,7 +48,7 @@ function FiltrosCarteraInner({ provincias, paises }: Props) {
     router.push(qs ? `${pathname}?${qs}` : pathname);
   }
 
-  const hayAlguno = Boolean(cliente || provincia || pais || estado || llamar);
+  const hayAlguno = Boolean(cliente || provincia || pais || estado || llamar || sinEstado);
 
   return (
     <div className="barra-filtros">
@@ -85,13 +90,24 @@ function FiltrosCarteraInner({ provincias, paises }: Props) {
 
       <label className="campo-filtro">
         Estado
-        <select value={estado} onChange={(e) => setUrl({ estado: e.target.value || undefined })}>
+        <select
+          value={estadoSeleccion}
+          onChange={(e) => {
+            const v = e.target.value;
+            setUrl(
+              v === 'sinestado'
+                ? { estado: undefined, sinestado: '1' }
+                : { estado: v || undefined, sinestado: undefined },
+            );
+          }}
+        >
           <option value="">Todos</option>
           {ESTADOS_CRM.map((e) => (
             <option key={e.valor} value={e.valor}>
               {e.etiqueta}
             </option>
           ))}
+          <option value="sinestado">Sin estado</option>
         </select>
       </label>
 
@@ -104,7 +120,7 @@ function FiltrosCarteraInner({ provincias, paises }: Props) {
           Solo los que requieren llamada
         </label>
 
-        <button className="boton" type="button" onClick={() => setUrl({ cliente: undefined, provincia: undefined, pais: undefined, estado: undefined, llamar: undefined })} disabled={!hayAlguno}>
+        <button className="boton" type="button" onClick={() => setUrl({ cliente: undefined, provincia: undefined, pais: undefined, estado: undefined, llamar: undefined, sinestado: undefined })} disabled={!hayAlguno}>
         Limpiar
       </button>
     </div>

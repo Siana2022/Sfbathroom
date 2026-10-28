@@ -62,6 +62,8 @@ console.log('cartera · normalización de filtros');
   comprobar('llamar=0 no activa nada', normalizarFiltros({ llamar: '0' }).aLlamar === false);
   comprobar('llamar basura no activa nada', normalizarFiltros({ llamar: 'sí' }).aLlamar === false);
   comprobar('llamar activo cuenta como filtro', hayFiltros(normalizarFiltros({ llamar: '1' })));
+  comprobar('sinestado=1 activa el filtro', normalizarFiltros({ sinestado: '1' }).sinEstado === true);
+  comprobar('sinestado basura no activa nada', normalizarFiltros({ sinestado: 'sí' }).sinEstado === false);
   comprobar('estado inválido se descarta', !hayFiltros(normalizarFiltros({ estado: 'inventado' })));
   comprobar('estado válido se acepta', hayFiltros(normalizarFiltros({ estado: 'ganado' })));
   comprobar('recorta espacios', normalizarFiltros({ cliente: '  Baños  ' }).cliente === 'Baños');
@@ -93,6 +95,12 @@ console.log('cartera · filtrado');
     filtrarCartera(muestra, { aLlamar: true, provincia: 'Barcelona' }).map((f) => f.cliente).join(',') === 'Sanitarios Bravo',
   );
   comprobar('aLlamar=false no filtra nada', filtrarCartera(muestra, { aLlamar: false }).length === 10);
+  // En la muestra solo 'Sin Datos SA' viene sin estado CRM.
+  comprobar(
+    'solo los sin estado',
+    filtrarCartera(muestra, { sinEstado: true }).every((f) => f.estadoCrm === null),
+  );
+  comprobar('sin estado no deja fuera a nadie con estado', filtrarCartera(muestra, { sinEstado: true }).length === 1);
   comprobar('perdido', filtrarCartera(muestra, { estadoCrm: 'perdido' }).length === 1);
   comprobar('estado sin clientes', filtrarCartera(muestra, { estadoCrm: 'ganado' }).length === 1);
 

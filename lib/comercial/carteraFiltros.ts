@@ -22,6 +22,8 @@ export type FiltrosCartera = {
    * habitual para ellos (el mismo criterio que el contador "requieren llamada").
    */
   aLlamar?: boolean;
+  /** Solo los clientes sin estado CRM asignado (para completar la cartera). */
+  sinEstado?: boolean;
 };
 
 export type FilaFiltrable = {
@@ -46,6 +48,7 @@ export function normalizarFiltros(sp: {
   pais?: string | string[];
   estado?: string | string[];
   llamar?: string | string[];
+  sinestado?: string | string[];
 }): FiltrosCartera {
   const estado = limpiarFiltro(sp.estado);
   const validos: EstadoCrm[] = ['habitual', 'nuevo', 'seguimiento', 'ganado', 'perdido'];
@@ -56,12 +59,13 @@ export function normalizarFiltros(sp: {
     estadoCrm: estado && validos.includes(estado as EstadoCrm) ? (estado as EstadoCrm) : undefined,
     // Solo el valor "1" activa el filtro: cualquier otra cosa en la URL lo ignora.
     aLlamar: limpiarFiltro(sp.llamar) === '1',
+    sinEstado: limpiarFiltro(sp.sinestado) === '1',
   };
 }
 
 /** ¿Hay algún filtro activo? Sirve para redactar "no hay resultados" con sentido. */
 export function hayFiltros(f: FiltrosCartera): boolean {
-  return Boolean(f.cliente || f.provincia || f.pais || f.estadoCrm || f.aLlamar);
+  return Boolean(f.cliente || f.provincia || f.pais || f.estadoCrm || f.aLlamar || f.sinEstado);
 }
 
 /**
@@ -76,6 +80,7 @@ export function filtrarCartera<T extends FilaFiltrable>(filas: T[], f: FiltrosCa
     if (f.pais && x.pais !== f.pais) return false;
     if (f.estadoCrm && x.estadoCrm !== f.estadoCrm) return false;
     if (f.aLlamar && !x.vencido) return false;
+    if (f.sinEstado && x.estadoCrm) return false;
     return true;
   });
 }

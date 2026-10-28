@@ -726,6 +726,52 @@ table.tabla .td-alerta { color: var(--rojo); }
 
 .campo-filtro.campo-check input { width: auto; margin: 0; cursor: pointer; }
 
+/* Reparto de la cartera por estado CRM: cada chip filtra el listado. */
+.resumen-estados {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 18px;
+}
+
+.resumen-estados-titulo {
+  color: var(--tenue);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  margin-right: 4px;
+}
+
+.chip-estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12.5px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.chip-estado strong { color: var(--texto, #1c1f22); font-variant-numeric: tabular-nums; }
+
+.chip-estado:hover:not(:disabled) { border-color: var(--border-2); color: var(--texto, #1c1f22); }
+
+.chip-estado.activo {
+  background: var(--wash);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.chip-estado.activo strong { color: var(--accent); }
+
+.chip-estado:disabled { opacity: 0.45; cursor: default; }
+
 /* Nota del KPI que lleva al listado filtrado. */
 .kpi-nota-enlace { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 .kpi-nota-enlace:hover { text-decoration-thickness: 2px; }
