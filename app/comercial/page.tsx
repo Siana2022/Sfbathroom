@@ -246,37 +246,37 @@ export default async function ComercialPage({ searchParams }: { searchParams: Se
       )}
 
       {vista === 'agenda' && (
-        <div className="card">
-          <h2>Agenda</h2>
-          <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 0 }}>
-            {contexto.puedeEscribir
-              ? 'Arrastra una tarjeta a otra columna para cerrar la reunión: al pasar a «Realizadas» se vuelca al histórico.'
-              : 'Vista de solo lectura de la agenda.'}
-          </p>
+        <>
+          <div className="card">
+            <h2>Agenda</h2>
+            <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 0 }}>
+              {contexto.puedeEscribir
+                ? 'Arrastra una tarjeta a otra columna para cerrar la reunión: al pasar a «Realizadas» se vuelca al histórico.'
+                : 'Vista de solo lectura de la agenda.'}
+            </p>
+
+            {d.reuniones.length === 0 ? (
+              <p style={{ color: 'var(--muted)', marginBottom: 0 }}>No hay reuniones en la agenda.</p>
+            ) : (
+              <>
+                <FiltroModalidad cuenta={cuentaModalidad} />
+                <TableroAgenda reuniones={d.reuniones} filtro={filtroModalidad} editable={contexto.puedeEscribir} conEnlace />
+              </>
+            )}
+          </div>
 
           {contexto.puedeEscribir && (
-            <details style={{ marginBottom: 14 }}>
-              <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: 14 }}>Agendar reunión</summary>
-              <div style={{ marginTop: 10 }}>
-                <FormReunion
-                  empresaCodigo={empresa}
-                  contactos={[]}
-                  clientes={d.filas.map((f) => ({ id: f.cliente_id, nombre: f.cliente }))}
-                  porDefecto={porDefectoReunion()}
-                />
-              </div>
-            </details>
+            <div className="card">
+              <h2>Agendar reunión</h2>
+              <FormReunion
+                empresaCodigo={empresa}
+                contactos={[]}
+                clientes={d.filas.map((f) => ({ id: f.cliente_id, nombre: f.cliente }))}
+                porDefecto={porDefectoReunion()}
+              />
+            </div>
           )}
-
-          {d.reuniones.length === 0 ? (
-            <p style={{ color: 'var(--muted)' }}>No hay reuniones en la agenda.</p>
-          ) : (
-            <>
-              <FiltroModalidad cuenta={cuentaModalidad} />
-              <TableroAgenda reuniones={d.reuniones} filtro={filtroModalidad} editable={contexto.puedeEscribir} conEnlace />
-            </>
-          )}
-        </div>
+        </>
       )}
 
       {vista === 'seguimiento' && (

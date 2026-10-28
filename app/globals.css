@@ -616,6 +616,17 @@ ul.tablas { color: var(--muted); font-size: 13px; margin: 8px 0 0; padding-left:
   box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15);
 }
 
+/* Etiqueta encima del campo, no al lado.
+   Sin esto un <label> suelto es inline y el campo queda pegado a su texto en la
+   misma línea, que es como se veían amontonados los formularios. Se limita a
+   `form label` para no tocar los filtros, que ya usan .campo-filtro, ni el login,
+   que fija su propio display. Los label con `style` inline siguen mandando. */
+form label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
 /* ---------------- Gráfico de barras ---------------- */
 
 .barras { display: flex; align-items: stretch; gap: 8px; height: 220px; margin-top: 14px; }

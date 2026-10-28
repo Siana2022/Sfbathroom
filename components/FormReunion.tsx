@@ -101,8 +101,8 @@ export default function FormReunion({ clienteId, empresaCodigo, contactos, clien
   const faltanDatos = fechaHora === '' || cliente === '';
 
   return (
-    <form onSubmit={guardar} style={{ display: 'grid', gap: 8 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
+    <form onSubmit={guardar} style={{ display: 'grid', gap: 8, maxWidth: 640 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         {!clienteId && (
           <label>
             Cliente *
@@ -169,7 +169,7 @@ export default function FormReunion({ clienteId, empresaCodigo, contactos, clien
       </label>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         <button className="btn" type="submit" disabled={cargando || faltanDatos}>
-          {cargando ? 'Agendando…' : 'Agendar reunión'}
+          {cargando ? 'Agendando…' : 'Agendar'}
         </button>
         {estado && (
           <span style={{ fontSize: 12, color: estado.tipo === 'error' ? 'var(--rojo)' : 'var(--muted)' }}>
