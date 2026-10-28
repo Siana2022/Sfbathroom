@@ -68,6 +68,15 @@ ningún sitio, pero sí que sea un módulo con efectos en el nivel superior.
   `permission denied for function auth_role` (la fila está protegida por RLS);
   si no existe, responde 400 `42703 column does not exist`. Ese contraste es la
   comprobación de que el SQL está aplicado.
+- **`comerciales` es único por `(codigo_erp, empresa_id)`, NO por `codigo_erp`.** El
+  mismo código existe en las tres empresas (SF/DOT/FUX): en los datos reales, el
+  '4' es a la vez "STARBATH PLUS - ALBA RAJADELL" y "ESPAÑA - CARLOS TARAZONA".
+  Un `where codigo_erp = '4'` devuelve varias filas, así que un
+  `set comercial_id = (select id from comerciales where codigo_erp = '4')` revienta
+  con "more than one row returned by a subquery". Filtra siempre por la pareja
+  (o por `empresa_id`). La cartera además es por empresa: `getPanelComercial`
+  filtra por `empresa_id` + `comercial_id`, y la empresa sale de la cookie
+  `sfb_empresa` (por defecto 'SF').
 - **`getCarteraComercial` (en `lib/datos/comercial.ts`) es código muerto.** La
   cartera real sale de `getPanelComercial`. Al tocar la cartera, mira cuál de las
   dos está en uso o te dejarás columnas sin cambiar.
