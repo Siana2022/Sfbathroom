@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { contextoDePeticion, noAutenticado, sinPermiso } from '@/lib/supabase/sesion';
+import { contextoDePeticion, errorDeFuncion, noAutenticado, sinPermiso } from '@/lib/supabase/sesion';
 import { ESTADOS_CRM } from '@/lib/comercial/tipos';
 
 const ESTADOS = ESTADOS_CRM.map((e) => e.valor);
@@ -7,15 +7,15 @@ const ESTADOS = ESTADOS_CRM.map((e) => e.valor);
 /**
  * Actualiza el estado CRM del cliente y su persona habitual de contacto.
  *
- * El estado CRM lo decide el comercial, no se deduce de los pedidos: por eso
- * vive en `clientes.estado_crm` y no toca `clientes.estado`, que lo calcula el
- * ERP y alimenta el semáforo de fuga. El upsert de A3ERP no sobrescribe estas
- * columnas, así que lo que se escriba aquí se mantiene.
+ * Estas dos columnas las mantiene el comercial, pero `clientes` solo deja
+ * escribir a admin/direccion: el RLS es por fila y no por columna, así que
+ * abrir la tabla le daría también `limite_credito` y compañía. Por eso la
+ * escritura pasa por dos funciones en base de datos (`crm_set_estado_cliente`
+ * y `crm_set_contacto_habitual`) que comprueban dentro que el cliente es de la
+ * cartera del usuario. Ver 0042_crm_comercial_escribe_clientes.sql.
  *
- * Se actualiza solo lo que llega en el cuerpo. Antes bastaba con mandar
- * `estado_crm`, pero la ficha también guarda aquí la persona habitual: si esta
- * llamada borrase lo que no le mandan, marcar el contacto habitual dejaría al
- * cliente sin estado.
+ * Se actualiza solo lo que llega en el cuerpo: mandar la persona habitual no
+ * debe borrar el estado, ni al revés.
  */
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const { supabase, contexto } = await contextoDePeticion();
@@ -23,49 +23,39 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (!contexto.puedeEscribir) return sinPermiso();
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-  const update: Record<string, unknown> = {};
 
-  if ('estado_crm' in body) {
+  const tieneEstado = 'estado_crm' in body;
+  const tieneHabitual = 'contacto_habitual_id' in body;
+
+  if (!tieneEstado && !tieneHabitual) {
+    return NextResponse.json({ error: 'Nada que actualizar.' }, { status: 400 });
+  }
+
+  if (tieneEstado) {
     const estado = typeof body.estado_crm === 'string' && body.estado_crm !== '' ? body.estado_crm : null;
     if (estado && !ESTADOS.includes(estado as never)) {
       return NextResponse.json({ error: `Estado no válido: ${estado}` }, { status: 400 });
     }
     const motivo = typeof body.motivo_perdida === 'string' ? body.motivo_perdida.trim() : '';
-    update.estado_crm = estado;
-    // El motivo solo tiene sentido si el cliente queda como perdido: en
-    // cualquier otro caso se limpia, para no arrastrar un motivo viejo.
-    update.motivo_perdida = estado === 'perdido' && motivo !== '' ? motivo : null;
+    const { error } = await supabase.rpc('crm_set_estado_cliente', {
+      p_cliente_id: params.id,
+      p_estado: estado,
+      p_motivo: motivo || null,
+    });
+    if (error) return errorDeFuncion(error.message);
   }
 
-  if ('contacto_habitual_id' in body) {
+  if (tieneHabitual) {
     const contactoId =
       typeof body.contacto_habitual_id === 'string' && body.contacto_habitual_id !== ''
         ? body.contacto_habitual_id
         : null;
-    if (contactoId) {
-      // El contacto tiene que ser de este cliente: si no, la cartera mostraría
-      // a una persona que no es de la empresa que se está llamando.
-      const { data: c } = await supabase
-        .from('contactos')
-        .select('id')
-        .eq('id', contactoId)
-        .eq('cliente_id', params.id)
-        .maybeSingle();
-      if (!c) return NextResponse.json({ error: 'El contacto no pertenece a este cliente.' }, { status: 400 });
-    }
-    update.contacto_habitual_id = contactoId;
+    const { error } = await supabase.rpc('crm_set_contacto_habitual', {
+      p_cliente_id: params.id,
+      p_contacto_id: contactoId,
+    });
+    if (error) return errorDeFuncion(error.message);
   }
 
-  if (Object.keys(update).length === 0) {
-    return NextResponse.json({ error: 'Nada que actualizar.' }, { status: 400 });
-  }
-
-  const { data, error } = await supabase
-    .from('clientes')
-    .update(update)
-    .eq('id', params.id)
-    .select('id, estado_crm, motivo_perdida, contacto_habitual_id')
-    .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  return NextResponse.json(data);
+  return NextResponse.json({ ok: true });
 }

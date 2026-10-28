@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { contextoDePeticion, noAutenticado, sinPermiso } from '@/lib/supabase/sesion';
+import { contextoDePeticion, errorDeFuncion, noAutenticado, sinPermiso } from '@/lib/supabase/sesion';
 import { MODALIDADES_REUNION, ESTADOS_REUNION, RESULTADOS_INTERACCION, ESTADOS_CRM } from '@/lib/comercial/tipos';
 
 const MODALIDADES = MODALIDADES_REUNION.map((m) => m.valor);
@@ -125,17 +125,16 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
   // El estado CRM del cliente se aplica después de guardar la reunión: si algo
-  // falla en la reunión, no se queda un estado cambiado a medias.
+  // falla en la reunión, no se queda un estado cambiado a medias. Va por la
+  // función de 0042 porque `clientes` no se puede escribir como comercial.
   if (estadoCrm) {
     const motivo = typeof body.motivo_perdida === 'string' ? body.motivo_perdida.trim() : '';
-    const { error: errCli } = await supabase
-      .from('clientes')
-      .update({
-        estado_crm: estadoCrm,
-        motivo_perdida: estadoCrm === 'perdido' && motivo !== '' ? motivo : null,
-      })
-      .eq('id', actual.cliente_id);
-    if (errCli) return NextResponse.json({ error: errCli.message }, { status: 400 });
+    const { error: errCli } = await supabase.rpc('crm_set_estado_cliente', {
+      p_cliente_id: actual.cliente_id,
+      p_estado: estadoCrm,
+      p_motivo: motivo || null,
+    });
+    if (errCli) return errorDeFuncion(errCli.message);
   }
 
   return NextResponse.json(data);

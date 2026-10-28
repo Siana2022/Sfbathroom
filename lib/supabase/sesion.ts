@@ -48,6 +48,19 @@ export function sinPermiso() {
   return NextResponse.json({ error: 'Sin permiso para esta operación.' }, { status: 403 });
 }
 
+/**
+ * Traduce el error de una función de base de datos a una respuesta HTTP.
+ *
+ * Las funciones de 0042 levantan 42501 cuando el cliente no es de la cartera
+ * del usuario: eso es un 403, no un 400. Devolverlo como 400 le diría al
+ * navegador que "mandó mal" algo que en realidad no le corresponde.
+ */
+export function errorDeFuncion(message: string) {
+  if (message.includes('Sin permiso')) return NextResponse.json({ error: 'Sin permiso para esta operación.' }, { status: 403 });
+  if (message.includes('No autenticado')) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+  return NextResponse.json({ error: message }, { status: 400 });
+}
+
 const CAMPOS_CONTACTO = ['nombre', 'apellidos', 'cargo', 'email', 'telefono', 'movil', 'pais', 'provincia', 'idioma', 'notas'] as const;
 
 /** Saneado del body de un contacto: solo campos conocidos, texto o null. */

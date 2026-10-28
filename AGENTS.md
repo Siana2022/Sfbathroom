@@ -71,6 +71,17 @@ ningún sitio, pero sí que sea un módulo con efectos en el nivel superior.
 - **`getCarteraComercial` (en `lib/datos/comercial.ts`) es código muerto.** La
   cartera real sale de `getPanelComercial`. Al tocar la cartera, mira cuál de las
   dos está en uso o te dejarás columnas sin cambiar.
+- **RLS es por FILA, no por columna.** `clientes` solo lo escribe admin/direccion
+  (`clientes_write`, 0001). No se puede abrir la fila "solo un poco": una política
+  que deje al comercial actualizar su cliente le deja también `limite_credito` y
+  `plazo_pactado_dias`. Para darle columnas sueltas, la vía son funciones
+  `security definer` con la comprobación dentro (ver 0042): la tabla no se abre.
+- **El estado CRM del cliente se escribe desde dos sitios**, no uno: el PATCH de
+  `app/api/comercial/clientes/[id]/route.ts` y el PATCH de
+  `app/api/comercial/reuniones/[id]/route.ts` (al cerrar una reunión). Si cambias
+  cómo se guarda `estado_crm`, mira los dos.
+- **Los errores de las funciones de 0042 se traducen con `errorDeFuncion`.** Un
+  42501 (cliente fuera de la cartera) tiene que salir 403, no 400.
 
 ## Flujo de trabajo
 
