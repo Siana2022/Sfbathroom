@@ -52,6 +52,14 @@ export default function Nav({ userEmail }: { userEmail?: string }) {
         Documentos origen (drill-down)
       </Link>
 
+      <p className="nav-group">Acceso comercial</p>
+      <Link key="/comercial" href="/comercial" className={pathname === '/comercial' || pathname.startsWith('/comercial/clientes') ? 'activo' : ''}>
+        Mi cartera
+      </Link>
+      <Link key="/comercial/contactos" href="/comercial/contactos" className={activo('/comercial/contactos')}>
+        Contactos
+      </Link>
+
       <p className="nav-group">Otros módulos</p>
       {otrosModulos.map((m) => (
         <Link key={m.slug} href={m.slug} className={activo(m.slug)}>
