@@ -17,6 +17,11 @@ export type FiltrosCartera = {
   provincia?: string;
   pais?: string;
   estadoCrm?: EstadoCrm;
+  /**
+   * Solo los clientes que requieren llamada: llevan más tiempo sin pedir del
+   * habitual para ellos (el mismo criterio que el contador "requieren llamada").
+   */
+  aLlamar?: boolean;
 };
 
 export type FilaFiltrable = {
@@ -24,6 +29,8 @@ export type FilaFiltrable = {
   provincia: string | null;
   pais: string | null;
   estadoCrm: EstadoCrm | null;
+  /** Requiere llamada (mismo criterio que el contador del KPI). */
+  vencido?: boolean;
 };
 
 /** Normaliza un valor de filtro: vacío o solo espacios es "sin filtro". */
@@ -38,6 +45,7 @@ export function normalizarFiltros(sp: {
   provincia?: string | string[];
   pais?: string | string[];
   estado?: string | string[];
+  llamar?: string | string[];
 }): FiltrosCartera {
   const estado = limpiarFiltro(sp.estado);
   const validos: EstadoCrm[] = ['habitual', 'nuevo', 'seguimiento', 'ganado', 'perdido'];
@@ -46,12 +54,14 @@ export function normalizarFiltros(sp: {
     provincia: limpiarFiltro(sp.provincia),
     pais: limpiarFiltro(sp.pais),
     estadoCrm: estado && validos.includes(estado as EstadoCrm) ? (estado as EstadoCrm) : undefined,
+    // Solo el valor "1" activa el filtro: cualquier otra cosa en la URL lo ignora.
+    aLlamar: limpiarFiltro(sp.llamar) === '1',
   };
 }
 
 /** ¿Hay algún filtro activo? Sirve para redactar "no hay resultados" con sentido. */
 export function hayFiltros(f: FiltrosCartera): boolean {
-  return Boolean(f.cliente || f.provincia || f.pais || f.estadoCrm);
+  return Boolean(f.cliente || f.provincia || f.pais || f.estadoCrm || f.aLlamar);
 }
 
 /**
@@ -65,6 +75,7 @@ export function filtrarCartera<T extends FilaFiltrable>(filas: T[], f: FiltrosCa
     if (f.provincia && x.provincia !== f.provincia) return false;
     if (f.pais && x.pais !== f.pais) return false;
     if (f.estadoCrm && x.estadoCrm !== f.estadoCrm) return false;
+    if (f.aLlamar && !x.vencido) return false;
     return true;
   });
 }

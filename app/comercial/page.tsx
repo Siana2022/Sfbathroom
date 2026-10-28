@@ -105,6 +105,19 @@ export default async function ComercialPage({ searchParams }: { searchParams: Se
   const filtroModalidad = normalizarFiltroModalidad(searchParams.modalidad);
   const cuentaModalidad = contarPorModalidad(d.reuniones);
 
+  // Enlace a la cartera filtrada por "requieren llamada". Se arrastran los
+  // demás parámetros (periodo, ámbito de dirección) porque si no el clic
+  // cambiaría la cartera que se está mirando.
+  const qsLlamar = (() => {
+    const p = new URLSearchParams();
+    for (const [k, v] of Object.entries(searchParams)) {
+      if (k === 'pagina' || k === 'llamar' || k === 'vista') continue;
+      if (typeof v === 'string' && v !== '') p.set(k, v);
+    }
+    p.set('llamar', '1');
+    return `/comercial?${p.toString()}`;
+  })();
+
   const def = rangoPorDefecto();
   const conPeriodo = rango.desde !== def.desde || rango.hasta !== def.hasta;
   const variacion = k.variacion === null ? null : Math.round(k.variacion * 10) / 10;
@@ -149,7 +162,12 @@ export default async function ComercialPage({ searchParams }: { searchParams: Se
           valor={variacion === null ? '—' : `${variacion > 0 ? '+' : ''}${numero(variacion)} %`}
           nota={k.facturacionPrevia > 0 ? `antes ${eur(k.facturacionPrevia)}` : 'sin base de comparación'}
         />
-        <Kpi etiqueta="Clientes en cartera" valor={numero(k.clientes)} nota={`${numero(k.vencidos)} requieren llamada`} />
+        <Kpi
+          etiqueta="Clientes en cartera"
+          valor={numero(k.clientes)}
+          nota={`${numero(k.vencidos)} requieren llamada`}
+          notaHref={vista === 'cartera' ? qsLlamar : undefined}
+        />
         <Kpi etiqueta="Clientes ganados" valor={numero(k.ganados)} nota="primer pedido en el periodo" />
         <Kpi etiqueta="Clientes perdidos" valor={numero(k.perdidos)} nota="+90 días sin pedir" />
         <Kpi etiqueta="Reuniones próximas" valor={numero(k.reunionesProximas)} nota="en agenda" />
@@ -202,7 +220,7 @@ export default async function ComercialPage({ searchParams }: { searchParams: Se
                       </td>
                       <td>{f.provincia ?? f.pais ?? '—'}</td>
                       <td style={{ color: 'var(--muted)' }}>{f.cadenciaTexto}</td>
-                      <td className={`td-num ${f.vencido ? 'td-pos' : ''}`}>
+                      <td className={`td-num ${f.vencido ? 'td-alerta' : ''}`}>
                         {f.diasSinPedir === null ? 'sin pedidos' : numero(f.diasSinPedir)}
                       </td>
                       <td className="td-num">{f.pedidosPeriodo === 0 ? '—' : numero(f.pedidosPeriodo)}</td>

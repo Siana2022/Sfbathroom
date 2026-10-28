@@ -707,6 +707,29 @@ table.tabla .td-num { text-align: right; font-variant-numeric: tabular-nums; whi
 
 table.tabla .td-pos { color: var(--verde); }
 
+/* Días sin pedir cuando el cliente ya está para llamar. No va en verde: el
+   verde es "todo bien" en el resto de tablas, y aquí el dato es una alarma. */
+table.tabla .td-alerta { color: var(--rojo); }
+
+/* Filtro de casilla: la etiqueta va a la derecha, no encima. */
+.campo-filtro.campo-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 7px;
+  align-self: flex-end;
+  padding-bottom: 8px;
+  color: var(--texto, #1c1f22);
+  font-size: 12.5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.campo-filtro.campo-check input { width: auto; margin: 0; cursor: pointer; }
+
+/* Nota del KPI que lleva al listado filtrado. */
+.kpi-nota-enlace { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.kpi-nota-enlace:hover { text-decoration-thickness: 2px; }
+
 /* Cabecera que ordena al pincharla. Se ve como una cabecera normal hasta que
    pasas por encima, para no llenar la tabla de botones. */
 .th-orden {

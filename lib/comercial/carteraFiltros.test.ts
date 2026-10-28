@@ -32,8 +32,9 @@ function fila(
   provincia: string | null,
   pais: string | null,
   estadoCrm: FilaFiltrable['estadoCrm'] = null,
+  vencido = false,
 ): FilaFiltrable {
-  return { cliente, provincia, pais, estadoCrm };
+  return { cliente, provincia, pais, estadoCrm, vencido };
 }
 
 const muestra: FilaFiltrable[] = [
@@ -42,11 +43,11 @@ const muestra: FilaFiltrable[] = [
   fila('Reformas Levante', 'Valencia', 'España', 'habitual'),
   fila('Bañomarket SL', 'Madrid', 'España', 'nuevo'),
   fila('Griferías Duero', 'Valladolid', 'España', 'nuevo'),
-  fila('Sanitarios Bravo', 'Barcelona', 'España', 'perdido'),
+  fila('Sanitarios Bravo', 'Barcelona', 'España', 'perdido', true),
   fila('Azulejos Penedès', 'Barcelona', 'España', 'habitual'),
   fila('Hogar y Obra', 'Madrid', 'España', 'ganado'),
   fila('Sin Datos SA', null, null, null),
-  fila('Luso Bath', 'Braga', 'Portugal', 'seguimiento'),
+  fila('Luso Bath', 'Braga', 'Portugal', 'seguimiento', true),
 ];
 
 console.log('cartera · normalización de filtros');
@@ -57,6 +58,10 @@ console.log('cartera · normalización de filtros');
   comprobar('solo espacios no filtra', !hayFiltros(normalizarFiltros({ provincia: '   ' })));
   comprobar('array vacío no filtra', !hayFiltros(normalizarFiltros({ provincia: [] })));
   comprobar('valor real sí filtra', hayFiltros(normalizarFiltros({ provincia: 'Valencia' })));
+  comprobar('llamar=1 activa el filtro', normalizarFiltros({ llamar: '1' }).aLlamar === true);
+  comprobar('llamar=0 no activa nada', normalizarFiltros({ llamar: '0' }).aLlamar === false);
+  comprobar('llamar basura no activa nada', normalizarFiltros({ llamar: 'sí' }).aLlamar === false);
+  comprobar('llamar activo cuenta como filtro', hayFiltros(normalizarFiltros({ llamar: '1' })));
   comprobar('estado inválido se descarta', !hayFiltros(normalizarFiltros({ estado: 'inventado' })));
   comprobar('estado válido se acepta', hayFiltros(normalizarFiltros({ estado: 'ganado' })));
   comprobar('recorta espacios', normalizarFiltros({ cliente: '  Baños  ' }).cliente === 'Baños');
@@ -82,6 +87,12 @@ console.log('cartera · filtrado');
   comprobar('búsqueda parcial', filtrarCartera(muestra, { cliente: 'ba' }).length === 3, 'Baños, Bañomarket, Luso Bath');
 
   comprobar('por estado CRM', filtrarCartera(muestra, { estadoCrm: 'nuevo' }).length === 2);
+  comprobar('solo los que requieren llamada', filtrarCartera(muestra, { aLlamar: true }).length === 2);
+  comprobar(
+    'requieren llamada y son de Barcelona',
+    filtrarCartera(muestra, { aLlamar: true, provincia: 'Barcelona' }).map((f) => f.cliente).join(',') === 'Sanitarios Bravo',
+  );
+  comprobar('aLlamar=false no filtra nada', filtrarCartera(muestra, { aLlamar: false }).length === 10);
   comprobar('perdido', filtrarCartera(muestra, { estadoCrm: 'perdido' }).length === 1);
   comprobar('estado sin clientes', filtrarCartera(muestra, { estadoCrm: 'ganado' }).length === 1);
 

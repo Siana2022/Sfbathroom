@@ -29,6 +29,7 @@ function FiltrosCarteraInner({ provincias, paises }: Props) {
   const provincia = sp.get('provincia') ?? '';
   const pais = sp.get('pais') ?? '';
   const estado = sp.get('estado') ?? '';
+  const llamar = sp.get('llamar') === '1';
 
   function setUrl(patch: Record<string, string | undefined>) {
     const params = new URLSearchParams(sp.toString());
@@ -42,7 +43,7 @@ function FiltrosCarteraInner({ provincias, paises }: Props) {
     router.push(qs ? `${pathname}?${qs}` : pathname);
   }
 
-  const hayAlguno = Boolean(cliente || provincia || pais || estado);
+  const hayAlguno = Boolean(cliente || provincia || pais || estado || llamar);
 
   return (
     <div className="barra-filtros">
@@ -94,7 +95,16 @@ function FiltrosCarteraInner({ provincias, paises }: Props) {
         </select>
       </label>
 
-      <button className="boton" type="button" onClick={() => setUrl({ cliente: undefined, provincia: undefined, pais: undefined, estado: undefined })} disabled={!hayAlguno}>
+      <label className="campo-filtro campo-check">
+          <input
+            type="checkbox"
+            checked={llamar}
+            onChange={(e) => setUrl({ llamar: e.target.checked ? '1' : undefined })}
+          />
+          Solo los que requieren llamada
+        </label>
+
+        <button className="boton" type="button" onClick={() => setUrl({ cliente: undefined, provincia: undefined, pais: undefined, estado: undefined, llamar: undefined })} disabled={!hayAlguno}>
         Limpiar
       </button>
     </div>
