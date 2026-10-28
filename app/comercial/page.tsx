@@ -7,12 +7,14 @@ import {
   rangoPorDefecto,
   type FilaPanel,
 } from '@/lib/datos/panelComercial';
+import { contarPorModalidad, normalizarFiltroModalidad } from '@/lib/comercial/agenda';
 import { getContextoComercial } from '@/lib/datos/comercial';
 import { eur, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import Aviso from '@/components/Aviso';
 import SelectorFechas from '@/components/SelectorFechas';
-import ListaReuniones from '@/components/ListaReuniones';
+import FiltroModalidad from '@/components/FiltroModalidad';
+import TableroAgenda from '@/components/TableroAgenda';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,6 +44,9 @@ export default async function ComercialPage({ searchParams }: { searchParams: Se
   const [d, contexto] = await Promise.all([getPanelComercial(empresa, rango), getContextoComercial()]);
   const filas = ordenarPorUrgencia(d.filas);
   const k = d.kpis;
+
+  const filtroModalidad = normalizarFiltroModalidad(searchParams.modalidad);
+  const cuentaModalidad = contarPorModalidad(d.reuniones);
 
   const def = rangoPorDefecto();
   const conPeriodo = rango.desde !== def.desde || rango.hasta !== def.hasta;
@@ -83,29 +88,26 @@ export default async function ComercialPage({ searchParams }: { searchParams: Se
       </ul>
 
       <div className="card">
-        <h2>Agenda · próximas reuniones</h2>
-        {d.agenda.length === 0 ? (
+        <h2>Agenda</h2>
+        <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 0 }}>
+          {contexto.puedeEscribir
+            ? 'Arrastra una tarjeta a otra columna para cerrar la reunión: al pasar a «Realizadas» se vuelca al histórico.'
+            : 'Vista de solo lectura de la agenda.'}
+        </p>
+        {d.reuniones.length === 0 ? (
           <p style={{ color: 'var(--muted)' }}>
-            No hay reuniones programadas. Agenda una desde la ficha de cualquier cliente.
+            No hay reuniones en la agenda. Agenda una desde la ficha de cualquier cliente.
           </p>
         ) : (
-          <ListaReuniones
-            reuniones={d.agenda.map((r) => ({
-              id: r.id,
-              cliente_id: r.cliente_id,
-              cliente: r.cliente,
-              contacto: r.contacto,
-              asunto: r.asunto,
-              fecha_hora: r.fecha_hora,
-              duracion_min: r.duracion_min,
-              modalidad: r.modalidad,
-              estado: r.estado,
-              notas: r.notas,
-              interaccion_id: r.interaccion_id,
-            }))}
-            conEnlace
-            editable={contexto.puedeEscribir}
-          />
+          <>
+            <FiltroModalidad cuenta={cuentaModalidad} />
+            <TableroAgenda
+              reuniones={d.reuniones}
+              filtro={filtroModalidad}
+              editable={contexto.puedeEscribir}
+              conEnlace
+            />
+          </>
         )}
       </div>
 

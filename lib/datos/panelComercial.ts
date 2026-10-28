@@ -4,6 +4,7 @@ import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 import { calcularCadencia, type Cadencia } from '@/lib/comercial/cadencia';
 import { normalizarRango, rangoAnterior, rangoPorDefecto, hoyISO, type RangoFechas } from '@/lib/comercial/periodos';
 import { ordenarPorUrgencia, type FilaPanel } from '@/lib/comercial/cartera';
+import { ventanaAgenda } from '@/lib/comercial/agenda';
 import type { ReunionConContexto } from '@/lib/comercial/tipos';
 
 /**
@@ -42,7 +43,10 @@ export type PanelComercial = {
   rango: RangoFechas;
   kpis: KpisPanel;
   filas: FilaPanel[];
+  /** Reuniones próximas (programadas y no vencidas hace rato). */
   agenda: ReunionAgenda[];
+  /** Todas las reuniones del alcance del comercial, para el tablero por estado. */
+  reuniones: ReunionConContexto[];
 };
 
 type FilaCliente = {
@@ -147,6 +151,9 @@ export async function getPanelComercial(
             'id, cliente_id, contacto_id, comercial_id, usuario_id, fecha_hora, duracion_min, asunto, modalidad, estado, notas, interaccion_id, created_at',
           )
           .eq('empresa_id', empresa.id)
+          // Ventana acotada: todo el futuro más los últimos meses. Sin esto el
+          // tablero acabaría cargando años de reuniones cerradas que nadie mira.
+          .gte('fecha_hora', ventanaAgenda(hoy))
           .order('fecha_hora')
           .range(desde, desde + TAMANO_PAGINA - 1),
       ),
@@ -260,27 +267,31 @@ export async function getPanelComercial(
   }
 
   const ahora = hoy.getTime();
-  const agenda: ReunionAgenda[] = reuniones
+
+  // Todas las reuniones con contexto: alimentan el tablero por estado.
+  const todasReuniones: ReunionConContexto[] = reuniones.map((r) => ({
+    id: r.id,
+    cliente_id: r.cliente_id,
+    contacto_id: r.contacto_id,
+    comercial_id: r.comercial_id,
+    usuario_id: r.usuario_id,
+    fecha_hora: r.fecha_hora,
+    duracion_min: r.duracion_min,
+    asunto: r.asunto,
+    modalidad: (r.modalidad as ReunionConContexto['modalidad']) ?? null,
+    estado: r.estado as ReunionConContexto['estado'],
+    notas: r.notas,
+    interaccion_id: r.interaccion_id,
+    created_at: r.created_at,
+    cliente: nombreCliente.get(r.cliente_id) ?? '—',
+    contacto: r.contacto_id ? contactoNombre.get(r.contacto_id) ?? null : null,
+    comercial: r.comercial_id ? comercialNombre.get(r.comercial_id) ?? null : null,
+  }));
+
+  // Reuniones próximas para el resumen de KPIs y el aviso de "lo siguiente".
+  const agenda: ReunionAgenda[] = todasReuniones
     .filter((r) => r.estado === 'programada')
-    .map((r) => ({
-      id: r.id,
-      cliente_id: r.cliente_id,
-      contacto_id: r.contacto_id,
-      comercial_id: r.comercial_id,
-      usuario_id: r.usuario_id,
-      fecha_hora: r.fecha_hora,
-      duracion_min: r.duracion_min,
-      asunto: r.asunto,
-      modalidad: (r.modalidad as ReunionConContexto['modalidad']) ?? null,
-      estado: r.estado as ReunionConContexto['estado'],
-      notas: r.notas,
-      interaccion_id: r.interaccion_id,
-      created_at: r.created_at,
-      cliente: nombreCliente.get(r.cliente_id) ?? '—',
-      contacto: r.contacto_id ? contactoNombre.get(r.contacto_id) ?? null : null,
-      comercial: r.comercial_id ? comercialNombre.get(r.comercial_id) ?? null : null,
-      minutos: Math.round((Date.parse(r.fecha_hora) - ahora) / 60000),
-    }))
+    .map((r) => ({ ...r, minutos: Math.round((Date.parse(r.fecha_hora) - ahora) / 60000) }))
     .filter((r) => r.minutos >= -60) // una reunión recién pasada sigue visible un rato
     .slice(0, 20);
 
@@ -302,6 +313,7 @@ export async function getPanelComercial(
     },
     filas,
     agenda,
+    reuniones: todasReuniones,
   };
 }
 
