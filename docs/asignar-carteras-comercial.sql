@@ -5,6 +5,10 @@
 -- distinto en cada una, con su código y su trozo de cartera. `profiles.
 -- comercial_id` solo admite una, así que las demás van en `perfiles_comerciales`.
 --
+-- Carlos Tarazona: 10 carteras, 1.935 clientes en total (SF 731, DOT 496, FUX 708).
+-- Se dejan fuera a propósito PARTICULARES (SF 139 + FUX 142) y PROVEEDORES
+-- (SF 25 + FUX 25), que están entre sus códigos pero no son cartera de ventas.
+--
 -- Ejecutar en Supabase → SQL Editor. Los datos salen de aquí:
 --   select e.codigo, cm.codigo_erp, cm.nombre, count(c.id) as clientes
 --   from public.comerciales cm
