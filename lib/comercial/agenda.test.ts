@@ -35,6 +35,7 @@ function reu(
     id,
     cliente_id: 'c1',
     contacto_id: null,
+    contacto_nombre: null,
     comercial_id: null,
     usuario_id: null,
     fecha_hora: '2026-10-29T09:00:00Z',

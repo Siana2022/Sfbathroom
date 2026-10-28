@@ -45,11 +45,21 @@ export async function POST(req: Request) {
 
   const empresa = await getEmpresaPorCodigo((body.empresa_codigo as string) || 'SF');
 
+  // El nombre a mano es el respaldo cuando la persona no está dada de alta como
+  // contacto. Si se elige un contacto de la ficha, el nombre libre se descarta
+  // para no guardar dos versiones de lo mismo.
+  const contactoId = typeof body.contacto_id === 'string' && body.contacto_id !== '' ? body.contacto_id : null;
+  const contactoNombre =
+    !contactoId && typeof body.contacto_nombre === 'string' && body.contacto_nombre.trim() !== ''
+      ? body.contacto_nombre.trim()
+      : null;
+
   const { data, error } = await supabase
     .from('reuniones')
     .insert({
       cliente_id: clienteId,
-      contacto_id: typeof body.contacto_id === 'string' && body.contacto_id !== '' ? body.contacto_id : null,
+      contacto_id: contactoId,
+      contacto_nombre: contactoNombre,
       empresa_id: empresa.id,
       comercial_id: contexto.esComercial ? contexto.comercialId : (body.comercial_id as string) || null,
       usuario_id: contexto.userId,

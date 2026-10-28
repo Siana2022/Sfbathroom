@@ -43,10 +43,19 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         ? body.modalidad_otro.trim()
         : null;
   }
-  for (const k of ['asunto', 'notas', 'contacto_id'] as const) {
+  for (const k of ['asunto', 'notas'] as const) {
     if (k in body) {
       update[k] = typeof body[k] === 'string' && (body[k] as string).trim() !== '' ? (body[k] as string).trim() : null;
     }
+  }
+  if ('contacto_id' in body || 'contacto_nombre' in body) {
+    const id = typeof body.contacto_id === 'string' && body.contacto_id.trim() !== '' ? body.contacto_id.trim() : null;
+    const nombre =
+      typeof body.contacto_nombre === 'string' && body.contacto_nombre.trim() !== '' ? body.contacto_nombre.trim() : null;
+    update.contacto_id = id;
+    // Igual que al crear: si hay contacto de la ficha, el nombre a mano se
+    // limpia; si no, se guarda como respaldo.
+    update.contacto_nombre = id ? null : nombre;
   }
   if ('duracion_min' in body) {
     const d = body.duracion_min === null || body.duracion_min === '' ? null : Number(body.duracion_min);

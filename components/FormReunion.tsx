@@ -27,6 +27,7 @@ export default function FormReunion({ clienteId, empresaCodigo, contactos, clien
   const [cargados, setCargados] = useState<ContactoMin[]>([]);
   const [fechaHora, setFechaHora] = useState(porDefecto ?? '');
   const [contactoId, setContactoId] = useState('');
+  const [contactoLibre, setContactoLibre] = useState('');
   const [asunto, setAsunto] = useState('');
   const [modalidad, setModalidad] = useState('presencial');
   const [modalidadOtro, setModalidadOtro] = useState('');
@@ -40,6 +41,10 @@ export default function FormReunion({ clienteId, empresaCodigo, contactos, clien
   // un array nuevo en cada render y sincronizarlo por estado daría un bucle.
   const listaContactos = clienteId ? contactos : cargados;
 
+  /** Valor centinela del desplegable para escribir un nombre que no está dado de alta. */
+  const OTRO = '__otro__';
+  const escribiendo = contactoId === OTRO;
+
   useEffect(() => {
     if (clienteId || !cliente) {
       setCargados([]);
@@ -47,6 +52,7 @@ export default function FormReunion({ clienteId, empresaCodigo, contactos, clien
     }
     let vigente = true;
     setContactoId('');
+    setContactoLibre('');
     fetch(`/api/comercial/contactos?cliente_id=${encodeURIComponent(cliente)}`)
       .then((r) => (r.ok ? r.json() : []))
       .then((d: ContactoMin[]) => {
@@ -72,7 +78,8 @@ export default function FormReunion({ clienteId, empresaCodigo, contactos, clien
           cliente_id: cliente,
           empresa_codigo: empresaCodigo,
           fecha_hora: fechaHora,
-          contacto_id: contactoId || null,
+          contacto_id: contactoId && contactoId !== OTRO ? contactoId : null,
+          contacto_nombre: contactoId === OTRO ? contactoLibre : null,
           asunto,
           modalidad,
           modalidad_otro: modalidad === 'otros' ? modalidadOtro : null,
@@ -86,6 +93,7 @@ export default function FormReunion({ clienteId, empresaCodigo, contactos, clien
       setAsunto('');
       setNotas('');
       setModalidadOtro('');
+      setContactoLibre('');
       if (!clienteId) {
         setCliente('');
         setContactoId('');
@@ -128,13 +136,35 @@ export default function FormReunion({ clienteId, empresaCodigo, contactos, clien
         </label>
         <label>
           Contacto
-          <select className="input-dato" value={contactoId} onChange={(e) => setContactoId(e.target.value)}>
+          <select
+            className="input-dato"
+            value={contactoId}
+            onChange={(e) => {
+              setContactoId(e.target.value);
+              if (e.target.value !== OTRO) setContactoLibre('');
+            }}
+          >
             <option value="">—</option>
             {listaContactos.map((c) => (
               <option key={c.id} value={c.id}>{`${c.nombre}${c.apellidos ? ` ${c.apellidos}` : ''}`}</option>
             ))}
+            {/* La persona con la que se queda a veces no está dada de alta
+                todavía; se escribe aquí solo para el seguimiento. */}
+            <option value={OTRO}>Otro (escribir nombre)…</option>
           </select>
         </label>
+        {escribiendo && (
+          <label>
+            Nombre del contacto
+            <input
+              className="input-dato"
+              value={contactoLibre}
+              onChange={(e) => setContactoLibre(e.target.value)}
+              placeholder="Quién te atiende"
+              maxLength={120}
+            />
+          </label>
+        )}
         <label>
           Modalidad
           <select className="input-dato" value={modalidad} onChange={(e) => setModalidad(e.target.value)}>

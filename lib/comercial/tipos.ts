@@ -122,6 +122,11 @@ export type Reunion = {
   id: string;
   cliente_id: string;
   contacto_id: string | null;
+  /**
+   * Nombre escrito a mano cuando la persona no está dada de alta como contacto.
+   * Solo para el seguimiento de la agenda: no crea un contacto en la ficha.
+   */
+  contacto_nombre: string | null;
   comercial_id: string | null;
   usuario_id: string | null;
   fecha_hora: string;
@@ -138,6 +143,7 @@ export type Reunion = {
 
 export type ReunionConContexto = Reunion & {
   cliente: string;
+  /** Contacto de la ficha si lo hay; si no, el nombre escrito a mano. */
   contacto: string | null;
   comercial: string | null;
 };
