@@ -2,20 +2,30 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { getFichaComercial, getContextoComercial } from '@/lib/datos/comercial';
+import { getReunionesCliente } from '@/lib/datos/panelComercial';
 import { ETIQUETA_TIPO } from '@/lib/comercial/tipos';
 import { eur, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import ListaContactos from '@/components/ListaContactos';
+import ListaReuniones from '@/components/ListaReuniones';
 import FormInteraccion from '@/components/FormInteraccion';
+import FormReunion from '@/components/FormReunion';
 import ResumenIA from '@/components/ResumenIA';
 
 export const dynamic = 'force-dynamic';
 
-/** Ficha comercial: contactos, histórico de conversaciones y pedidos. */
+/** Ficha comercial: contactos, agenda, histórico de conversaciones y pedidos. */
 export default async function FichaComercialPage({ params }: { params: { id: string } }) {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
-  const [d, contexto] = await Promise.all([getFichaComercial(empresa, params.id), getContextoComercial()]);
+  const [d, contexto, reuniones] = await Promise.all([
+    getFichaComercial(empresa, params.id),
+    getContextoComercial(),
+    getReunionesCliente(empresa, params.id),
+  ]);
   if (!d) notFound();
+
+  const proximas = reuniones.filter((r) => r.estado === 'programada');
+  const pasadas = reuniones.filter((r) => r.estado !== 'programada');
 
   const ultimoResumen = d.interacciones.find((i) => i.resumen_ia)?.resumen_ia ?? null;
   const ultimasConclusiones = d.interacciones.find((i) => i.conclusiones_ia)?.conclusiones_ia ?? null;
@@ -42,6 +52,40 @@ export default async function FichaComercialPage({ params }: { params: { id: str
       </ul>
 
       <ListaContactos clienteId={d.cliente.id} empresaCodigo={empresa} contactos={d.contactos} />
+
+      {contexto.puedeEscribir && (
+        <div className="card">
+          <h2>Agendar reunión</h2>
+          <FormReunion
+            clienteId={d.cliente.id}
+            empresaCodigo={empresa}
+            contactos={d.contactos}
+            porDefecto={(() => {
+              const m = new Date(Date.now() + 86400000);
+              m.setUTCHours(9, 0, 0, 0);
+              return m.toISOString().slice(0, 16);
+            })()}
+          />
+        </div>
+      )}
+
+      <div className="card">
+        <h2>Agenda</h2>
+        {proximas.length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>Sin reuniones programadas con este cliente.</p>
+        ) : (
+          <ListaReuniones
+            reuniones={proximas}
+            editable={contexto.puedeEscribir}
+          />
+        )}
+        {pasadas.length > 0 && (
+          <>
+            <h3 style={{ marginTop: 18, fontSize: 14, color: 'var(--muted)' }}>Reuniones cerradas</h3>
+            <ListaReuniones reuniones={pasadas} />
+          </>
+        )}
+      </div>
 
       {contexto.puedeEscribir && (
         <div className="card">

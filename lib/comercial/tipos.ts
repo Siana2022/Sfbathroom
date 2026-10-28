@@ -58,3 +58,49 @@ export type Interaccion = {
   conclusiones_ia: string | null;
   resumen_generado_at: string | null;
 };
+
+export type EstadoReunion = 'programada' | 'realizada' | 'cancelada';
+
+export const ESTADOS_REUNION: { valor: EstadoReunion; etiqueta: string }[] = [
+  { valor: 'programada', etiqueta: 'Programada' },
+  { valor: 'realizada', etiqueta: 'Realizada' },
+  { valor: 'cancelada', etiqueta: 'Cancelada' },
+];
+
+export type ModalidadReunion = 'presencial' | 'telefono' | 'videollamada';
+
+export const MODALIDADES_REUNION: { valor: ModalidadReunion; etiqueta: string }[] = [
+  { valor: 'presencial', etiqueta: 'Presencial' },
+  { valor: 'telefono', etiqueta: 'Teléfono' },
+  { valor: 'videollamada', etiqueta: 'Videollamada' },
+];
+
+export const ETIQUETA_ESTADO_REUNION: Record<string, string> = Object.fromEntries(
+  ESTADOS_REUNION.map((e) => [e.valor, e.etiqueta]),
+);
+
+export const ETIQUETA_MODALIDAD: Record<string, string> = Object.fromEntries(
+  MODALIDADES_REUNION.map((m) => [m.valor, m.etiqueta]),
+);
+
+export type Reunion = {
+  id: string;
+  cliente_id: string;
+  contacto_id: string | null;
+  comercial_id: string | null;
+  usuario_id: string | null;
+  fecha_hora: string;
+  duracion_min: number | null;
+  asunto: string | null;
+  modalidad: ModalidadReunion | null;
+  estado: EstadoReunion;
+  notas: string | null;
+  interaccion_id: string | null;
+  created_at: string;
+};
+
+export type ReunionConContexto = Reunion & {
+  cliente: string;
+  contacto: string | null;
+  comercial: string | null;
+};
