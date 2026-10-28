@@ -44,16 +44,18 @@ security definer
 set search_path = public
 as $$
 begin
-  -- admin puede todo: ya lo permite profiles_admin_update, y es quien asigna
-  -- roles y carteras.
-  if public.auth_role() = 'admin' then
+  -- Sin usuario autenticado no hay ataque posible, y esto cubre de una vez el
+  -- SQL Editor (que corre como postgres), los jobs con service_role y psql.
+  -- Es imprescindible: `docs/asignar-carteras-comercial.sql` cambia
+  -- `comercial_id` desde el SQL Editor, y sin esta salida el trigger se lo
+  -- bloquearía a sí mismo.
+  if auth.uid() is null then
     return new;
   end if;
 
-  -- service_role (jobs del cron, servidor MCP) salta el RLS, así que también
-  -- tiene que saltar esta guarda. Sin esta línea, el primer proceso de servidor
-  -- que tocara profiles empezaría a fallar sin motivo.
-  if auth.role() = 'service_role' then
+  -- admin puede todo: ya lo permite profiles_admin_update, y es quien asigna
+  -- roles y carteras.
+  if public.auth_role() = 'admin' then
     return new;
   end if;
 
@@ -95,6 +97,15 @@ create trigger profiles_proteger_columnas
 --     .eq('id', user.id);
 --   console.log(error?.code, error?.message);
 --
--- 3. La vía buena sigue funcionando. Como admin (o por SQL Editor):
---   update public.profiles set full_name = full_name where id = auth.uid();
+-- 3. NO SE HA ROTO NADA (esto es lo que hay que probar sí o sí). Desde el
+--    SQL Editor, que corre como postgres y debe seguir pudiendo asignar:
+--   update public.profiles set role = role, comercial_id = comercial_id
+--     where id = (select id from auth.users where email = 'c.tarazona@sfbathroom.com');
+--   -- Debe funcionar sin error.
+--
+-- 4. Y un cambio real por SQL Editor, sobre un usuario de prueba:
+--   update public.profiles set comercial_id = null
+--     where id = (select id from auth.users where email = 'comercial.b@sfbathroom.com');
+--   -- Debe funcionar. Si esto falla, el trigger está bloqueando al SQL Editor
+--   -- y hay que parar: se habría roto la asignación de carteras.
 -- ============================================================
