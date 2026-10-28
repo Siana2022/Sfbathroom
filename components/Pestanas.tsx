@@ -2,12 +2,13 @@
 import { Suspense } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
-export type Pestana = 'cartera' | 'agenda' | 'seguimiento';
+export type Pestana = 'cartera' | 'agenda' | 'seguimiento' | 'contactos';
 
 export const PESTANAS: { valor: Pestana; etiqueta: string }[] = [
   { valor: 'cartera', etiqueta: 'Cartera' },
   { valor: 'agenda', etiqueta: 'Agenda' },
   { valor: 'seguimiento', etiqueta: 'Seguimiento' },
+  { valor: 'contactos', etiqueta: 'Contactos' },
 ];
 
 type Props = {

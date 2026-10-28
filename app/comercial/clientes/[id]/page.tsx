@@ -4,10 +4,13 @@ import { cookies } from 'next/headers';
 import { getFichaComercial, getContextoComercial } from '@/lib/datos/comercial';
 import { getReunionesCliente } from '@/lib/datos/panelComercial';
 import { ETIQUETA_TIPO } from '@/lib/comercial/tipos';
+import { porDefectoReunion } from '@/lib/comercial/agenda';
 import { eur, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import ListaContactos from '@/components/ListaContactos';
 import ListaReuniones from '@/components/ListaReuniones';
+import ListaHitos from '@/components/ListaHitos';
+import SelectorEstadoCrm from '@/components/SelectorEstadoCrm';
 import FormInteraccion from '@/components/FormInteraccion';
 import FormReunion from '@/components/FormReunion';
 import ResumenIA from '@/components/ResumenIA';
@@ -44,6 +47,19 @@ export default async function FichaComercialPage({ params }: { params: { id: str
         {d.cliente.email && <> · {d.cliente.email}</>}
       </p>
 
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', margin: '0 0 4px' }}>
+        <span style={{ color: 'var(--muted)', fontSize: 13 }}>Estado CRM:</span>
+        <SelectorEstadoCrm
+          clienteId={d.cliente.id}
+          estadoActual={d.cliente.estadoCrm}
+          motivoActual={d.cliente.motivoPerdida}
+          editable={contexto.puedeEscribir}
+        />
+        {d.cliente.estadoCrm === 'perdido' && d.cliente.motivoPerdida && (
+          <span style={{ color: 'var(--muted)', fontSize: 13 }}>Motivo: {d.cliente.motivoPerdida}</span>
+        )}
+      </div>
+
       <ul className="grid-kpis">
         <Kpi etiqueta="Días sin pedir" valor={d.diasSinPedir === null ? 'sin pedidos' : numero(d.diasSinPedir)} />
         <Kpi etiqueta="Pedidos registrados" valor={numero(d.pedidos.length)} />
@@ -53,6 +69,13 @@ export default async function FichaComercialPage({ params }: { params: { id: str
 
       <ListaContactos clienteId={d.cliente.id} empresaCodigo={empresa} contactos={d.contactos} />
 
+      <ListaHitos
+        clienteId={d.cliente.id}
+        empresaCodigo={empresa}
+        hitos={d.hitos}
+        editable={contexto.puedeEscribir}
+      />
+
       {contexto.puedeEscribir && (
         <div className="card">
           <h2>Agendar reunión</h2>
@@ -60,11 +83,7 @@ export default async function FichaComercialPage({ params }: { params: { id: str
             clienteId={d.cliente.id}
             empresaCodigo={empresa}
             contactos={d.contactos}
-            porDefecto={(() => {
-              const m = new Date(Date.now() + 86400000);
-              m.setUTCHours(9, 0, 0, 0);
-              return m.toISOString().slice(0, 16);
-            })()}
+            porDefecto={porDefectoReunion()}
           />
         </div>
       )}

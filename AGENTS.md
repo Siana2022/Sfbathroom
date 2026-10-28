@@ -36,8 +36,14 @@ ningún sitio, pero sí que sea un módulo con efectos en el nivel superior.
   clase nuevo no existe ya antes de añadirlo.
 - **Escritura con sesión del usuario.** Las mutaciones van por
   `/api/comercial/*` con `contextoDePeticion()`, que comprueba
-  `puedeEscribir`. El RLS limita las filas a la cartera del comercial; no hay
-  que filtrar por comercial a mano.
+  `puedeEscribir`. El RLS limita las filas a la cartera del comercial; para un
+  comercial no hay que filtrar a mano.
+- **El filtro de cartera de dirección sí se hace a mano.** Dirección elige un
+  comercial (`?comercial=`) y `getPanelComercial` acota el panel por
+  `clientes.comercial_id` en JS, tras la consulta: la cartera se define por el
+  cliente, no por `facturas.comercial_id`, que no está relleno en todas las
+  filas. Por eso el filtro se aplica al conjunto entero (KPIs, agenda,
+  seguimiento y contactos) y no consulta a consulta.
 
 ## Trampas conocidas
 

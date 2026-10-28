@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 import { callLLM } from '@/lib/agente/llm';
-import type { Contacto, Interaccion, TipoInteraccion } from '@/lib/comercial/tipos';
+import type { Contacto, EstadoCrm, Hito, HitoConAutor, Interaccion, TipoInteraccion } from '@/lib/comercial/tipos';
 
 export type { Contacto, Interaccion, TipoInteraccion };
 export { TIPOS_INTERACCION, RESULTADOS_INTERACCION, ETIQUETA_TIPO } from '@/lib/comercial/tipos';
@@ -233,6 +233,7 @@ export async function getCartera(codigoEmpresa: string, opts?: { soloSinPedir60?
 
 export type FilaContactoListado = {
   id: string;
+  cliente_id: string;
   cliente: string;
   nombre: string;
   apellidos: string | null;
@@ -302,6 +303,7 @@ export async function getContactos(
     empresa: { codigo: empresa.codigo, nombre: empresa.nombre },
     filas: lista.map((c) => ({
       id: c.id,
+      cliente_id: c.cliente_id,
       cliente: nombreCliente.get(c.cliente_id) ?? '—',
       nombre: c.nombre,
       apellidos: c.apellidos,
@@ -317,9 +319,21 @@ export async function getContactos(
 }
 
 export type FichaComercial = {
-  cliente: { id: string; nombre: string; codigoErp: string | null; provincia: string | null; pais: string | null; comercial: string | null; telefono: string | null; email: string | null };
+  cliente: {
+    id: string;
+    nombre: string;
+    codigoErp: string | null;
+    provincia: string | null;
+    pais: string | null;
+    comercial: string | null;
+    telefono: string | null;
+    email: string | null;
+    estadoCrm: EstadoCrm | null;
+    motivoPerdida: string | null;
+  };
   contactos: Contacto[];
   interacciones: Interaccion[];
+  hitos: HitoConAutor[];
   pedidos: { id: string; numero: string | null; fecha: string; estado: string | null; importe: number; diasSinPedir: number }[];
   diasSinPedir: number | null;
 };
@@ -331,7 +345,7 @@ export async function getFichaComercial(codigoEmpresa: string, clienteId: string
 
   const { data: cli } = await supabase
     .from('clientes')
-    .select('id, nombre, codigo_erp, provincia, pais_facturacion, comercial_id, telefono, email')
+    .select('id, nombre, codigo_erp, provincia, pais_facturacion, comercial_id, telefono, email, estado_crm, motivo_perdida')
     .eq('id', clienteId)
     .eq('empresa_id', empresa.id)
     .maybeSingle();
@@ -346,9 +360,11 @@ export async function getFichaComercial(codigoEmpresa: string, clienteId: string
     comercial_id: string | null;
     telefono: string | null;
     email: string | null;
+    estado_crm: string | null;
+    motivo_perdida: string | null;
   };
 
-  const [contactos, interacciones, pedidos] = await Promise.all([
+  const [contactos, interacciones, pedidos, hitosRes] = await Promise.all([
     todasLasFilas<Contacto>((desde) =>
       supabase
         .from('contactos')
@@ -373,6 +389,15 @@ export async function getFichaComercial(codigoEmpresa: string, clienteId: string
         .order('fecha', { ascending: false })
         .range(desde, desde + TAMANO_PAGINA - 1),
     ),
+    todasLasFilas<Hito>((desde) =>
+      supabase
+        .from('hitos')
+        .select('id, cliente_id, comercial_id, usuario_id, fecha, titulo, detalle, created_at')
+        .eq('cliente_id', clienteId)
+        .order('fecha', { ascending: false })
+        .order('created_at', { ascending: false })
+        .range(desde, desde + TAMANO_PAGINA - 1),
+    ),
   ]);
 
   let comercial: string | null = null;
@@ -380,6 +405,21 @@ export async function getFichaComercial(codigoEmpresa: string, clienteId: string
     const { data: com } = await supabase.from('comerciales').select('nombre').eq('id', c.comercial_id).maybeSingle();
     comercial = (com?.nombre as string | null) ?? null;
   }
+
+  // El autor de cada hito se resuelve con el nombre del comercial: en la ficha,
+  // "quién lo apuntó" es la mitad del contexto del hito.
+  const comercialesRes = await todasLasFilas<{ id: string; nombre: string }>((desde) =>
+    supabase
+      .from('comerciales')
+      .select('id, nombre')
+      .eq('empresa_id', empresa.id)
+      .range(desde, desde + TAMANO_PAGINA - 1),
+  );
+  const nombreComercial = new Map(comercialesRes.map((x) => [x.id, x.nombre]));
+  const hitos: HitoConAutor[] = hitosRes.map((h) => ({
+    ...h,
+    autor: h.comercial_id ? nombreComercial.get(h.comercial_id) ?? null : null,
+  }));
 
   const hoyMs = Date.now();
   const pedidosFila = pedidos.slice(0, 30).map((p) => ({
@@ -401,9 +441,12 @@ export async function getFichaComercial(codigoEmpresa: string, clienteId: string
       comercial,
       telefono: c.telefono,
       email: c.email,
+      estadoCrm: (c.estado_crm as EstadoCrm | null) ?? null,
+      motivoPerdida: c.motivo_perdida,
     },
     contactos,
     interacciones,
+    hitos,
     pedidos: pedidosFila,
     diasSinPedir: pedidosFila.length ? pedidosFila[0].diasSinPedir : null,
   };

@@ -47,6 +47,10 @@ export type PanelComercial = {
   agenda: ReunionAgenda[];
   /** Todas las reuniones del alcance del comercial, para el tablero por estado. */
   reuniones: ReunionConContexto[];
+  /** Comerciales de la empresa, para el selector de cartera de dirección. */
+  comerciales: { id: string; nombre: string }[];
+  /** Comercial por el que está acotado el panel, si lo hay. */
+  comercialFiltro: string | null;
 };
 
 type FilaCliente = {
@@ -68,20 +72,26 @@ export async function getPanelComercial(
   codigoEmpresa: string,
   rango: RangoFechas,
   hoy: Date = new Date(),
+  comercialId?: string | null,
 ): Promise<PanelComercial> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
   const previo = rangoAnterior(rango);
 
-  const [clientes, contactos, interacciones, comercialesRes, pedidos, facturas, facturasPrevias, reuniones] =
+  // Dirección puede acotar el panel a la cartera de un comercial concreto.
+  // Para un comercial esto llega vacío: su RLS ya limita las filas a lo suyo.
+  const filtroComercial = comercialId ?? null;
+
+  let [clientes, contactos, interacciones, comercialesRes, pedidos, facturas, facturasPrevias, reuniones] =
     await Promise.all([
-      todasLasFilas<FilaCliente>((desde) =>
-        supabase
+      todasLasFilas<FilaCliente>((desde) => {
+        let q = supabase
           .from('clientes')
-          .select('id, nombre, provincia, pais_facturacion, fecha_primer_pedido, estado_crm, motivo_perdida')
-          .eq('empresa_id', empresa.id)
-          .range(desde, desde + TAMANO_PAGINA - 1),
-      ),
+          .select('id, nombre, provincia, pais_facturacion, fecha_primer_pedido, estado_crm, motivo_perdida, comercial_id')
+          .eq('empresa_id', empresa.id);
+        if (filtroComercial) q = q.eq('comercial_id', filtroComercial);
+        return q.range(desde, desde + TAMANO_PAGINA - 1);
+      }),
       todasLasFilas<{ cliente_id: string }>((desde) =>
         supabase
           .from('contactos')
@@ -161,6 +171,22 @@ export async function getPanelComercial(
           .range(desde, desde + TAMANO_PAGINA - 1),
       ),
     ]);
+
+  // Acotar al comercial elegido. Se filtra aquí y no en cada consulta porque la
+  // cartera se define por `clientes.comercial_id`: así el panel entero (KPIs,
+  // agenda y seguimiento) habla de la misma cartera, sin depender de que
+  // `facturas.comercial_id` esté relleno en todas las filas.
+  if (filtroComercial) {
+    const cartera = new Set(clientes.map((c) => c.id));
+    const enCartera = <T extends { cliente_id: string | null }>(filas: T[]) =>
+      filas.filter((f) => f.cliente_id !== null && cartera.has(f.cliente_id));
+    contactos = contactos.filter((f) => cartera.has(f.cliente_id));
+    interacciones = interacciones.filter((f) => cartera.has(f.cliente_id));
+    pedidos = enCartera(pedidos);
+    facturas = enCartera(facturas);
+    facturasPrevias = enCartera(facturasPrevias);
+    reuniones = reuniones.filter((f) => cartera.has(f.cliente_id));
+  }
 
   // --- Índices por cliente ---
   const contactosPorCliente = new Map<string, number>();
@@ -320,6 +346,10 @@ export async function getPanelComercial(
     filas,
     agenda,
     reuniones: todasReuniones,
+    comerciales: comercialesRes
+      .map((c) => ({ id: c.id, nombre: c.nombre }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre)),
+    comercialFiltro: filtroComercial,
   };
 }
 

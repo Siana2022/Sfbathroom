@@ -2,6 +2,30 @@ import { NextResponse } from 'next/server';
 import { contextoDePeticion, limpiarContacto, noAutenticado, sinPermiso } from '@/lib/supabase/sesion';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 
+/**
+ * Contactos de un cliente, para poder agendar una reunión desde la agenda sin
+ * pasar por su ficha. Devuelve lo mínimo para el desplegable.
+ *
+ * El RLS de `contactos` ya limita las filas a la cartera del comercial.
+ */
+export async function GET(req: Request) {
+  const { supabase, contexto } = await contextoDePeticion();
+  if (!contexto) return noAutenticado();
+
+  const clienteId = new URL(req.url).searchParams.get('cliente_id') ?? '';
+  if (!clienteId) return NextResponse.json({ error: 'Falta cliente_id.' }, { status: 400 });
+
+  const { data, error } = await supabase
+    .from('contactos')
+    .select('id, nombre, apellidos')
+    .eq('cliente_id', clienteId)
+    .eq('activo', true)
+    .order('nombre');
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  return NextResponse.json(data ?? []);
+}
+
 /** Alta de contacto. El RLS comprueba que el cliente pertenece a la cartera. */
 export async function POST(req: Request) {
   const { supabase, contexto } = await contextoDePeticion();

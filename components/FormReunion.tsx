@@ -1,29 +1,64 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { MODALIDADES_REUNION } from '@/lib/comercial/tipos';
 
 type ContactoMin = { id: string; nombre: string; apellidos: string | null };
 
 type Props = {
-  clienteId: string;
+  /** Si se pasa, la reunión es con ese cliente y no se pide elegirlo. */
+  clienteId?: string;
   empresaCodigo: string;
   contactos: ContactoMin[];
+  /** Clientes para el desplegable, cuando no se fija `clienteId`. */
+  clientes?: { id: string; nombre: string }[];
   /** Fecha/hora sugerida (por defecto, mañana a las 10:00). */
   porDefecto?: string;
 };
 
-/** Agenda una reunión con un cliente. */
-export default function FormReunion({ clienteId, empresaCodigo, contactos, porDefecto }: Props) {
+/**
+ * Agenda una reunión. Sirve en dos sitios: dentro de la ficha (con el cliente
+ * fijo) y en la pestaña de agenda (eligiendo el cliente). En el segundo caso los
+ * contactos se cargan al elegir el cliente, porque no se conocen de antemano.
+ */
+export default function FormReunion({ clienteId, empresaCodigo, contactos, clientes, porDefecto }: Props) {
   const router = useRouter();
+  const [cliente, setCliente] = useState(clienteId ?? '');
+  const [cargados, setCargados] = useState<ContactoMin[]>([]);
   const [fechaHora, setFechaHora] = useState(porDefecto ?? '');
   const [contactoId, setContactoId] = useState('');
   const [asunto, setAsunto] = useState('');
   const [modalidad, setModalidad] = useState('presencial');
+  const [modalidadOtro, setModalidadOtro] = useState('');
   const [duracion, setDuracion] = useState('60');
   const [notas, setNotas] = useState('');
   const [estado, setEstado] = useState<{ tipo: 'ok' | 'error'; mensaje: string } | null>(null);
   const [cargando, setCargando] = useState(false);
+
+  // Con el cliente fijo los contactos llegan por props; si se elige aquí, hay
+  // que pedirlos. Se deriva en vez de copiarse a estado: `contactos` puede ser
+  // un array nuevo en cada render y sincronizarlo por estado daría un bucle.
+  const listaContactos = clienteId ? contactos : cargados;
+
+  useEffect(() => {
+    if (clienteId || !cliente) {
+      setCargados([]);
+      return;
+    }
+    let vigente = true;
+    setContactoId('');
+    fetch(`/api/comercial/contactos?cliente_id=${encodeURIComponent(cliente)}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d: ContactoMin[]) => {
+        if (vigente) setCargados(Array.isArray(d) ? d : []);
+      })
+      .catch(() => {
+        if (vigente) setCargados([]);
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [cliente, clienteId]);
 
   async function guardar(e: React.FormEvent) {
     e.preventDefault();
@@ -34,12 +69,13 @@ export default function FormReunion({ clienteId, empresaCodigo, contactos, porDe
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          cliente_id: clienteId,
+          cliente_id: cliente,
           empresa_codigo: empresaCodigo,
           fecha_hora: fechaHora,
           contacto_id: contactoId || null,
           asunto,
           modalidad,
+          modalidad_otro: modalidad === 'otros' ? modalidadOtro : null,
           duracion_min: duracion === '' ? null : Number(duracion),
           notas,
         }),
@@ -49,6 +85,11 @@ export default function FormReunion({ clienteId, empresaCodigo, contactos, porDe
       setEstado({ tipo: 'ok', mensaje: 'Reunión agendada.' });
       setAsunto('');
       setNotas('');
+      setModalidadOtro('');
+      if (!clienteId) {
+        setCliente('');
+        setContactoId('');
+      }
       router.refresh();
     } catch (err) {
       setEstado({ tipo: 'error', mensaje: err instanceof Error ? err.message : 'Error al agendar.' });
@@ -57,9 +98,24 @@ export default function FormReunion({ clienteId, empresaCodigo, contactos, porDe
     }
   }
 
+  const faltanDatos = fechaHora === '' || cliente === '';
+
   return (
     <form onSubmit={guardar} style={{ display: 'grid', gap: 8 }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
+        {!clienteId && (
+          <label>
+            Cliente *
+            <select className="input-dato" value={cliente} onChange={(e) => setCliente(e.target.value)} required>
+              <option value="">—</option>
+              {(clientes ?? []).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label>
           Fecha y hora *
           <input
@@ -74,7 +130,7 @@ export default function FormReunion({ clienteId, empresaCodigo, contactos, porDe
           Contacto
           <select className="input-dato" value={contactoId} onChange={(e) => setContactoId(e.target.value)}>
             <option value="">—</option>
-            {contactos.map((c) => (
+            {listaContactos.map((c) => (
               <option key={c.id} value={c.id}>{`${c.nombre}${c.apellidos ? ` ${c.apellidos}` : ''}`}</option>
             ))}
           </select>
@@ -87,6 +143,17 @@ export default function FormReunion({ clienteId, empresaCodigo, contactos, porDe
             ))}
           </select>
         </label>
+        {modalidad === 'otros' && (
+          <label>
+            ¿Cuál?
+            <input
+              className="input-dato"
+              value={modalidadOtro}
+              onChange={(e) => setModalidadOtro(e.target.value)}
+              placeholder="Feria, visita a obra…"
+            />
+          </label>
+        )}
         <label>
           Duración (min)
           <input className="input-dato" type="number" min="0" value={duracion} onChange={(e) => setDuracion(e.target.value)} />
@@ -101,11 +168,11 @@ export default function FormReunion({ clienteId, empresaCodigo, contactos, porDe
         <textarea className="input-dato" rows={2} value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Qué llevar preparado, puntos a tratar…" />
       </label>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <button className="btn" type="submit" disabled={cargando || fechaHora === ''}>
+        <button className="btn" type="submit" disabled={cargando || faltanDatos}>
           {cargando ? 'Agendando…' : 'Agendar reunión'}
         </button>
         {estado && (
-          <span style={{ fontSize: 12, color: estado.tipo === 'error' ? 'var(--error, darkred)' : 'var(--muted)' }}>
+          <span style={{ fontSize: 12, color: estado.tipo === 'error' ? 'var(--rojo)' : 'var(--muted)' }}>
             {estado.mensaje}
           </span>
         )}

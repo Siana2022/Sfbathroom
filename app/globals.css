@@ -1181,7 +1181,7 @@ table.tabla .td-pos { color: var(--verde); }
 .pestanas {
   display: flex;
   gap: 4px;
-  border-bottom: 1px solid var(--borde);
+  border-bottom: 1px solid var(--border);
   margin: 18px 0 0;
   flex-wrap: wrap;
 }
@@ -1202,7 +1202,7 @@ table.tabla .td-pos { color: var(--verde); }
   margin-bottom: -1px;
 }
 
-.pestanas button:hover { color: var(--texto); }
+.pestanas button:hover { color: var(--text); }
 
 .pestanas button.activo {
   color: var(--accent);
@@ -1210,7 +1210,7 @@ table.tabla .td-pos { color: var(--verde); }
 }
 
 .pestanas button .cuenta {
-  background: var(--fondo-suave, rgba(127, 127, 127, 0.14));
+  background: var(--wash);
   border-radius: 999px;
   font-size: 11.5px;
   font-weight: 600;
@@ -1248,10 +1248,10 @@ table.tabla .td-pos { color: var(--verde); }
   min-width: 30px;
   height: 30px;
   padding: 0 7px;
-  border: 1px solid var(--borde);
+  border: 1px solid var(--border);
   border-radius: 7px;
-  background: var(--tarjeta, transparent);
-  color: var(--texto);
+  background: var(--card-bg);
+  color: var(--text);
   font: inherit;
   font-size: 12.5px;
   cursor: pointer;
@@ -1284,11 +1284,11 @@ table.tabla .td-pos { color: var(--verde); }
   white-space: nowrap;
 }
 
-.badge-crm.crm-habitual { background: rgba(34, 139, 94, 0.14); color: #1d7a52; }
-.badge-crm.crm-nuevo { background: rgba(37, 99, 235, 0.14); color: #2563eb; }
-.badge-crm.crm-seguimiento { background: rgba(217, 119, 6, 0.16); color: #b45309; }
-.badge-crm.crm-ganado { background: rgba(22, 163, 74, 0.18); color: #15803d; }
-.badge-crm.crm-perdido { background: rgba(220, 38, 38, 0.14); color: #b91c1c; }
+.badge-crm.crm-habitual { background: #eaf4ee; color: var(--verde); }
+.badge-crm.crm-nuevo { background: var(--wash); color: var(--accent); }
+.badge-crm.crm-seguimiento { background: #fbf7ec; color: var(--ambar); }
+.badge-crm.crm-ganado { background: #eaf4ee; color: var(--verde); }
+.badge-crm.crm-perdido { background: #fdeeee; color: var(--rojo); }
 
 /* La barra de filtros de cartera reutiliza .barra-filtros; solo se ajusta el
    ancho de los desplegables para que las opciones con recuento no se corten. */

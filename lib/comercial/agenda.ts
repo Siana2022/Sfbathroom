@@ -101,6 +101,20 @@ export function normalizarFiltroModalidad(valor: string | string[] | undefined):
 export const MESES_HISTORICO_AGENDA = 6;
 
 /**
+ * Valor por defecto del campo «fecha y hora» al agendar: mañana a las 9:00.
+ *
+ * Se devuelve en hora local, no UTC: el campo `datetime-local` se interpreta en
+ * la zona del navegador, así que fijar las 9:00 en UTC daría otra hora en
+ * pantalla y el comercial agendaría sin querer a las 7:00 o a las 11:00.
+ */
+export function porDefectoReunion(ahora: Date = new Date()): string {
+  const m = new Date(ahora.getTime() + 86400000);
+  m.setHours(9, 0, 0, 0);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${m.getFullYear()}-${p(m.getMonth() + 1)}-${p(m.getDate())}T${p(m.getHours())}:${p(m.getMinutes())}`;
+}
+
+/**
  * Corte inferior de la ventana de agenda que se carga.
  *
  * El tablero enseña todo el futuro (nada que agendar se queda fuera) más unos

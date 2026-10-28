@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
 import {
@@ -8,9 +9,11 @@ import {
   rangoPorDefecto,
   type FilaPanel,
 } from '@/lib/datos/panelComercial';
-import { contarPorModalidad, normalizarFiltroModalidad, ventanaAgenda } from '@/lib/comercial/agenda';
+import { contarPorModalidad, normalizarFiltroModalidad, porDefectoReunion, ventanaAgenda } from '@/lib/comercial/agenda';
 import { filtrarCartera, normalizarFiltros, normalizarPagina, opcionesDe, paginar, hayFiltros } from '@/lib/comercial/carteraFiltros';
-import { getContextoComercial } from '@/lib/datos/comercial';
+import { filtrarContactos, hayFiltrosContactos, normalizarFiltrosContactos, opcionesTerritorio } from '@/lib/comercial/contactosFiltros';
+import { getContactos, getContextoComercial } from '@/lib/datos/comercial';
+import { puedeElegirComercial } from '@/lib/comercial/roles';
 import { eur, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import Aviso from '@/components/Aviso';
@@ -18,9 +21,12 @@ import SelectorFechas from '@/components/SelectorFechas';
 import FiltroModalidad from '@/components/FiltroModalidad';
 import TableroAgenda from '@/components/TableroAgenda';
 import FiltrosCartera from '@/components/FiltrosCartera';
+import FiltrosContactos from '@/components/FiltrosContactos';
 import Paginacion from '@/components/Paginacion';
 import Pestanas, { type Pestana } from '@/components/Pestanas';
 import SelectorEstadoCrm from '@/components/SelectorEstadoCrm';
+import SelectorComercial from '@/components/SelectorComercial';
+import FormReunion from '@/components/FormReunion';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,14 +58,38 @@ export default async function ComercialPage({ searchParams }: { searchParams: Se
     typeof searchParams.hasta === 'string' ? searchParams.hasta : undefined,
   );
 
-  const [d, contexto] = await Promise.all([getPanelComercial(empresa, rango), getContextoComercial()]);
+  const contexto = await getContextoComercial();
+
+  // Dirección puede acotar el panel a la cartera de un comercial concreto; el
+  // comercial no (su RLS ya limita las filas a lo suyo).
+  const puedeElegir = puedeElegirComercial(contexto.rol);
+  const comercialFiltro = puedeElegir && typeof searchParams.comercial === 'string' ? searchParams.comercial : null;
+
+  const d = await getPanelComercial(empresa, rango, new Date(), comercialFiltro);
 
   const vista: Pestana =
-    searchParams.vista === 'agenda' || searchParams.vista === 'seguimiento' ? searchParams.vista : 'cartera';
+    searchParams.vista === 'agenda' || searchParams.vista === 'seguimiento' || searchParams.vista === 'contactos'
+      ? searchParams.vista
+      : 'cartera';
 
   // El seguimiento solo se consulta si hace falta: la pestaña de cartera es la
   // que se abre por defecto y no debe pagar una consulta que no se va a ver.
   const seguimiento = vista === 'seguimiento' ? await getSeguimiento(empresa, ventanaAgenda(new Date())) : [];
+
+  // Igual con los contactos: es la pestaña más pesada (toda la base de
+  // contactos) y solo se carga cuando se va a mostrar.
+  const contactos = vista === 'contactos' ? await getContactos(empresa) : null;
+  const filtrosContactos = normalizarFiltrosContactos(searchParams);
+  // Si dirección acotó el panel a una cartera, los contactos también se acotan:
+  // la pestaña entera debe hablar de la misma cartera.
+  const carteraIds = comercialFiltro ? new Set(d.filas.map((f) => f.cliente_id)) : null;
+  const baseContactos = contactos
+    ? carteraIds
+      ? contactos.filas.filter((c) => carteraIds.has(c.cliente_id))
+      : contactos.filas
+    : [];
+  const contactosFiltrados = filtrarContactos(baseContactos, filtrosContactos);
+  const paginaContactos = paginar(contactosFiltrados, normalizarPagina(searchParams.pagina));
 
   const filtros = normalizarFiltros(searchParams);
   const filtradas = ordenarPorUrgencia(filtrarCartera(d.filas, filtros));
@@ -89,6 +119,15 @@ export default async function ComercialPage({ searchParams }: { searchParams: Se
         {vista === 'cartera' && ', no con un umbral fijo.'}
       </p>
 
+      {puedeElegir && (
+        <div className="barra-filtros">
+          <span className="barra-filtros-titulo">Ámbito</span>
+          <Suspense fallback={null}>
+            <SelectorComercial comerciales={d.comerciales} actual={d.comercialFiltro} />
+          </Suspense>
+        </div>
+      )}
+
       {!contexto.puedeEscribir && (
         <Aviso tipo="info">
           Tu rol es de solo lectura en este módulo: puedes consultar la cartera y la agenda, pero no registrar cambios.
@@ -110,7 +149,14 @@ export default async function ComercialPage({ searchParams }: { searchParams: Se
         <Kpi etiqueta="Reuniones próximas" valor={numero(k.reunionesProximas)} nota="en agenda" />
       </ul>
 
-      <Pestanas cuenta={{ cartera: filtradas.length, agenda: d.reuniones.length, seguimiento: seguimiento.length }} />
+      <Pestanas
+        cuenta={{
+          cartera: filtradas.length,
+          agenda: d.reuniones.length,
+          seguimiento: seguimiento.length,
+          contactos: contactosFiltrados.length,
+        }}
+      />
 
       {vista === 'cartera' && (
         <div className="card">
@@ -207,6 +253,21 @@ export default async function ComercialPage({ searchParams }: { searchParams: Se
               ? 'Arrastra una tarjeta a otra columna para cerrar la reunión: al pasar a «Realizadas» se vuelca al histórico.'
               : 'Vista de solo lectura de la agenda.'}
           </p>
+
+          {contexto.puedeEscribir && (
+            <details style={{ marginBottom: 14 }}>
+              <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: 14 }}>Agendar reunión</summary>
+              <div style={{ marginTop: 10 }}>
+                <FormReunion
+                  empresaCodigo={empresa}
+                  contactos={[]}
+                  clientes={d.filas.map((f) => ({ id: f.cliente_id, nombre: f.cliente }))}
+                  porDefecto={porDefectoReunion()}
+                />
+              </div>
+            </details>
+          )}
+
           {d.reuniones.length === 0 ? (
             <p style={{ color: 'var(--muted)' }}>No hay reuniones en la agenda.</p>
           ) : (
@@ -269,6 +330,73 @@ export default async function ComercialPage({ searchParams }: { searchParams: Se
               </table>
             </div>
           )}
+        </div>
+      )}
+      {vista === 'contactos' && (
+        <div className="card">
+          <h2>Contactos · {d.empresa.nombre}</h2>
+          <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 0 }}>
+            Personas de contacto de tu cartera, con país y provincia para segmentar envíos masivos.
+          </p>
+
+          <FiltrosContactos
+            paises={opcionesTerritorio(baseContactos, 'pais')}
+            provincias={opcionesTerritorio(baseContactos, 'provincia')}
+          />
+
+          {paginaContactos.filas.length === 0 ? (
+            <p style={{ color: 'var(--muted)' }}>
+              {hayFiltrosContactos(filtrosContactos)
+                ? 'Ningún contacto cumple esos filtros.'
+                : 'No hay contactos registrados en tu cartera.'}
+            </p>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="tabla">
+                <thead>
+                  <tr>
+                    <th>Cliente</th>
+                    <th>Contacto</th>
+                    <th>Cargo</th>
+                    <th>Email</th>
+                    <th>Teléfono</th>
+                    <th>País</th>
+                    <th>Provincia</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginaContactos.filas.map((c) => (
+                    <tr key={c.id}>
+                      <td>{c.cliente}</td>
+                      <td>
+                        <strong>{c.nombre}</strong>
+                        {c.apellidos ? ` ${c.apellidos}` : ''}
+                      </td>
+                      <td>{c.cargo ?? '—'}</td>
+                      <td>{c.email ?? <span className="badge pendiente">sin email</span>}</td>
+                      <td>{c.telefono ?? '—'}</td>
+                      <td>{c.pais ?? '—'}</td>
+                      <td>{c.provincia ?? '—'}</td>
+                      <td>
+                        <Link className="enlace" href={`/comercial/clientes/${c.cliente_id}`}>
+                          Ficha
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <Paginacion
+            pagina={paginaContactos.pagina}
+            totalPaginas={paginaContactos.totalPaginas}
+            total={paginaContactos.total}
+            desde={paginaContactos.desde}
+            hasta={paginaContactos.hasta}
+          />
         </div>
       )}
     </div>
