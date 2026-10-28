@@ -5,9 +5,14 @@
 -- distinto en cada una, con su código y su trozo de cartera. `profiles.
 -- comercial_id` solo admite una, así que las demás van en `perfiles_comerciales`.
 --
--- Carlos Tarazona: 10 carteras, 1.935 clientes en total (SF 731, DOT 496, FUX 708).
+-- Carlos Tarazona: 9 carteras, 1.922 clientes en total (SF 718, DOT 496, FUX 708).
 -- Se dejan fuera a propósito PARTICULARES (SF 139 + FUX 142) y PROVEEDORES
 -- (SF 25 + FUX 25), que están entre sus códigos pero no son cartera de ventas.
+--
+-- La lista de códigos está COPIADA A MANO de la consulta de abajo, y ahí está el
+-- riesgo: si se escribe un código que no existe, no da error, simplemente no
+-- asigna nada y pasa desapercibido. Al cambiar la lista, comprueba que la
+-- consulta del paso 5 devuelve exactamente tantas filas como códigos hay aquí.
 --
 -- Ejecutar en Supabase → SQL Editor. Los datos salen de aquí:
 --   select e.codigo, cm.codigo_erp, cm.nombre, count(c.id) as clientes
@@ -60,7 +65,6 @@ where u.email = 'c.tarazona@sfbathroom.com'
     ('SF',  '5'),   -- España/Portugal · 635 clientes
     ('SF',  '6'),   -- Francia/Bélgica   ·  65
     ('SF',  '18'),  --                   ·  18
-    ('SF',  '10'),  --                   ·  13
     ('DOT', '4'),   -- España            · 474
     ('DOT', '8'),   -- Francia           ·   9
     ('DOT', '10'),  --                   ·  13

@@ -98,6 +98,11 @@ ningún sitio, pero sí que sea un módulo con efectos en el nivel superior.
   NO compara contra un uuid sino contra `auth_comercial_ids()` (conjunto): si
   escribes una política nueva para una tabla del comercial, usa
   `comercial_id in (select public.auth_comercial_ids())`, no `= auth_comercial_id()`.
+- **Un `in (...)` de códigos escritos a mano no avisa si uno no existe.** En
+  `docs/asignar-carteras-comercial.sql` la lista de `(empresa, codigo_erp)` se
+  copia a mano: un código inexistente no da error, solo no asigna nada. Al
+  tocarla, contrasta que el paso 5 devuelve tantas filas como códigos hay. Mejor
+  aún, genera la lista desde la consulta en vez de teclearla.
 - **Verificar políticas por `pg_policies.qual` da de menos.** Una política
   `for insert` no tiene `using`, así que su expresión vive en `with_check` y
   `qual` queda NULL. Para contar políticas hay que mirar las dos columnas, o
