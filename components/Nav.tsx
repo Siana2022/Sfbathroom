@@ -62,6 +62,17 @@ export default function Nav({ userEmail, rol }: { userEmail?: string; rol?: stri
         </>
       )}
 
+      <p className="nav-group">Acceso comercial</p>
+      <Link
+        key="/comercial"
+        href="/comercial"
+        className={
+          pathname === '/comercial' || pathname.startsWith('/comercial/') ? 'activo' : ''
+        }
+      >
+        Acceso comercial
+      </Link>
+
       {!cuadroMando && (
         <>
           {/* El comercial necesita facturación y stock para vender. */}
@@ -74,17 +85,6 @@ export default function Nav({ userEmail, rol }: { userEmail?: string; rol?: stri
           </Link>
         </>
       )}
-
-      <p className="nav-group">Acceso comercial</p>
-      <Link
-        key="/comercial"
-        href="/comercial"
-        className={
-          pathname === '/comercial' || pathname.startsWith('/comercial/') ? 'activo' : ''
-        }
-      >
-        Acceso comercial
-      </Link>
 
       {cuadroMando && (
         <>
