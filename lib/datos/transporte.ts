@@ -185,6 +185,7 @@ export type RentabilidadTransporteFila = {
   margen: number;
   margenPct: number | null;
   facturacion: number; // facturación neta total del cliente (todas las líneas) en el año
+  facturacionMeses: number[]; // 12 · facturación neta del cliente por mes
   pctSobreFacturacion: number | null; // margen de transporte / facturación × 100
 };
 
@@ -256,15 +257,22 @@ export async function getRentabilidadTransporteCliente(
 
   const nombreCliente = new Map(clientes.map((c) => [c.id, c.nombre]));
   const facturaInfo = new Map<string, { cliente: string; mes: number }>();
-  // Facturación neta total (cabecera, todas las líneas) por cliente y de la empresa.
+  // Facturación neta total (cabecera, todas las líneas) por cliente, por mes y de la empresa.
   const facturacionPorCliente = new Map<string, number>();
+  const facturacionMesesPorCliente = new Map<string, number[]>();
   let facturacionEmpresa = 0;
   for (const f of facturas) {
+    const mes = Number(f.fecha.slice(5, 7));
     const cliente = (f.cliente_id && nombreCliente.get(f.cliente_id)) || 'Sin cliente';
-    facturaInfo.set(f.id, { cliente, mes: Number(f.fecha.slice(5, 7)) });
+    facturaInfo.set(f.id, { cliente, mes });
     const base = Number(f.base_imponible ?? 0);
     facturacionPorCliente.set(cliente, (facturacionPorCliente.get(cliente) ?? 0) + base);
     facturacionEmpresa += base;
+    if (mes >= 1 && mes <= 12) {
+      const mm = facturacionMesesPorCliente.get(cliente) ?? new Array(12).fill(0);
+      mm[mes - 1] += base;
+      facturacionMesesPorCliente.set(cliente, mm);
+    }
   }
 
   const lineas = await enLotes<{ factura_id: string; articulo_id: string | null; importe: number; cantidad: number; coste_unitario: number | null }>(
@@ -310,6 +318,7 @@ export async function getRentabilidadTransporteCliente(
         margen,
         margenPct: facturado > 0.005 ? (margen / facturado) * 100 : null,
         facturacion,
+        facturacionMeses: facturacionMesesPorCliente.get(cliente) ?? new Array(12).fill(0),
         pctSobreFacturacion: Math.abs(facturacion) > 0.005 ? (margen / facturacion) * 100 : null,
       };
     })
