@@ -71,6 +71,22 @@ function tramosMensuales(desde, hasta) {
   return out;
 }
 
+async function muestraFacturas(empresaCodigo) {
+  const base = entorno.SUPABASE_URL.replace(/\/$/, '');
+  const headers = {
+    apikey: entorno.SUPABASE_SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${entorno.SUPABASE_SERVICE_ROLE_KEY}`,
+  };
+  const empresas = await (await fetch(`${base}/rest/v1/empresas?select=id&codigo=eq.${empresaCodigo}`, { headers })).json();
+  const id = empresas?.[0]?.id;
+  if (!id) return;
+  const filas = await (await fetch(
+    `${base}/rest/v1/facturas?select=numero_erp&empresa_id=eq.${id}&order=fecha.desc&limit=5`,
+    { headers },
+  )).json();
+  console.log(`  facturas.numero_erp (muestra): ${filas.map((f) => JSON.stringify(f.numero_erp)).join(', ')}`);
+}
+
 async function rpc(empresa, pares) {
   const res = await fetch(`${entorno.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/rpc/enlazar_fechas_pedido`, {
     method: 'POST',
@@ -99,6 +115,8 @@ async function main() {
   try {
     for (const e of empresas) {
       console.log(`\n=== ${e.codigo} · ${e.base} ===`);
+      await muestraFacturas(e.codigo);
+      let mostrado = false;
       for (const t of tramosMensuales(desde, hasta)) {
         const filtro = a3.sqlFechasPedido.filtroFecha.replace('{desde}', t.desde).replace('{hasta}', t.hasta);
         const sql = a3.sqlFechasPedido.consulta.replace('{RANGO}', filtro).replaceAll('{base}', e.base);
@@ -112,6 +130,10 @@ async function main() {
           }))
           .filter((p) => p.factura_numero !== '' && p.pedido_fecha !== '');
         if (pares.length === 0) continue;
+        if (!mostrado) {
+          console.log(`  ejemplo de par enviado: ${JSON.stringify(pares[0])}`);
+          mostrado = true;
+        }
         const res = await rpc(e.codigo, pares);
         totalPares += pares.length;
         totalActualizadas += Number(res.facturas_actualizadas ?? 0);
