@@ -1,14 +1,14 @@
 /**
  * Enlaza cada factura con su pedido (fechas) sin recargar ventas.
  *
- * Usa la consulta `sqlFechasPedido` de config y llama al RPC
- * `enlazar_fechas_pedido` (migraciones 0046 y 0047). Sirve para rellenar el
- * histórico rápido, o para reparar el enlace si la reconciliación falló.
+ * No depende del formato de `facturas.numero_erp`: descarga los números reales
+ * de Supabase, empareja en memoria y llama a `enlazar_fechas_pedido_por_id`
+ * (migración 0049) con el uuid de cada factura.
  *
  * Uso (en el PC de la ingesta, con su .env):
- *   npm run enlazar:pedidos                 # todas las empresas, desde 2021
- *   npm run enlazar:pedidos -- --empresa SF
- *   npm run enlazar:pedidos -- --desde 2025-01-01 --hasta 2026-12-31
+ *   node --env-file=.env enlazar-pedidos.mjs
+ *   node --env-file=.env enlazar-pedidos.mjs --empresa SF
+ *   node --env-file=.env enlazar-pedidos.mjs --desde 2025-01-01 --hasta 2026-12-31
  */
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -22,9 +22,16 @@ const nombres = ['MSSQL_HOST', 'MSSQL_PORT', 'MSSQL_USER', 'MSSQL_PASSWORD', 'MS
 const entorno = Object.fromEntries(nombres.map((n) => [n, process.env[n] ?? '']));
 
 if (!entorno.MSSQL_HOST || !entorno.SUPABASE_URL || !entorno.SUPABASE_SERVICE_ROLE_KEY) {
-  console.error('Faltan variables: ejecuta con el .env de la ingesta (`npm run enlazar:pedidos`).');
+  console.error('Faltan variables: ejecuta con el .env de la ingesta.');
   process.exit(1);
 }
+
+const SUPABASE = entorno.SUPABASE_URL.replace(/\/$/, '');
+const CABECERAS_SUPA = {
+  apikey: entorno.SUPABASE_SERVICE_ROLE_KEY,
+  Authorization: `Bearer ${entorno.SUPABASE_SERVICE_ROLE_KEY}`,
+  'Content-Type': 'application/json',
+};
 
 function arg(nombre) {
   const i = process.argv.indexOf(nombre);
@@ -42,6 +49,9 @@ const conn = {
   password: entorno.MSSQL_PASSWORD,
   options: { encrypt: entorno.MSSQL_ENCRYPT === 'true', trustServerCertificate: true },
 };
+
+const norm = (v) => String(v ?? '').trim();
+const digitos = (v) => norm(v).replace(/\D/g, '');
 
 function iso(d) {
   const y = d.getFullYear();
@@ -71,34 +81,52 @@ function tramosMensuales(desde, hasta) {
   return out;
 }
 
-async function muestraFacturas(empresaCodigo) {
-  const base = entorno.SUPABASE_URL.replace(/\/$/, '');
-  const headers = {
-    apikey: entorno.SUPABASE_SERVICE_ROLE_KEY,
-    Authorization: `Bearer ${entorno.SUPABASE_SERVICE_ROLE_KEY}`,
-  };
-  const empresas = await (await fetch(`${base}/rest/v1/empresas?select=id&codigo=eq.${empresaCodigo}`, { headers })).json();
-  const id = empresas?.[0]?.id;
-  if (!id) return;
-  const filas = await (await fetch(
-    `${base}/rest/v1/facturas?select=numero_erp&empresa_id=eq.${id}&order=fecha.desc&limit=5`,
-    { headers },
-  )).json();
-  console.log(`  facturas.numero_erp (muestra): ${filas.map((f) => JSON.stringify(f.numero_erp)).join(', ')}`);
+async function getSupabase(ruta) {
+  const res = await fetch(`${SUPABASE}/rest/v1/${ruta}`, { headers: CABECERAS_SUPA });
+  if (!res.ok) throw new Error(`GET ${ruta}: ${res.status} ${await res.text()}`);
+  return res.json();
 }
 
-async function rpc(empresa, pares) {
-  const res = await fetch(`${entorno.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/rpc/enlazar_fechas_pedido`, {
+/** Mapa número de factura → uuid, tolerante a espacios y formatos. */
+async function indiceFacturas(empresaId) {
+  const porNumero = new Map();
+  const porDigitos = new Map();
+  for (let desde = 0; ; desde += 1000) {
+    const filas = await getSupabase(
+      `facturas?select=id,numero_erp&empresa_id=eq.${empresaId}&order=numero_erp&limit=1000&offset=${desde}`,
+    );
+    for (const f of filas) {
+      const n = norm(f.numero_erp);
+      if (!n) continue;
+      if (!porNumero.has(n)) porNumero.set(n, f.id);
+      const d = digitos(n);
+      if (d && !porDigitos.has(d)) porDigitos.set(d, f.id);
+    }
+    if (filas.length < 1000) break;
+  }
+  return { porNumero, porDigitos, total: porNumero.size };
+}
+
+function resolver(par, indice) {
+  const compuesto = norm(par.factura_numero);
+  const simple = norm(par.factura_numero_alt);
+  return (
+    indice.porNumero.get(compuesto) ??
+    indice.porNumero.get(simple) ??
+    indice.porDigitos.get(digitos(compuesto)) ??
+    indice.porDigitos.get(digitos(simple)) ??
+    null
+  );
+}
+
+async function rpcPorId(pares) {
+  const res = await fetch(`${SUPABASE}/rest/v1/rpc/enlazar_fechas_pedido_por_id`, {
     method: 'POST',
-    headers: {
-      apikey: entorno.SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${entorno.SUPABASE_SERVICE_ROLE_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ p_codigo_empresa: empresa, p_pares: pares }),
+    headers: CABECERAS_SUPA,
+    body: JSON.stringify({ p_pares: pares }),
   });
   const texto = await res.text();
-  if (!res.ok) throw new Error(`enlazar_fechas_pedido: ${res.status} ${texto}`);
+  if (!res.ok) throw new Error(`enlazar_pedido_por_id: ${res.status} ${texto}`);
   return JSON.parse(texto || '{}');
 }
 
@@ -108,45 +136,80 @@ async function main() {
   const empresas = a3.empresas.filter((e) => !soloEmpresa || e.codigo === soloEmpresa);
   console.log(`[enlace] ${desde} → ${hasta} · empresas: ${empresas.map((e) => e.codigo).join(', ')}`);
 
+  const empresasSupabase = await getSupabase('empresas?select=id,codigo');
+  const idDe = new Map(empresasSupabase.map((e) => [e.codigo, e.id]));
+
   const pool = await mssql.connect(conn);
   let totalPares = 0;
+  let totalResueltos = 0;
   let totalActualizadas = 0;
+  let sinResolverMostrados = 0;
 
   try {
     for (const e of empresas) {
-      console.log(`\n=== ${e.codigo} · ${e.base} ===`);
-      await muestraFacturas(e.codigo);
+      const empresaId = idDe.get(e.codigo);
+      if (!empresaId) {
+        console.log(`\n=== ${e.codigo} === sin empresa en Supabase, se omite`);
+        continue;
+      }
+
+      const indice = await indiceFacturas(empresaId);
+      console.log(`\n=== ${e.codigo} · ${e.base} === facturas con número: ${indice.total}`);
+
       let mostrado = false;
       for (const t of tramosMensuales(desde, hasta)) {
         const filtro = a3.sqlFechasPedido.filtroFecha.replace('{desde}', t.desde).replace('{hasta}', t.hasta);
         const sql = a3.sqlFechasPedido.consulta.replace('{RANGO}', filtro).replaceAll('{base}', e.base);
         const filas = (await pool.request().query(sql)).recordset;
+
         const pares = filas
           .map((f) => ({
-            factura_numero: String(f.FACTURA_NUMERO ?? '').trim(),
-            factura_numero_alt: String(f.FACTURA_NUMDOC ?? '').trim(),
+            factura_numero: norm(f.FACTURA_NUMERO),
+            factura_numero_alt: norm(f.FACTURA_NUMDOC),
             pedido_fecha: fechaISODe(f.PEDIDO_FECHA),
             pedido_entrega: fechaISODe(f.PEDIDO_ENTREGA),
           }))
           .filter((p) => p.factura_numero !== '' && p.pedido_fecha !== '');
         if (pares.length === 0) continue;
+
         if (!mostrado) {
-          console.log(`  ejemplo de par enviado: ${JSON.stringify(pares[0])}`);
+          const muestra = (await getSupabase(`facturas?select=numero_erp&empresa_id=eq.${empresaId}&limit=5&order=fecha.desc`))
+            .map((f) => JSON.stringify(f.numero_erp))
+            .join(', ');
+          console.log(`  facturas.numero_erp (muestra): ${muestra}`);
+          console.log(`  ejemplo de par: ${JSON.stringify(pares[0])}`);
           mostrado = true;
         }
-        const res = await rpc(e.codigo, pares);
+
+        const conId = [];
+        for (const p of pares) {
+          const id = resolver(p, indice);
+          if (id) conId.push({ factura_id: id, pedido_fecha: p.pedido_fecha, pedido_entrega: p.pedido_entrega });
+          else if (sinResolverMostrados < 5) {
+            console.log(`  sin emparejar: ${JSON.stringify(p.factura_numero)} / ${JSON.stringify(p.factura_numero_alt)}`);
+            sinResolverMostrados += 1;
+          }
+        }
+
         totalPares += pares.length;
-        totalActualizadas += Number(res.facturas_actualizadas ?? 0);
-        console.log(`  ${t.desde} → ${t.hasta}: ${pares.length} pares · ${JSON.stringify(res)}`);
+        totalResueltos += conId.length;
+        if (conId.length === 0) continue;
+
+        for (let i = 0; i < conId.length; i += 500) {
+          const lote = conId.slice(i, i + 500);
+          const res = await rpcPorId(lote);
+          totalActualizadas += Number(res.facturas_actualizadas ?? 0);
+        }
+        console.log(`  ${t.desde} → ${t.hasta}: ${pares.length} pares · ${conId.length} emparejados`);
       }
     }
   } finally {
     await pool.close();
   }
 
-  console.log(`\n[enlace] TOTAL: ${totalPares} pares enviados · ${totalActualizadas} facturas actualizadas`);
-  if (totalPares > 0 && totalActualizadas === 0) {
-    console.log('[enlace] AVISO: ningún número de factura ha casado. Revisa el formato de facturas.numero_erp.');
+  console.log(`\n[enlace] TOTAL: ${totalPares} pares · ${totalResueltos} emparejados · ${totalActualizadas} facturas actualizadas`);
+  if (totalPares > 0 && totalResueltos === 0) {
+    console.log('[enlace] AVISO: ningún número ha casado. Pásame las líneas "muestra" y "sin emparejar".');
   }
 }
 
