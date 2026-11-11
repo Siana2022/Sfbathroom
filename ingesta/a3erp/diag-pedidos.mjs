@@ -268,6 +268,40 @@ async function main() {
         );
       }
 
+      // ---------------- Enlace pedido ↔ albarán ↔ factura ----------------
+      pintar(
+        'Tablas/columnas que referencian pedidos',
+        await consulta(
+          `SELECT t.name AS tabla, c.name AS columna
+           FROM ${base}.sys.tables t
+           JOIN ${base}.sys.columns c ON c.object_id = t.object_id
+           WHERE c.name LIKE '%PEDV%' OR c.name LIKE '%PEDIDO%' OR c.name LIKE '%IDPED%'
+           ORDER BY t.name, c.name`,
+        ),
+      );
+
+      // Si LINEALBA guarda el pedido de origen, medimos el ciclo pedido → factura.
+      const colsLinPed = await columnasDe(base, 'LINEALBA');
+      const enlacePedido = buscar(colsLinPed, 'IDPEDV', 'IDPED', 'IDLINPED', 'IDPEDIDO');
+      if (enlacePedido) {
+        pintar(
+          `Ciclo pedido → factura (enlace ${enlacePedido})`,
+          await consulta(
+            `SELECT COUNT(*) AS facturas_enlazadas,
+                    AVG(CAST(DATEDIFF(day, p.FECHA, f.FECHA) AS float)) AS dias_medios,
+                    MIN(DATEDIFF(day, p.FECHA, f.FECHA)) AS minimo,
+                    MAX(DATEDIFF(day, p.FECHA, f.FECHA)) AS maximo
+             FROM ${base}.dbo.LINEFACT lf
+             JOIN ${base}.dbo.LINEALBA la ON la.IDALBV = lf.IDALBV AND la.NUMLINALB = lf.NUMLINALB
+             JOIN ${base}.dbo.CABEPEDV p ON p.IDPEDV = la.${enlacePedido}
+             JOIN ${base}.dbo.CABEFACV f ON f.IDFACV = lf.IDFACV
+             WHERE f.FECHA >= DATEADD(year, -2, GETDATE())`,
+          ),
+        );
+      } else {
+        console.log(`LINEALBA no tiene columna de pedido (columnas: ${colsLinPed.join(', ')}).`);
+      }
+
       // ---------------- Albaranes sin factura (LINEFACT.IDALBV) ----------------
       const colsLin = await columnasDe(base, 'LINEFACT');
       if (!colsLin.includes('IDALBV')) {
