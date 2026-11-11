@@ -38,6 +38,20 @@ export async function cargarVentas(entrada: {
   return JSON.parse(res.texto || '{}');
 }
 
+/**
+ * Refresca la vista materializada de rendimiento (mv_perf_facturacion_mensual) tras la
+ * ingesta, para que la app sirva los agregados mensuales ya calculados. Ver migración
+ * 0038_perf_vistas_materializadas.sql. Idempotente y barato; usa el service_role key.
+ */
+export async function refrescarVistas(): Promise<void> {
+  const res = await envio(`${cfg.supabaseUrl}/rest/v1/rpc/refresh_mv_perf`, {
+    method: 'POST',
+    headers: cabeceras(),
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) throw new Error(`refresh_mv_perf: ${res.status} ${res.texto}`);
+}
+
 export async function leerEstado(clave: string): Promise<Record<string, unknown>> {
   const res = await envio(`${cfg.supabaseUrl}/rest/v1/rpc/leer_estado`, {
     method: 'POST',

@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
+import { filtrarPorIds, getFacturaIdsFiltradas, hayFiltros, type Filtros } from '@/lib/datos/filtros';
 import { lineasPorFacturas } from '@/lib/datos/lineas';
 import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 
@@ -58,10 +58,49 @@ type FilaFacturaVariacion = {
 };
 type FilaLineaVariacion = { factura_id: string; articulo_id: string; cantidad: number; base_imponible: number | null };
 
+// Camino rápido: la variación se calcula en Postgres (RPC perf_variacion), que respeta la
+// cartera del rol. Devuelve null si la RPC no está desplegada aún o falla, para que el
+// llamador caiga al cálculo en Node (compatibilidad con producción antes de aplicar 0039).
+async function getVariacionRpc(
+  supabase: ReturnType<typeof createClient>,
+  codigoEmpresa: string,
+  anio: number,
+): Promise<Variacion | null> {
+  const { data, error } = await supabase.rpc('perf_variacion', {
+    p_codigo_empresa: codigoEmpresa,
+    p_anio: anio,
+  });
+  if (error || !data) return null;
+  const d = data as {
+    delta: number;
+    precio: number;
+    volumen: number;
+    mix: number;
+    efecto_clientes: { nuevos: number; perdidos: number; existentes: number };
+  };
+  return {
+    delta: Number(d.delta ?? 0),
+    precio: Number(d.precio ?? 0),
+    volumen: Number(d.volumen ?? 0),
+    mix: Number(d.mix ?? 0),
+    efectoClientes: {
+      nuevos: Number(d.efecto_clientes?.nuevos ?? 0),
+      perdidos: Number(d.efecto_clientes?.perdidos ?? 0),
+      existentes: Number(d.efecto_clientes?.existentes ?? 0),
+    },
+  };
+}
+
 export async function getVariacion(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<Variacion> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
   const anioPrevio = anio - 1;
+
+  // Sin filtros (caso de portada/facturación por defecto): agrega en Postgres.
+  if (!filtros || !hayFiltros(filtros)) {
+    const rpc = await getVariacionRpc(supabase, codigoEmpresa, anio);
+    if (rpc) return rpc;
+  }
 
   const [idsFiltrados, filasRes] = await Promise.all([
     getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anioPrevio}-01-01`, `${anio}-12-31`),
@@ -165,12 +204,101 @@ export async function getEmpresaPorCodigo(codigo: string): Promise<EmpresaSel> {
   return (defecto as EmpresaSel) ?? { id: '', codigo: 'SF', nombre: 'SF Bathroom' };
 }
 
+// Camino rápido: los agregados de facturación se calculan en Postgres (RPC perf_facturacion),
+// que respeta la cartera del rol. Solo cubre el caso SIN filtros (portada + facturación por
+// defecto), que es la ruta caliente. El presupuesto se sigue leyendo aparte (tabla pequeña).
+// Devuelve null si la RPC no está desplegada aún o falla → el llamador usa el camino en Node.
+async function getFacturacionRpc(
+  supabase: ReturnType<typeof createClient>,
+  empresa: EmpresaSel,
+  anio: number,
+): Promise<FacturacionData | null> {
+  const [rpcRes, presupuestoRes] = await Promise.all([
+    supabase.rpc('perf_facturacion', { p_codigo_empresa: empresa.codigo, p_anio: anio }),
+    supabase.from('presupuesto').select('mes, importe').eq('empresa_id', empresa.id).eq('ejercicio', anio),
+  ]);
+  if (rpcRes.error || !rpcRes.data) return null;
+
+  const d = rpcRes.data as {
+    neta: number;
+    unidades: number;
+    n_facturas: number;
+    abonos_y_notas: number;
+    neta_previo_total: number;
+    series: { mes: number; neta: number; unidades: number; facturas: number; neta_previo: number | null }[];
+    top_clientes: { id: string; nombre: string; neta: number }[];
+  };
+
+  const presupuestoMes = new Map<number, number>();
+  let presupuesto = 0;
+  for (const p of (presupuestoRes.data ?? []) as { mes: number; importe: number }[]) {
+    const mes = Number(p.mes);
+    const importe = Number(p.importe ?? 0);
+    presupuestoMes.set(mes, (presupuestoMes.get(mes) ?? 0) + importe);
+    presupuesto += importe;
+  }
+
+  const seriePorMes = new Map<number, { neta: number; unidades: number; facturas: number; neta_previo: number | null }>();
+  for (const s of d.series ?? []) {
+    seriePorMes.set(Number(s.mes), {
+      neta: Number(s.neta ?? 0),
+      unidades: Number(s.unidades ?? 0),
+      facturas: Number(s.facturas ?? 0),
+      neta_previo: s.neta_previo == null ? null : Number(s.neta_previo),
+    });
+  }
+
+  const series: SerieMes[] = MESES.map((m) => {
+    const s = seriePorMes.get(m);
+    return {
+      mes: m,
+      neta: s?.neta ?? 0,
+      unidades: s?.unidades ?? 0,
+      facturas: s?.facturas ?? 0,
+      presupuesto: presupuestoMes.get(m) ?? null,
+      netaPrevio: s?.neta_previo ?? null,
+    };
+  });
+
+  const neta = Number(d.neta ?? 0);
+  const unidades = Number(d.unidades ?? 0);
+  const nFacturas = Number(d.n_facturas ?? 0);
+  const topClientes: ClienteTop[] = (d.top_clientes ?? []).map((c) => ({
+    id: c.id,
+    nombre: c.nombre ?? '—',
+    neta: Number(c.neta ?? 0),
+  }));
+
+  return {
+    empresa,
+    anio,
+    anioPrevio: anio - 1,
+    neta,
+    netaPrevioTotal: Number(d.neta_previo_total ?? 0),
+    unidades,
+    abonosYNotas: Number(d.abonos_y_notas ?? 0),
+    nFacturas,
+    ticketMedio: nFacturas > 0 ? neta / nFacturas : 0,
+    precioMedio: unidades > 0 ? neta / unidades : 0,
+    presupuesto,
+    cumplimiento: presupuesto > 0 ? (neta / presupuesto) * 100 : null,
+    series,
+    topClientes,
+  };
+}
+
 export async function getFacturacion(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<FacturacionData> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
   const anioPrevio = anio - 1;
   const at = String(anio);
   const conFiltros = Boolean(filtros && (filtros.cliente || filtros.comercial || filtros.familia || filtros.marca));
+
+  // Sin filtros: agrega en Postgres (RPC). Fallback al camino en Node si no está desplegada.
+  if (!filtros || !hayFiltros(filtros)) {
+    const rpc = await getFacturacionRpc(supabase, empresa, anio);
+    if (rpc) return rpc;
+  }
 
   const idsFiltrados = getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anioPrevio}-01-01`, `${anio}-12-31`);
   const facturasP = todasLasFilas<FilaFactura>((desde) =>

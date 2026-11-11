@@ -5,7 +5,7 @@ import { bloques } from '@/lib/bloques';
 import { getFacturacion, getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getKpisPersonalizadosVistos } from '@/lib/datos/kpisVisibles';
 import { getMiDia } from '@/lib/datos/miDia';
-import { memo } from '@/lib/perf/memo';
+import { memo, memoDiario } from '@/lib/perf/memo';
 import { decimal, eur, numero, pct } from '@/lib/formato';
 import { FORMATOS } from '@/lib/datos/kpisCatalogo';
 import Kpi from '@/components/Kpi';
@@ -151,8 +151,8 @@ export default async function Home() {
 
   const clave = uid ?? 'anon';
   const [d, kpisExtraTotal, resumen] = await Promise.all([
-    memo(`facturacion:${clave}:${empresa}:${ANIO}`, () => getFacturacion(empresa, ANIO)),
-    memo(`kpis:${clave}:${empresa}`, () => getKpisPersonalizadosVistos(empresa)),
+    memoDiario(`facturacion:${clave}:${empresa}:${ANIO}`, () => getFacturacion(empresa, ANIO)),
+    memoDiario(`kpis:${clave}:${empresa}`, () => getKpisPersonalizadosVistos(empresa)),
     getResumenHoy(empresa),
   ]);
   const MAX_KPI_PORTADA = 8;
