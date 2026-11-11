@@ -60,14 +60,14 @@ export default function GraficoLineas({ series, formato, leyenda }: Props) {
     segmentos(vals).map((seg) => seg.map(([i, v]) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' '));
 
   const act = hi != null ? series[hi] : null;
-  const tipW = 150;
+  const tipW = 172;
   const tipLineas = act
     ? [
         { c: COLOR_A, t: `${leyenda?.a ?? 'Actual'}: ${act.cur != null ? formato(act.cur) : '—'}` },
         ...(leyenda?.b ? [{ c: COLOR_B, t: `${leyenda.b}: ${act.prev != null ? formato(act.prev) : '—'}` }] : []),
       ]
     : [];
-  const tipH = 20 + tipLineas.length * 18;
+  const tipH = 26 + tipLineas.length * 17;
   const tipX = hi != null ? (x(hi) + tipW + 14 > W - PAD_R ? x(hi) - tipW - 12 : x(hi) + 12) : 0;
 
   return (
@@ -86,7 +86,7 @@ export default function GraficoLineas({ series, formato, leyenda }: Props) {
           viewBox={`0 0 ${W} ${H}`}
           width="100%"
           role="img"
-          style={{ maxWidth: '100%', height: 'auto' }}
+          style={{ width: '100%', maxWidth: 820, height: 'auto', display: 'block' }}
           onMouseLeave={() => setHi(null)}
         >
           {/* Rejilla + etiquetas eje Y */}
@@ -95,7 +95,7 @@ export default function GraficoLineas({ series, formato, leyenda }: Props) {
             return (
               <g key={idx}>
                 <line x1={PAD_L} y1={yy} x2={W - PAD_R} y2={yy} stroke="var(--border)" strokeWidth={1} />
-                <text x={PAD_L - 10} y={yy + 4} textAnchor="end" fontSize={11.5} fill="var(--muted)" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                <text x={PAD_L - 10} y={yy + 4} textAnchor="end" fontSize={10.5} fill="var(--muted)" style={{ fontVariantNumeric: 'tabular-nums' }}>
                   {formato(val)}
                 </text>
               </g>
@@ -126,7 +126,7 @@ export default function GraficoLineas({ series, formato, leyenda }: Props) {
 
           {/* Etiquetas eje X */}
           {series.map((s, i) => (
-            <text key={`x${i}`} x={x(i)} y={H - PAD_B + 20} textAnchor="middle" fontSize={11.5} fill="var(--muted)">
+            <text key={`x${i}`} x={x(i)} y={H - PAD_B + 20} textAnchor="middle" fontSize={10.5} fill="var(--muted)">
               {s.etiqueta}
             </text>
           ))}
@@ -135,11 +135,11 @@ export default function GraficoLineas({ series, formato, leyenda }: Props) {
           {act ? (
             <g pointerEvents="none">
               <rect x={tipX} y={PAD_T + 2} width={tipW} height={tipH} rx={8} fill="var(--panel)" stroke="var(--border)" strokeWidth={1} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.12))' }} />
-              <text x={tipX + 12} y={PAD_T + 20} fontSize={12.5} fontWeight={600} fill="currentColor">{act.etiqueta}</text>
+              <text x={tipX + 12} y={PAD_T + 19} fontSize={11.5} fontWeight={600} fill="currentColor">{act.etiqueta}</text>
               {tipLineas.map((l, k) => (
                 <g key={k}>
-                  <circle cx={tipX + 16} cy={PAD_T + 36 + k * 18} r={4} fill={l.c} />
-                  <text x={tipX + 26} y={PAD_T + 40 + k * 18} fontSize={12} fill="var(--muted)" style={{ fontVariantNumeric: 'tabular-nums' }}>{l.t}</text>
+                  <circle cx={tipX + 16} cy={PAD_T + 35 + k * 17} r={3.5} fill={l.c} />
+                  <text x={tipX + 25} y={PAD_T + 39 + k * 17} fontSize={11} fill="var(--muted)" style={{ fontVariantNumeric: 'tabular-nums' }}>{l.t}</text>
                 </g>
               ))}
             </g>
