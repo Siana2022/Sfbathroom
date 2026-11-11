@@ -150,7 +150,7 @@ async function rpcEntregaPedidos(pares) {
   return JSON.parse(texto || '{}');
 }
 
-/** Copia CABEPEDV.FECENTREGA a pedidos.fecha_promedida. */
+/** Copia CABEPEDV.FECENTREGA a pedidos.fecha_prometida. */
 async function sincronizarPedidos(e, empresaId, pool) {
   const indice = await indicePedidos(empresaId);
   const sql = `SELECT LTRIM(RTRIM(SERIE)) + '-' + CAST(CAST(NUMDOC AS bigint) AS varchar(20)) AS COMPUESTO,

@@ -17,7 +17,7 @@ declare
   v_actualizados int := 0;
 begin
   update public.pedidos p
-     set fecha_promedida = nullif(d ->> 'fecha_prometida', '')::date
+     set fecha_prometida = nullif(d ->> 'fecha_prometida', '')::date
     from jsonb_array_elements(p_pares) d
    where p.id = (d ->> 'pedido_id')::uuid;
 
