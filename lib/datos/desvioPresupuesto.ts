@@ -3,7 +3,7 @@ import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { filtrarPorIds, getFacturaIdsFiltradas, hayFiltros, type Filtros } from '@/lib/datos/filtros';
 import { lineasPorFacturas } from '@/lib/datos/lineas';
 import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
-import { ventasAnioRpc } from '@/lib/datos/ventas';
+import { ventasAnioRpc, ventasFiltradoRpc } from '@/lib/datos/ventas';
 
 export type FilaDesvio = {
   nombre: string;
@@ -39,20 +39,27 @@ export async function getDesvioPresupuesto(codigoEmpresa: string, anio: number, 
     facturas = ventas.facturas as unknown as FilaFactura[];
     lineas = ventas.lineas as unknown as FilaLinea[];
   } else {
-    const idsFiltrados = await getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anio}-01-01`, `${anio}-12-31`);
-    const filasRaw = await todasLasFilas<FilaFactura>((desde) =>
-      supabase
-        .from('facturas')
-        .select('id, cliente_id, comercial_id, base_imponible, tipo_documento')
-        .eq('empresa_id', empresa.id)
-        .gte('fecha', `${anio}-01-01`)
-        .lte('fecha', `${anio}-12-31`)
-        .range(desde, desde + TAMANO_PAGINA - 1)
-    );
-    facturas = filtrarPorIds(filasRaw, idsFiltrados);
-    lineas = facturas.length
-      ? await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, articulo_id, importe', facturas.map((f) => f.id))
-      : [];
+    // Con filtros: facturas+líneas ya filtradas en SQL (una llamada). Fallback al camino antiguo.
+    const ventasFil = await ventasFiltradoRpc(supabase, codigoEmpresa, filtros ?? {}, `${anio}-01-01`, `${anio}-12-31`);
+    if (ventasFil) {
+      facturas = ventasFil.facturas as unknown as FilaFactura[];
+      lineas = ventasFil.lineas as unknown as FilaLinea[];
+    } else {
+      const idsFiltrados = await getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anio}-01-01`, `${anio}-12-31`);
+      const filasRaw = await todasLasFilas<FilaFactura>((desde) =>
+        supabase
+          .from('facturas')
+          .select('id, cliente_id, comercial_id, base_imponible, tipo_documento')
+          .eq('empresa_id', empresa.id)
+          .gte('fecha', `${anio}-01-01`)
+          .lte('fecha', `${anio}-12-31`)
+          .range(desde, desde + TAMANO_PAGINA - 1)
+      );
+      facturas = filtrarPorIds(filasRaw, idsFiltrados);
+      lineas = facturas.length
+        ? await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, articulo_id, importe', facturas.map((f) => f.id))
+        : [];
+    }
   }
 
   const netaCliente = new Map<string, number>();
