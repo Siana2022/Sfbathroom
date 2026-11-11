@@ -1,11 +1,14 @@
 /**
- * Diagnóstico de pedidos en A3ERP (solo lectura).
+ * Diagnóstico de pedidos y albaranes en A3ERP (solo lectura).
  *
- * Responde la pregunta que decide si la página "Pedidos y cartera" está vacía
- * porque no hay cartera o porque la ingesta no trae los pedidos abiertos:
- *   - ¿qué valores tiene SITUACION y cuántos pedidos hay de cada uno?
- *   - ¿existen pedidos que no estén servidos (S) ni anulados (A)?
- *   - ¿la fecha de entrega (FECHAENTREGA) tiene datos y difiere de la de registro?
+ * Objetivo: decidir de dónde sale la "cartera pendiente" de sfbathroom.
+ * En CABEPEDV todo está servido (S) o anulado (A), así que la cartera real
+ * apunta a los albaranes servidos y todavía no facturados (CABEALBV).
+ *
+ * Muestra, por empresa:
+ *   - CABEPEDV: columnas, volumen, SITUACION y fecha de entrega (FECENTREGA)
+ *   - CABEALBV: columnas, volumen, rango e importe
+ *   - cuántos albaranes están SIN FACTURAR y una muestra de ellos
  *
  * Uso (en el PC de la ingesta, con su .env):
  *   npm run diag:pedidos
@@ -46,90 +49,165 @@ function pintar(titulo, filas) {
 
 async function main() {
   const pool = await mssql.connect(conn);
+
+  const consulta = async (sql) => {
+    try {
+      return (await pool.request().query(sql)).recordset;
+    } catch (err) {
+      console.log(`  [no se pudo consultar: ${err.message}]`);
+      return null;
+    }
+  };
+
+  const columnasDe = async (base, tabla) => {
+    const filas = await consulta(
+      `SELECT COLUMN_NAME AS col FROM ${base}.INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_NAME = '${tabla}' ORDER BY ORDINAL_POSITION`,
+    );
+    return (filas ?? []).map((r) => r.col);
+  };
+
+  const buscar = (columnas, ...candidatos) => {
+    for (const c of candidatos) {
+      const encontrada = columnas.find((x) => x.toUpperCase() === c.toUpperCase());
+      if (encontrada) return encontrada;
+    }
+    return null;
+  };
+
   try {
     for (const e of a3.empresas) {
       const base = `[${e.base}]`;
       console.log(`\n================ ${e.codigo} · ${e.base} ================`);
 
-      const columnas = (
-        await pool
-          .request()
-          .query(
-            `SELECT COLUMN_NAME AS col FROM ${base}.INFORMATION_SCHEMA.COLUMNS
-             WHERE TABLE_NAME = 'CABEPEDV' ORDER BY ORDINAL_POSITION`,
-          )
-      ).recordset.map((r) => r.col);
+      // ---------------- Pedidos ----------------
+      const colsPed = await columnasDe(base, 'CABEPEDV');
+      if (colsPed.length === 0) {
+        console.log('No existe CABEPEDV.');
+      } else {
+        const cFecha = buscar(colsPed, 'FECHA');
+        const cEntrega = buscar(colsPed, 'FECENTREGA', 'FECHENTREGA', 'FECHAENTREGA', 'FECHA_ENTREGA');
+        const cSituacion = buscar(colsPed, 'SITUACION');
+        const cNum = buscar(colsPed, 'NUMDOC');
+        const cSerie = buscar(colsPed, 'SERIE');
+        const cNom = buscar(colsPed, 'NOMCLI');
 
-      if (columnas.length === 0) {
-        console.log('No existe la tabla CABEPEDV en esta base.');
-        continue;
-      }
-      console.log(`Columnas: ${columnas.join(', ')}`);
-
-      const col = (re) => columnas.find((c) => re.test(c));
-      const cSituacion = col(/^SITUACION$/i);
-      const cFecha = col(/^FECHA$/i);
-      const cEntrega = col(/^FECHAENTREGA$|^FECHENTREGA$|^FECHA_ENTREGA$/i);
-      const cNum = col(/^NUMDOC$/i);
-      const cSerie = col(/^SERIE$/i);
-      const cCli = col(/^CODCLI$/i);
-      const cNom = col(/^NOMCLI$/i);
-
-      const orden = cFecha ?? cNum;
-      const orderBy = orden ? `ORDER BY ${orden} DESC` : 'ORDER BY (SELECT NULL)';
-
-      if (cFecha) {
-        const rango = (
-          await pool
-            .request()
-            .query(
-              `SELECT MIN(${cFecha}) AS desde, MAX(${cFecha}) AS hasta, COUNT(*) AS pedidos FROM ${base}.dbo.CABEPEDV`,
-            )
-        ).recordset[0];
-        pintar('Rango de fechas y volumen:', [rango]);
-      }
-
-      if (cSituacion) {
-        const dist = (
-          await pool
-            .request()
-            .query(
+        if (cFecha) {
+          pintar(
+            'Pedidos · rango y volumen',
+            await consulta(
+              `SELECT MIN(${cFecha}) AS desde, MAX(${cFecha}) AS hasta, COUNT(*) AS pedidos
+               FROM ${base}.dbo.CABEPEDV`,
+            ),
+          );
+        }
+        if (cSituacion) {
+          pintar(
+            'Pedidos · por SITUACION',
+            await consulta(
               `SELECT ${cSituacion} AS situacion, COUNT(*) AS pedidos
                FROM ${base}.dbo.CABEPEDV GROUP BY ${cSituacion} ORDER BY pedidos DESC`,
-            )
-        ).recordset;
-        pintar('Pedidos por SITUACION:', dist);
-
-        const detalle = [cNum, cSerie, cFecha, cSituacion, cCli, cNom].filter(Boolean).join(', ');
-        const abiertos = (
-          await pool
-            .request()
-            .query(
-              `SELECT TOP 20 ${detalle}
-               FROM ${base}.dbo.CABEPEDV
-               WHERE ${cSituacion} IS NULL OR ${cSituacion} NOT IN ('S', 'A')
-               ${orderBy}`,
-            )
-        ).recordset;
-        pintar('Últimos 20 pedidos que NO están servidos ni anulados:', abiertos);
-      } else {
-        console.log('No encuentro la columna SITUACION en CABEPEDV.');
+            ),
+          );
+        }
+        if (cFecha && cEntrega) {
+          pintar(
+            `Pedidos · fecha de entrega (${cEntrega})`,
+            await consulta(
+              `SELECT COUNT(*) AS total,
+                      SUM(CASE WHEN ${cEntrega} IS NULL THEN 1 ELSE 0 END) AS sin_fecha,
+                      SUM(CASE WHEN ${cEntrega} IS NOT NULL AND ${cEntrega} <> ${cFecha} THEN 1 ELSE 0 END) AS distinta_de_fecha,
+                      SUM(CASE WHEN ${cEntrega} > CAST(GETDATE() AS date) THEN 1 ELSE 0 END) AS entrega_futura
+               FROM ${base}.dbo.CABEPEDV`,
+            ),
+          );
+        }
       }
 
-      if (cFecha && cEntrega) {
-        const ent = (
-          await pool
-            .request()
-            .query(
-              `SELECT COUNT(*) AS total,
-                      SUM(CASE WHEN ${cEntrega} IS NULL THEN 1 ELSE 0 END) AS sin_fecha_entrega,
-                      SUM(CASE WHEN ${cEntrega} IS NOT NULL AND ${cEntrega} <> ${cFecha} THEN 1 ELSE 0 END) AS entrega_distinta
-               FROM ${base}.dbo.CABEPEDV`,
-            )
-        ).recordset[0];
-        pintar('Fecha de entrega en el ERP:', [ent]);
+      // ---------------- Albaranes ----------------
+      const colsAlb = await columnasDe(base, 'CABEALBV');
+      if (colsAlb.length === 0) {
+        console.log('No existe CABEALBV (albaranes de venta).');
+        continue;
+      }
+
+      console.log(`Albaranes · columnas clave: ${colsAlb.join(', ')}`);
+
+      const aNum = buscar(colsAlb, 'NUMDOC');
+      const aSerie = buscar(colsAlb, 'SERIE');
+      const aFecha = buscar(colsAlb, 'FECHA');
+      const aCli = buscar(colsAlb, 'CODCLI');
+      const aNom = buscar(colsAlb, 'NOMCLI');
+      const aTotal = buscar(colsAlb, 'TOTDOC', 'TOTMONEDA');
+      const aBase = buscar(colsAlb, 'BASEMONEDA', 'BASE');
+      const aFacturado = buscar(colsAlb, 'FACTURADO');
+      const aIdFac = buscar(colsAlb, 'IDFACV');
+      const aSituacion = buscar(colsAlb, 'SITUACION');
+      const aEntrega = buscar(colsAlb, 'FECENTREGA', 'FECHENTREGA', 'FECHAENTREGA');
+      const aCerrado = buscar(colsAlb, 'CERRADO');
+
+      if (aFecha) {
+        pintar(
+          'Albaranes · rango y volumen',
+          await consulta(
+            `SELECT MIN(${aFecha}) AS desde, MAX(${aFecha}) AS hasta, COUNT(*) AS albaranes
+             FROM ${base}.dbo.CABEALBV`,
+          ),
+        );
+      }
+
+      if (aTotal) {
+        pintar(
+          'Albaranes · importe total',
+          await consulta(`SELECT SUM(${aTotal}) AS importe_total FROM ${base}.dbo.CABEALBV`),
+        );
+      }
+
+      // Columna que indica si el albarán está facturado.
+      let condSinFacturar = null;
+      let etiquetaFlag = null;
+      if (aIdFac) {
+        condSinFacturar = `(${aIdFac} IS NULL OR ${aIdFac} = 0)`;
+        etiquetaFlag = `${aIdFac} vacío/0`;
+      } else if (aFacturado) {
+        condSinFacturar = `${aFacturado} = 0`;
+        etiquetaFlag = `${aFacturado} = 0`;
+      }
+
+      if (condSinFacturar) {
+        pintar(
+          `Albaranes · SIN FACTURAR (${etiquetaFlag})`,
+          await consulta(
+            `SELECT COUNT(*) AS sin_facturar,
+                    SUM(CASE WHEN ${aFecha} >= DATEADD(day, -365, GETDATE()) THEN 1 ELSE 0 END) AS ultimo_anio
+             FROM ${base}.dbo.CABEALBV WHERE ${condSinFacturar}`,
+          ),
+        );
+
+        const detalle = [aNum, aSerie, aFecha, aEntrega, aCli, aNom, aBase, aTotal, aSituacion]
+          .filter(Boolean)
+          .join(', ');
+        if (detalle) {
+          pintar(
+            'Albaranes · muestra de los últimos sin facturar',
+            await consulta(
+              `SELECT TOP 15 ${detalle}
+               FROM ${base}.dbo.CABEALBV
+               WHERE ${condSinFacturar}
+               ${aFecha ? `ORDER BY ${aFecha} DESC` : ''}`,
+            ),
+          );
+        }
       } else {
-        console.log('No encuentro columna de fecha de entrega (FECHAENTREGA) en CABEPEDV.');
+        console.log('No encuentro una columna que marque el albarán como facturado (IDFACV / FACTURADO).');
+        if (aCerrado) {
+          pintar(
+            `Albaranes · por ${aCerrado}`,
+            await consulta(
+              `SELECT ${aCerrado} AS cerrado, COUNT(*) AS albaranes FROM ${base}.dbo.CABEALBV GROUP BY ${aCerrado}`,
+            ),
+          );
+        }
       }
     }
   } finally {
