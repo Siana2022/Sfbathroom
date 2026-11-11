@@ -7,9 +7,10 @@ import {
   type TransporteClienteMes,
   type TransporteProveedorMes,
 } from '@/lib/datos/transporte';
-import { eur, decimal } from '@/lib/formato';
+import { eur } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
+import RentabilidadTransporte from '@/components/RentabilidadTransporte';
 import { ANIO_ACTUAL } from '@/lib/ejercicio';
 
 const ANIO = ANIO_ACTUAL;
@@ -146,68 +147,7 @@ export default async function TransportePage() {
           interiores) frente a lo que <strong>cuesta</strong> (coste de esas mismas líneas). Margen = facturado − coste.
           Si no se cobra transporte (precio 0) pero hay coste, el margen sale negativo.
         </p>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '8px 0' }}>
-          <DescargarExcel
-            nombre={`rentabilidad-transporte-${ANIO}`}
-            columnas={['Cliente', 'Factura transporte', 'Facturado', 'Coste', 'Margen', 'Margen %']}
-            registros={rent.filas.map((f) => [f.cliente, f.facturaTransporte ? 'Sí' : 'No', f.facturado, f.coste, f.margen, f.margenPct ?? ''])}
-          />
-        </div>
-        {rent.filas.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>Sin líneas de transporte terrestre en {ANIO}.</p>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="tabla">
-              <thead>
-                <tr>
-                  <th>Cliente</th>
-                  <th>Factura transporte</th>
-                  <th className="td-num">Facturado</th>
-                  <th className="td-num">Coste</th>
-                  <th className="td-num">Margen</th>
-                  <th className="td-num">Margen %</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rent.filas.map((f) => (
-                  <tr key={f.cliente}>
-                    <td>{f.cliente}</td>
-                    <td>{f.facturaTransporte ? 'Sí' : 'No'}</td>
-                    <td className="td-num">{eur(f.facturado)}</td>
-                    <td className="td-num">{eur(f.coste)}</td>
-                    <td className={`td-num ${f.margen >= 0 ? 'td-pos' : ''}`} style={f.margen < 0 ? { color: '#c0392b' } : undefined}>
-                      {f.margen > 0 ? '+' : ''}{eur(f.margen)}
-                    </td>
-                    <td className="td-num" style={f.margenPct != null && f.margenPct < 0 ? { color: '#c0392b' } : undefined}>
-                      {f.margenPct === null ? '—' : `${decimal(f.margenPct)} %`}
-                    </td>
-                  </tr>
-                ))}
-                <tr>
-                  <td><strong>Total</strong></td>
-                  <td></td>
-                  <td className="td-num"><strong>{eur(rent.totales.facturado)}</strong></td>
-                  <td className="td-num"><strong>{eur(rent.totales.coste)}</strong></td>
-                  <td className="td-num"><strong style={rent.totales.margen < 0 ? { color: '#c0392b' } : undefined}>{eur(rent.totales.margen)}</strong></td>
-                  <td className="td-num"><strong>{rent.totales.margenPct === null ? '—' : `${decimal(rent.totales.margenPct)} %`}</strong></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        <TablaTransporteCliente
-          titulo="Facturado de transporte terrestre por mes"
-          anio={ANIO}
-          filas={rent.filas.filter((f) => Math.abs(f.facturado) > 0.005).map((f) => ({ cliente: f.cliente, meses: f.facturadoMeses, total: f.facturado }))}
-          total={rent.totales.facturado}
-        />
-        <TablaTransporteCliente
-          titulo="Coste de transporte terrestre por mes"
-          anio={ANIO}
-          filas={rent.filas.filter((f) => Math.abs(f.coste) > 0.005).map((f) => ({ cliente: f.cliente, meses: f.costeMeses, total: f.coste }))}
-          total={rent.totales.coste}
-        />
+        <RentabilidadTransporte datos={rent} />
       </div>
 
       <div className="card">

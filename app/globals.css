@@ -495,6 +495,53 @@ ul.tablas { color: var(--muted); font-size: 13px; margin: 8px 0 0; padding-left:
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+/* Fila de tabla clicable (abre modal de detalle). */
+.fila-clic {
+  cursor: pointer;
+}
+.fila-clic:hover {
+  background: var(--fila-hover, rgba(0, 0, 0, 0.035));
+}
+
+/* Modal / ventana emergente. */
+.modal-fondo {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+}
+.modal-caja {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+  padding: 20px 22px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 85vh;
+  overflow: auto;
+}
+.modal-cerrar {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.modal-cerrar:hover {
+  border-color: var(--muted);
+}
+
 /* KPI clicable (despliega el gráfico de evolución). */
 .kpi-boton {
   appearance: none;
