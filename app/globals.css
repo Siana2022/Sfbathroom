@@ -484,6 +484,48 @@ ul.tablas { color: var(--muted); font-size: 13px; margin: 8px 0 0; padding-left:
   margin-bottom: 12px;
 }
 
+/* Desplegables de "Pedidos por estado": fila resumen con las cifras a la derecha. */
+details.estado-grupo { border-top: 1px solid var(--border); }
+
+details.estado-grupo:first-of-type { border-top: none; }
+
+details.estado-grupo > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 2px;
+  font-weight: 600;
+  font-size: 15px;
+  user-select: none;
+}
+
+details.estado-grupo > summary::-webkit-details-marker {
+  display: none;
+}
+
+details.estado-grupo > summary::before {
+  content: '▸';
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+
+details.estado-grupo[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+details.estado-grupo .estado-cifras {
+  margin-left: auto;
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 13.5px;
+}
+
+details.estado-grupo > .tabla {
+  margin-bottom: 12px;
+}
+
 .kpi {
   position: relative;
   background: var(--panel);

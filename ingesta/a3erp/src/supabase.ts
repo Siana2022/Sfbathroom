@@ -52,6 +52,24 @@ export async function refrescarVistas(): Promise<void> {
   if (!res.ok) throw new Error(`refresh_mv_perf: ${res.status} ${res.texto}`);
 }
 
+/**
+ * Guarda en cada factura la fecha del pedido de origen y su fecha de entrega
+ * comprometida (ver migración 0046). No toca la tabla `pedidos`: la app calcula
+ * el plazo pedido→factura con esas dos columnas.
+ */
+export async function enlazarFechasPedido(
+  empresaCodigo: string,
+  pares: { factura_numero: string; factura_numero_alt: string; pedido_fecha: string; pedido_entrega: string }[],
+): Promise<unknown> {
+  const res = await envio(`${cfg.supabaseUrl}/rest/v1/rpc/enlazar_fechas_pedido`, {
+    method: 'POST',
+    headers: cabeceras(),
+    body: JSON.stringify({ p_codigo_empresa: empresaCodigo, p_pares: pares }),
+  });
+  if (!res.ok) throw new Error(`enlazar_fechas_pedido: ${res.status} ${res.texto}`);
+  return JSON.parse(res.texto || '{}');
+}
+
 export async function leerEstado(clave: string): Promise<Record<string, unknown>> {
   const res = await envio(`${cfg.supabaseUrl}/rest/v1/rpc/leer_estado`, {
     method: 'POST',

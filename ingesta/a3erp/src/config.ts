@@ -29,6 +29,7 @@ export const cfg = {
 
 export type A3Config = {
   sqlVentas: { consulta: string; filtroFecha: string };
+  sqlFechasPedido?: { consulta: string; filtroFecha: string };
   tiposDocumento: Record<string, string>;
   columnas: Record<string, string>;
   empresas: { codigo: string; base: string }[];

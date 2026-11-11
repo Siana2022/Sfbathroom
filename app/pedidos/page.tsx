@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { getPedidos } from '@/lib/datos/pedidos';
 import { parseFiltros, getOpcionesFiltros, type SearchParams } from '@/lib/datos/filtros';
-import { decimal, eur, numero } from '@/lib/formato';
+import { decimal, eur, fecha, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
 import Filtros from '@/components/Filtros';
@@ -10,14 +10,6 @@ import { ANIO_ACTUAL } from '@/lib/ejercicio';
 
 
 const ANIO = ANIO_ACTUAL;
-
-const ESTADOS_LABEL: Record<string, string> = {
-  captado: 'Captado',
-  aceptado: 'Aceptado',
-  parcial: 'Servido parcial',
-  servido: 'Servido',
-  anulado: 'Anulado',
-};
 
 export default async function PedidosPage({ searchParams }: { searchParams: SearchParams }) {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
@@ -30,48 +22,93 @@ export default async function PedidosPage({ searchParams }: { searchParams: Sear
       <p className="breadcrumb">Cuadro mando comercial · Bloque 2</p>
       <h1>Pedidos y cartera</h1>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
-        Captación de pedidos de {d.empresa.nombre}, cartera y distribución por cliente extraídos en tiempo real de A3ERP.
+        Pedidos de {d.empresa.nombre}, cartera pendiente de servir y entregas fuera de plazo.
       </p>
 
-      <Filtros opciones={opciones} />
+      <Filtros opciones={opciones} campos={['cliente', 'comercial', 'desde', 'hasta']} />
+
+      {d.sinEnlaceFacturas && (
+        <Aviso tipo="info">
+          Todavía no hay facturas enlazadas a pedidos, así que <strong>servido</strong> y{' '}
+          <strong>pendiente</strong> se estiman con la situación del pedido en A3ERP. Cuando la
+          ingesta rellene el vínculo pedido → factura, estas cifras pasarán a calcularse por
+          fecha de factura.
+        </Aviso>
+      )}
+
+      {d.captados === 0 && (
+        <Aviso tipo="info">
+          No hay pedidos cargados para {d.anio} con los filtros actuales.
+        </Aviso>
+      )}
 
       <ul className="grid-kpis">
         <Kpi etiqueta={`Pedidos captados ${d.anio}`} valor={numero(d.captados)} nota={`importe ${eur(d.importeCaptado)}`} />
-        <Kpi etiqueta="Cartera pendiente" valor={eur(d.enCarteraImporte)} nota={`${d.enCartera} pedidos abiertos`} />
-        <Kpi etiqueta="Ratio servido / facturación" valor={d.ratioServidoVsFacturado === null ? '—' : `${decimal(d.ratioServidoVsFacturado)} %`} nota="importe servido vs facturación neta" />
-        <Kpi etiqueta="Ticket medio por pedido" valor={eur(d.ticketMedio)} nota="importe captado entre pedidos no anulados" />
+        <Kpi etiqueta="Cartera pendiente" valor={eur(d.importePendiente)} nota={`${numero(d.pendientes)} pedidos sin facturar`} />
         <Kpi etiqueta="Pedidos servidos" valor={numero(d.servidos)} nota={`importe ${eur(d.importeServido)}`} />
         <Kpi etiqueta="Pedidos anulados" valor={numero(d.anulados)} nota={`importe ${eur(d.importeAnulado)}`} />
-        <Kpi etiqueta="Antigüedad media cartera" valor={`${Math.round(d.antiguedadMediaCartera)} días`} nota="desde fecha de entrada" />
-        <Kpi etiqueta="Plazo medio entrada → entrega" valor={d.plazoMedioEntrega === null ? '—' : `${Math.round(d.plazoMedioEntrega)} días`} nota="pedidos servidos" />
-        <Kpi etiqueta="Cumplimiento fecha comprometida" valor={d.cumplimientoFecha === null ? '—' : `${decimal(d.cumplimientoFecha)} %`} nota="servidos a tiempo respecto a los solicitados" />
+        <Kpi etiqueta="Ticket medio por pedido" valor={eur(d.ticketMedio)} nota="importe captado entre pedidos no anulados" />
+        <Kpi etiqueta="Antigüedad media cartera" valor={`${Math.round(d.antiguedadMediaCartera)} días`} nota="desde la fecha de entrada" />
+        <Kpi
+          etiqueta="Plazo medio entrada → entrega"
+          valor={d.plazoMedioEntrega === null ? '—' : `${Math.round(d.plazoMedioEntrega)} días`}
+          nota="solo pedidos sin fecha programada"
+        />
+        <Kpi etiqueta="Pedidos con fecha programada" valor={numero(d.programados)} nota={`importe ${eur(d.importeProgramado)}`} />
+        <Kpi
+          etiqueta="Cumplimiento fecha comprometida"
+          valor={d.cumplimientoFecha === null ? '—' : `${decimal(d.cumplimientoFecha)} %`}
+          nota="facturados en la fecha programada o antes"
+        />
       </ul>
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2>Cartera pendiente por compromiso</h2>
+          <h2>Pedidos fuera de plazo de entrega</h2>
           <DescargarExcel
-            nombre={`pedidos-cartera-compromiso-${d.anio}`}
-            columnas={['Compromiso', 'Pendiente']}
-            registros={d.carteraFechaSolicitada.map((b) => [b.label, b.importe])}
+            nombre={`pedidos-fuera-plazo-${d.anio}`}
+            columnas={['Cliente', 'Pedido', 'Entrega prevista', 'Días de retraso', 'Importe']}
+            registros={d.fueraPlazo.map((f) => [f.cliente, f.numero, f.fechaPrevista, f.diasRetraso, f.importe])}
           />
         </div>
-        <table className="tabla">
-          <thead>
-            <tr>
-              <th>Compromiso (fecha solicitada)</th>
-              <th className="td-num">Pendiente</th>
-            </tr>
-          </thead>
-          <tbody>
-            {d.carteraFechaSolicitada.map((b) => (
-              <tr key={b.label}>
-                <td>{b.label}</td>
-                <td className="td-num">{eur(b.importe)}</td>
+        <p className="nota" style={{ color: 'var(--muted)', marginTop: 0 }}>
+          Entrega prevista: la fecha programada del pedido; si no la tiene,{' '}
+          {d.empresa.codigo === 'DOT' ? '21 días naturales' : '5 días hábiles'} desde la fecha de
+          entrada. Solo pedidos pendientes de servir.
+        </p>
+        {d.fueraPlazo.length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>No hay pedidos abiertos fuera de plazo.</p>
+        ) : (
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Pedido</th>
+                <th>Entrega prevista</th>
+                <th className="td-num">Días de retraso</th>
+                <th className="td-num">Importe</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {d.fueraPlazo.map((f) => (
+                <tr key={f.id}>
+                  <td>{f.cliente}</td>
+                  <td>{f.numero}</td>
+                  <td>{fecha(f.fechaPrevista)}</td>
+                  <td className="td-num" style={{ color: 'var(--rojo)', fontWeight: 600 }}>
+                    {f.diasRetraso}
+                  </td>
+                  <td className="td-num">{eur(f.importe)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {d.fueraPlazoTotal > d.fueraPlazo.length && (
+          <p className="nota" style={{ color: 'var(--muted)' }}>
+            Mostrando los {d.fueraPlazo.length} más retrasados de {numero(d.fueraPlazoTotal)}.
+          </p>
+        )}
       </div>
 
       <div className="card">
@@ -79,11 +116,17 @@ export default async function PedidosPage({ searchParams }: { searchParams: Sear
           <h2>Cartera pendiente por cliente</h2>
           <DescargarExcel
             nombre={`pedidos-cartera-por-cliente-${d.anio}`}
-            columnas={['Cliente', 'Pedidos', 'Pendiente', 'Antigüedad media']}
-            registros={d.enCarteraCliente.map((c) => [c.nombre, c.pedidos, c.pendiente, c.antiguedadMedia.toFixed(2)])}
+            columnas={['Cliente', 'Pedidos', 'Pendiente', 'Entrada más antigua', 'Antigüedad media']}
+            registros={d.carteraCliente.map((c) => [
+              c.nombre,
+              c.pedidos,
+              c.pendiente,
+              c.entradaMasAntigua ?? '',
+              Math.round(c.antiguedadMedia),
+            ])}
           />
         </div>
-        {d.enCarteraCliente.length === 0 ? (
+        {d.carteraCliente.length === 0 ? (
           <p style={{ color: 'var(--muted)' }}>Sin cartera pendiente.</p>
         ) : (
           <table className="tabla">
@@ -92,15 +135,17 @@ export default async function PedidosPage({ searchParams }: { searchParams: Sear
                 <th>Cliente</th>
                 <th className="td-num">Pedidos</th>
                 <th className="td-num">Pendiente</th>
+                <th>Entrada más antigua</th>
                 <th className="td-num">Antigüedad media</th>
               </tr>
             </thead>
             <tbody>
-              {d.enCarteraCliente.map((c) => (
+              {d.carteraCliente.map((c) => (
                 <tr key={c.nombre}>
                   <td>{c.nombre}</td>
-                  <td className="td-num">{c.pedidos}</td>
+                  <td className="td-num">{numero(c.pedidos)}</td>
                   <td className="td-num">{eur(c.pendiente)}</td>
+                  <td>{fecha(c.entradaMasAntigua)}</td>
                   <td className="td-num">{Math.round(c.antiguedadMedia)} días</td>
                 </tr>
               ))}
@@ -110,82 +155,57 @@ export default async function PedidosPage({ searchParams }: { searchParams: Sear
       </div>
 
       <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2>Pedidos por estado</h2>
-          <DescargarExcel
-            nombre={`pedidos-por-estado-${d.anio}`}
-            columnas={['Estado', 'Pedidos', 'Importe']}
-            registros={d.porEstado.map((e) => [ESTADOS_LABEL[e.estado] ?? e.estado, e.pedidos, e.importe])}
-          />
-        </div>
-        <table className="tabla">
-          <thead>
-            <tr>
-              <th>Estado</th>
-              <th className="td-num">Pedidos</th>
-              <th className="td-num">Importe</th>
-            </tr>
-          </thead>
-          <tbody>
-            {d.porEstado.map((e) => (
-              <tr key={e.estado}>
-                <td>{ESTADOS_LABEL[e.estado] ?? e.estado}</td>
-                <td className="td-num">{numero(e.pedidos)}</td>
-                <td className="td-num">{eur(e.importe)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="card">
-        <h2>Anulaciones por motivo</h2>
-        {d.anulacionesMotivo.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>Sin anulaciones con motivo registrado.</p>
-        ) : (
-          <table className="tabla">
-            <thead>
-              <tr>
-                <th>Motivo</th>
-                <th className="td-num">Pedidos</th>
-                <th className="td-num">Importe</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.anulacionesMotivo.map((a) => (
-                <tr key={a.motivo}>
-                  <td>{a.motivo}</td>
-                  <td className="td-num">{numero(a.pedidos)}</td>
-                  <td className="td-num">{eur(a.importe)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      <div className="card">
-        <h2>Modificaciones de pedido</h2>
-        {d.modificados.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>Sin modificaciones registradas.</p>
-        ) : (
-          <table className="tabla">
-            <thead>
-              <tr>
-                <th>Tipo</th>
-                <th className="td-num">Veces</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.modificados.map((m) => (
-                <tr key={m.tipo}>
-                  <td>{m.tipo}</td>
-                  <td className="td-num">{numero(m.count)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <h2>Pedidos por estado</h2>
+        {d.porEstado.map((e) => (
+          <details key={e.estado} className="estado-grupo">
+            <summary>
+              <span>{e.label}</span>
+              <span className="estado-cifras">
+                {numero(e.pedidos)} pedidos · {eur(e.importe)}
+              </span>
+            </summary>
+            {e.detalle.length === 0 ? (
+              <p style={{ color: 'var(--muted)' }}>Sin pedidos en este estado.</p>
+            ) : (
+              <table className="tabla">
+                <thead>
+                  <tr>
+                    <th>Cliente</th>
+                    <th>Pedido</th>
+                    <th>Entrada</th>
+                    <th>Entrega prevista</th>
+                    <th>Facturado</th>
+                    <th className="td-num">Importe</th>
+                    <th className="td-num">Retraso</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {e.detalle.map((p) => (
+                    <tr key={p.id}>
+                      <td>{p.cliente}</td>
+                      <td>{p.numero}</td>
+                      <td>{fecha(p.fechaEntrada)}</td>
+                      <td>{fecha(p.fechaPrevista)}</td>
+                      <td>{fecha(p.fechaFactura)}</td>
+                      <td className="td-num">{eur(p.importe)}</td>
+                      <td
+                        className="td-num"
+                        style={p.diasRetraso ? { color: 'var(--rojo)', fontWeight: 600 } : undefined}
+                      >
+                        {p.diasRetraso ? `${p.diasRetraso} días` : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            {e.total > e.detalle.length && (
+              <p className="nota" style={{ color: 'var(--muted)' }}>
+                Mostrando los {e.detalle.length} más recientes de {numero(e.total)}.
+              </p>
+            )}
+          </details>
+        ))}
       </div>
     </div>
   );
