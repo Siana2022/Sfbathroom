@@ -14,6 +14,12 @@ export function decimal(v: number, digitos = 2): string {
   return new Intl.NumberFormat('es-ES', { minimumFractionDigits: digitos, maximumFractionDigits: digitos }).format(v);
 }
 
+/** Fecha ISO (`YYYY-MM-DD`) a formato corto español (`dd/mm/aaaa`). */
+export function fecha(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  return new Date(`${iso.slice(0, 10)}T00:00:00`).toLocaleDateString('es-ES');
+}
+
 export function pct(v: number): string {
   const formateado = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(v);
   return `${v > 0 ? '+' : ''}${formateado} %`;
