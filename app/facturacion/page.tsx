@@ -162,17 +162,19 @@ function TablaTransporteProveedor({ titulo, anio, filas, total }: { titulo: stri
 export default async function FacturacionPage({ searchParams }: { searchParams: SearchParams }) {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
   const filtros = parseFiltros(searchParams);
-  const opciones = await getOpcionesFiltros(empresa, { fuente: 'facturas', anio: ANIO });
-  const d = await getFacturacion(empresa, ANIO, filtros);
-  const t = await getVistasTemporales(empresa, ANIO, filtros);
+  // Todas las consultas en paralelo (antes eran 7 awaits en serie → 10-15 s con filtros).
+  const [opciones, d, t, v, trans, transCli, costeProv, desvio] = await Promise.all([
+    getOpcionesFiltros(empresa, { fuente: 'facturas', anio: ANIO }),
+    getFacturacion(empresa, ANIO, filtros),
+    getVistasTemporales(empresa, ANIO, filtros),
+    getVariacion(empresa, ANIO, filtros),
+    getCosteTransporte(empresa, ANIO),
+    getTransporteFacturadoPorCliente(empresa, ANIO),
+    getCosteTransportePorProveedor(empresa, ANIO),
+    getDesvioPresupuesto(empresa, ANIO, filtros),
+  ]);
   const previo = d.anioPrevio;
   const delta = d.netaPrevioTotal > 0 ? pct(((d.neta - d.netaPrevioTotal) / d.netaPrevioTotal) * 100) : '—';
-
-  const v = await getVariacion(empresa, ANIO, filtros);
-  const trans = await getCosteTransporte(empresa, ANIO);
-  const transCli = await getTransporteFacturadoPorCliente(empresa, ANIO);
-  const costeProv = await getCosteTransportePorProveedor(empresa, ANIO);
-  const desvio = await getDesvioPresupuesto(empresa, ANIO, filtros);
 
   const barras: Barra[] = d.series.map((s) => ({
     etiqueta: NOMBRE_MES[s.mes],

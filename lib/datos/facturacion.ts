@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { filtrarPorIds, getFacturaIdsFiltradas, hayFiltros, type Filtros } from '@/lib/datos/filtros';
 import { lineasPorFacturas } from '@/lib/datos/lineas';
 import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
+import { ventasFiltradoRpc } from '@/lib/datos/ventas';
 
 export type EmpresaSel = { id: string; codigo: string; nombre: string };
 
@@ -102,19 +103,26 @@ export async function getVariacion(codigoEmpresa: string, anio: number, filtros?
     if (rpc) return rpc;
   }
 
-  const [idsFiltrados, filasRes] = await Promise.all([
-    getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anioPrevio}-01-01`, `${anio}-12-31`),
-    todasLasFilas<FilaFacturaVariacion>((desde) =>
-      supabase
-        .from('facturas')
-        .select('id, cliente_id, fecha, tipo_documento')
-        .eq('empresa_id', empresa.id)
-        .gte('fecha', `${anioPrevio}-01-01`)
-        .lte('fecha', `${anio}-12-31`)
-        .range(desde, desde + TAMANO_PAGINA - 1)
-    ),
-  ]);
-  const facturas = filtrarPorIds(filasRes, idsFiltrados);
+  // Con filtros: facturas+líneas ya filtradas en SQL (una llamada). Fallback al camino antiguo.
+  const ventasFil = await ventasFiltradoRpc(supabase, codigoEmpresa, filtros ?? {}, `${anioPrevio}-01-01`, `${anio}-12-31`);
+  let facturas: FilaFacturaVariacion[];
+  if (ventasFil) {
+    facturas = ventasFil.facturas as unknown as FilaFacturaVariacion[];
+  } else {
+    const [idsFiltrados, filasRes] = await Promise.all([
+      getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anioPrevio}-01-01`, `${anio}-12-31`),
+      todasLasFilas<FilaFacturaVariacion>((desde) =>
+        supabase
+          .from('facturas')
+          .select('id, cliente_id, fecha, tipo_documento')
+          .eq('empresa_id', empresa.id)
+          .gte('fecha', `${anioPrevio}-01-01`)
+          .lte('fecha', `${anio}-12-31`)
+          .range(desde, desde + TAMANO_PAGINA - 1)
+      ),
+    ]);
+    facturas = filtrarPorIds(filasRes, idsFiltrados);
+  }
 
   const infoPorId = new Map<string, { anio: number; tipo: string }>();
   const clientePorId = new Map<string, string | null>();
@@ -123,11 +131,13 @@ export async function getVariacion(codigoEmpresa: string, anio: number, filtros?
     clientePorId.set(f.id, f.cliente_id);
   }
 
-  const lineasArr = await lineasPorFacturas<FilaLineaVariacion>(
-    supabase,
-    'factura_id, articulo_id, cantidad, base_imponible',
-    [...infoPorId.keys()],
-  );
+  const lineasArr = ventasFil
+    ? (ventasFil.lineas as unknown as FilaLineaVariacion[])
+    : await lineasPorFacturas<FilaLineaVariacion>(
+        supabase,
+        'factura_id, articulo_id, cantidad, base_imponible',
+        [...infoPorId.keys()],
+      );
 
   const unidades = new Map<string, number[]>(); // articulo -> [P0 unidades, P1 unidades]
   const valores = new Map<string, number[]>(); // articulo -> [P0 importe, P1 importe]
@@ -300,16 +310,6 @@ export async function getFacturacion(codigoEmpresa: string, anio: number, filtro
     if (rpc) return rpc;
   }
 
-  const idsFiltrados = getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anioPrevio}-01-01`, `${anio}-12-31`);
-  const facturasP = todasLasFilas<FilaFactura>((desde) =>
-    supabase
-      .from('facturas')
-      .select('id, cliente_id, fecha, tipo_documento, base_imponible')
-      .eq('empresa_id', empresa.id)
-      .gte('fecha', `${anioPrevio}-01-01`)
-      .lte('fecha', `${anio}-12-31`)
-      .range(desde, desde + TAMANO_PAGINA - 1)
-  );
   const presupuestoP = filtros?.marca || filtros?.familia
     ? Promise.resolve({ data: [] as unknown[] })
     : (() => {
@@ -322,16 +322,44 @@ export async function getFacturacion(codigoEmpresa: string, anio: number, filtro
         if (filtros?.comercial) pq = pq.eq('comercial_id', filtros.comercial);
         return pq;
       })();
-  const vistaP = conFiltros
-    ? Promise.resolve({ data: null as unknown, error: null })
-    : supabase
-        .from('v_perf_facturacion_mensual')
-        .select('mes, ejercicio, neta_total, n_facturas, unidades')
-        .eq('empresa_id', empresa.id)
-        .in('ejercicio', [anio, anioPrevio]);
 
-  const [idsFiltradosRes, filasRes, presupuestoRes, vistaRes] = await Promise.all([idsFiltrados, facturasP, presupuestoP, vistaP]);
-  const facturas = filtrarPorIds(filasRes, idsFiltradosRes);
+  // Con filtros: facturas+líneas ya filtradas en SQL (una llamada). Fallback al camino antiguo.
+  const ventasFil = conFiltros
+    ? await ventasFiltradoRpc(supabase, empresa.codigo, filtros ?? {}, `${anioPrevio}-01-01`, `${anio}-12-31`)
+    : null;
+
+  let facturas: FilaFactura[];
+  let lineasPreCargadas: FilaLinea[] | null = null;
+  let presupuestoRes: { data: unknown };
+  let vistaRes: { data: unknown; error: unknown } = { data: null, error: null };
+
+  if (ventasFil) {
+    facturas = ventasFil.facturas as unknown as FilaFactura[];
+    lineasPreCargadas = ventasFil.lineas as unknown as FilaLinea[];
+    presupuestoRes = await presupuestoP;
+  } else {
+    const idsFiltrados = getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anioPrevio}-01-01`, `${anio}-12-31`);
+    const facturasP = todasLasFilas<FilaFactura>((desde) =>
+      supabase
+        .from('facturas')
+        .select('id, cliente_id, fecha, tipo_documento, base_imponible')
+        .eq('empresa_id', empresa.id)
+        .gte('fecha', `${anioPrevio}-01-01`)
+        .lte('fecha', `${anio}-12-31`)
+        .range(desde, desde + TAMANO_PAGINA - 1)
+    );
+    const vistaP = conFiltros
+      ? Promise.resolve({ data: null as unknown, error: null })
+      : supabase
+          .from('v_perf_facturacion_mensual')
+          .select('mes, ejercicio, neta_total, n_facturas, unidades')
+          .eq('empresa_id', empresa.id)
+          .in('ejercicio', [anio, anioPrevio]);
+    const [idsFiltradosRes, filasRes, pRes, vRes] = await Promise.all([idsFiltrados, facturasP, presupuestoP, vistaP]);
+    facturas = filtrarPorIds(filasRes, idsFiltradosRes);
+    presupuestoRes = pRes as { data: unknown };
+    vistaRes = vRes as { data: unknown; error: unknown };
+  }
 
   const curs = { neta: 0, unidades: 0, facturas: 0, abonosYNotas: 0 };
   const prev = { neta: 0, unidades: 0, facturas: 0 };
@@ -401,7 +429,10 @@ export async function getFacturacion(codigoEmpresa: string, anio: number, filtro
   const unidadesMes = new Map<number, number>();
   const unidadesMesPrev = new Map<number, number>();
   if (!vistaDisp && (idsActivo.length || idsPrevio.length)) {
-    const lineas = await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, cantidad', [...idsActivo, ...idsPrevio]);
+    const setIds = new Set([...idsActivo, ...idsPrevio]);
+    const lineas = lineasPreCargadas
+      ? lineasPreCargadas.filter((l) => setIds.has(l.factura_id))
+      : await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, cantidad', [...idsActivo, ...idsPrevio]);
     const setActivo = new Set(idsActivo);
     for (const l of lineas) {
       const cant = Number(l.cantidad ?? 0);
