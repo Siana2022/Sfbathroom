@@ -17,9 +17,10 @@ function ModalCliente({ fila, anio, onClose }: { fila: RentabilidadTransporteFil
 
   const meses = NOMBRE_MES.map((m, i) => ({
     mes: m,
+    facturacion: fila.facturacionMeses[i] ?? 0,
     facturado: fila.facturadoMeses[i] ?? 0,
     coste: fila.costeMeses[i] ?? 0,
-  })).filter((r) => Math.abs(r.facturado) > 0.005 || Math.abs(r.coste) > 0.005);
+  })).filter((r) => Math.abs(r.facturacion) > 0.005 || Math.abs(r.facturado) > 0.005 || Math.abs(r.coste) > 0.005);
 
   return (
     <div className="modal-fondo" onClick={onClose} role="dialog" aria-modal="true">
@@ -45,6 +46,7 @@ function ModalCliente({ fila, anio, onClose }: { fila: RentabilidadTransporteFil
             <thead>
               <tr>
                 <th>Mes</th>
+                <th className="td-num">Facturación</th>
                 <th className="td-num">Facturado</th>
                 <th className="td-num">Coste</th>
                 <th className="td-num">Margen</th>
@@ -56,6 +58,7 @@ function ModalCliente({ fila, anio, onClose }: { fila: RentabilidadTransporteFil
                 return (
                   <tr key={r.mes}>
                     <td>{r.mes}</td>
+                    <td className="td-num">{r.facturacion === 0 ? '' : eur(r.facturacion)}</td>
                     <td className="td-num">{r.facturado === 0 ? '' : eur(r.facturado)}</td>
                     <td className="td-num">{r.coste === 0 ? '' : eur(r.coste)}</td>
                     <td className="td-num" style={margen < 0 ? { color: '#c0392b' } : undefined}>
@@ -66,6 +69,7 @@ function ModalCliente({ fila, anio, onClose }: { fila: RentabilidadTransporteFil
               })}
               <tr>
                 <td><strong>Total</strong></td>
+                <td className="td-num"><strong>{eur(fila.facturacion)}</strong></td>
                 <td className="td-num"><strong>{eur(fila.facturado)}</strong></td>
                 <td className="td-num"><strong>{eur(fila.coste)}</strong></td>
                 <td className="td-num"><strong style={fila.margen < 0 ? { color: '#c0392b' } : undefined}>{eur(fila.margen)}</strong></td>
