@@ -20,19 +20,24 @@ export async function getKpisPersonalizadosVistos(codigoEmpresa: string): Promis
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
 
-  const { data } = await supabase
-    .from('kpis_personalizados')
-    .select('*')
-    .eq('empresa_id', empresa.id)
-    .order('orden')
-    .order('created_at');
+  const [{ data }, { data: userData }] = await Promise.all([
+    supabase
+      .from('kpis_personalizados')
+      .select('*')
+      .eq('empresa_id', empresa.id)
+      .order('orden')
+      .order('created_at'),
+    supabase.auth.getUser(),
+  ]);
+  // uid para que evaluarKpi comparta la caché de ventas_anio entre los N KPIs (RLS-safe).
+  const uid = userData?.user?.id;
 
   const filas = (data ?? []) as (KpiConfig & { id: string })[];
   const vistos = await Promise.all(
     filas.map(async (k) => {
       let valor: number | null = null;
       try {
-        valor = (await evaluarKpi(k, codigoEmpresa)).valor;
+        valor = (await evaluarKpi(k, codigoEmpresa, uid)).valor;
       } catch {
         valor = null;
       }

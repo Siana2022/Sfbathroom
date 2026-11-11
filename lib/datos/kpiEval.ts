@@ -4,7 +4,38 @@ import { getFacturaIdsFiltradas, filtrarPorIds } from '@/lib/datos/filtros';
 import { lineasPorFacturas } from '@/lib/datos/lineas';
 import { enLotes, todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 import { netaDeDocumento } from '@/lib/datos/neta';
+import { ventasAnioRpc, type VentasAnio } from '@/lib/datos/ventas';
+import { memoDiario } from '@/lib/perf/memo';
 import { METRICAS, type KpiConfig, type MetricaClave } from '@/lib/datos/kpisCatalogo';
+
+/**
+ * Carga perezosa y cacheada de facturas+líneas de un año (RPC ventas_anio), para la ruta
+ * caliente de los KPIs (año natural completo SIN filtros de factura ni de producto). Devuelve
+ * null si no aplica la ruta rápida o si el RPC no está desplegado → el handler usa el camino
+ * antiguo. La caché va prefijada por uid (RLS-safe) y comparte entre los N KPIs de una página,
+ * evitando bajar las facturas del año una vez por cada KPI.
+ */
+type VentasLoader = (
+  desde: string,
+  hasta: string,
+  ids: Set<string> | null,
+  artIds: Set<string> | null,
+) => Promise<VentasAnio | null>;
+
+function crearVentasLoader(
+  supabase: ReturnType<typeof createClient>,
+  codigoEmpresa: string,
+  uid?: string,
+): VentasLoader {
+  return async (desde, hasta, ids, artIds) => {
+    if (ids || artIds) return null;
+    const y = desde.slice(0, 4);
+    if (desde !== `${y}-01-01` || hasta !== `${y}-12-31`) return null;
+    const anioY = Number(y);
+    const cargar = () => ventasAnioRpc(supabase, codigoEmpresa, anioY);
+    return uid ? memoDiario(`kpiventas:${uid}:${codigoEmpresa}:${anioY}`, cargar) : cargar();
+  };
+}
 
 type FilaFactura = {
   id: string; fecha: string; tipo_documento: string; total: number; base_imponible: number;
@@ -188,9 +219,13 @@ async function handleVentasNetas(
   supabase: ReturnType<typeof createClient>,
   empId: string, desde: string, hasta: string,
   ids: Set<string> | null, artIds: Set<string> | null,
+  ventas: VentasLoader,
 ): Promise<number> {
   if (artIds) return (await netaPorLineas(supabase, empId, desde, hasta, ids, artIds)).neta;
-  const filas = await filasFacturas(supabase, empId, desde, hasta, ids, 'id, fecha, tipo_documento, base_imponible, cliente_id');
+  const v = await ventas(desde, hasta, ids, artIds);
+  const filas = v
+    ? (v.facturas as unknown as FilaFactura[])
+    : await filasFacturas(supabase, empId, desde, hasta, ids, 'id, fecha, tipo_documento, base_imponible, cliente_id');
   return filas.reduce((s, f) => s + netaDeDocumento(f.tipo_documento, f.base_imponible), 0);
 }
 
@@ -198,7 +233,12 @@ async function handleUnidades(
   supabase: ReturnType<typeof createClient>,
   empId: string, desde: string, hasta: string,
   ids: Set<string> | null, artIds: Set<string> | null,
+  ventas: VentasLoader,
 ): Promise<number> {
+  const v = await ventas(desde, hasta, ids, artIds);
+  if (v) {
+    return (v.lineas as unknown as FilaLinea[]).reduce((s, l) => s + Number(l.cantidad ?? 0), 0);
+  }
   const filas = await filasFacturas(supabase, empId, desde, hasta, ids, 'id');
   if (filas.length === 0) return 0;
   const lineas = await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, articulo_id, cantidad', filas.map((f) => f.id));
@@ -213,8 +253,12 @@ async function handleNumClientes(
   supabase: ReturnType<typeof createClient>,
   empId: string, desde: string, hasta: string,
   ids: Set<string> | null,
+  ventas: VentasLoader,
 ): Promise<number> {
-  const filas = await filasFacturas(supabase, empId, desde, hasta, ids, 'cliente_id');
+  const v = await ventas(desde, hasta, ids, null);
+  const filas = v
+    ? (v.facturas as unknown as FilaFactura[])
+    : await filasFacturas(supabase, empId, desde, hasta, ids, 'cliente_id');
   return new Set(filas.filter((f) => f.cliente_id).map((f) => f.cliente_id)).size;
 }
 
@@ -222,12 +266,16 @@ async function handleTicketMedio(
   supabase: ReturnType<typeof createClient>,
   empId: string, desde: string, hasta: string,
   ids: Set<string> | null, artIds: Set<string> | null,
+  ventas: VentasLoader,
 ): Promise<number> {
   if (artIds) {
     const r = await netaPorLineas(supabase, empId, desde, hasta, ids, artIds);
     return r.nFacturas > 0 ? r.neta / r.nFacturas : 0;
   }
-  const filas = await filasFacturas(supabase, empId, desde, hasta, ids, 'id, tipo_documento, base_imponible, cliente_id');
+  const v = await ventas(desde, hasta, ids, artIds);
+  const filas = v
+    ? (v.facturas as unknown as FilaFactura[])
+    : await filasFacturas(supabase, empId, desde, hasta, ids, 'id, tipo_documento, base_imponible, cliente_id');
   const neta = filas.reduce((s, f) => s + netaDeDocumento(f.tipo_documento, f.base_imponible), 0);
   const nFacturas = filas.filter((f) => f.tipo_documento !== 'abono').length;
   return nFacturas > 0 ? neta / nFacturas : 0;
@@ -305,13 +353,17 @@ async function handlePctDevoluciones(
   supabase: ReturnType<typeof createClient>,
   empId: string, desde: string, hasta: string,
   ids: Set<string> | null, artIds: Set<string> | null,
+  ventas: VentasLoader,
 ): Promise<number> {
   if (artIds) {
     const r = await netaPorLineas(supabase, empId, desde, hasta, ids, artIds);
     const total = r.ventaAbs + r.abonosAbs;
     return total > 0 ? (r.abonosAbs / total) * 100 : 0;
   }
-  const filas = await filasFacturas(supabase, empId, desde, hasta, ids, 'tipo_documento, base_imponible, cliente_id');
+  const v = await ventas(desde, hasta, ids, artIds);
+  const filas = v
+    ? (v.facturas as unknown as FilaFactura[])
+    : await filasFacturas(supabase, empId, desde, hasta, ids, 'tipo_documento, base_imponible, cliente_id');
   const total = filas.reduce((s, f) => s + Math.abs(Number(f.base_imponible ?? 0)), 0);
   const abonos = filas.filter((f) => f.tipo_documento === 'abono').reduce((s, f) => s + Math.abs(Number(f.base_imponible ?? 0)), 0);
   return total > 0 ? (abonos / total) * 100 : 0;
@@ -322,12 +374,13 @@ async function handleCumplimiento(
   empId: string, anio: number,
   ids: Set<string> | null, artIds: Set<string> | null,
   filtros: KpiConfig['filtros'],
+  ventas: VentasLoader,
 ): Promise<number> {
   const desde = `${anio}-01-01`;
   const hasta = `${anio}-12-31`;
   const neta = artIds
     ? (await netaPorLineas(supabase, empId, desde, hasta, ids, artIds)).neta
-    : await handleVentasNetas(supabase, empId, desde, hasta, ids, null);
+    : await handleVentasNetas(supabase, empId, desde, hasta, ids, null, ventas);
 
   let pq = supabase.from('presupuesto').select('importe').eq('empresa_id', empId).eq('ejercicio', anio);
   if (filtros?.cliente_id) pq = pq.eq('cliente_id', filtros.cliente_id);
@@ -342,15 +395,28 @@ async function handleMargen(
   supabase: ReturnType<typeof createClient>,
   empId: string, desde: string, hasta: string,
   ids: Set<string> | null, artIds: Set<string> | null, pct: boolean,
+  ventas: VentasLoader,
 ): Promise<number> {
-  const filas = await filasFacturas(supabase, empId, desde, hasta, ids, 'id, tipo_documento, cliente_id');
+  const v = await ventas(desde, hasta, ids, artIds);
+  const filas = v
+    ? (v.facturas as unknown as FilaFactura[])
+    : await filasFacturas(supabase, empId, desde, hasta, ids, 'id, tipo_documento, cliente_id');
   if (filas.length === 0) return 0;
 
-  const lineas = await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, importe, cantidad, articulo_id', filas.map((f) => f.id));
+  const lineas = v
+    ? (v.lineas as unknown as FilaLinea[])
+    : await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, importe, cantidad, articulo_id', filas.map((f) => f.id));
   const tipadas = artIds ? lineas.filter((l) => artIds.has(l.articulo_id ?? '')) : lineas;
   const artIdsTodas = [...new Set(tipadas.filter((l) => l.articulo_id).map((l) => l.articulo_id!))];
   const articulosMap = new Map<string, number>();
-  if (artIdsTodas.length) {
+  if (v) {
+    // Ruta rápida: coste de artículos de todo el catálogo en una sola consulta (mismos valores
+    // que el enLotes por ids referenciados, superconjunto).
+    const arts = await todasLasFilas<FilaArticulo>((desde2) =>
+      supabase.from('articulos').select('id, coste_unitario').eq('empresa_id', empId).range(desde2, desde2 + TAMANO_PAGINA - 1),
+    );
+    for (const a of arts) articulosMap.set(a.id, Number(a.coste_unitario ?? 0));
+  } else if (artIdsTodas.length) {
     const arts = await enLotes<FilaArticulo>(
       (lote, desde) =>
         supabase
@@ -378,35 +444,36 @@ async function handleMargen(
 
 // ─── Motor principal ───────────────────────────────────────────────────
 
-export async function evaluarKpi(cfg: KpiConfig, codigoEmpresa: string): Promise<ResultadoKpi> {
+export async function evaluarKpi(cfg: KpiConfig, codigoEmpresa: string, uid?: string): Promise<ResultadoKpi> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
   const { anio, desde, hasta } = parseFiltros(cfg);
   const metrica = cfg.metrica as MetricaClave;
   const calculo = cfg.calculo;
+  const ventas = crearVentasLoader(supabase, codigoEmpresa, uid);
 
   const ids = await resolverIds(supabase, empresa.id, cfg, desde, hasta);
   const artIds = await artIdsFiltro(supabase, empresa.id, cfg.filtros);
 
   // Si es yoy, calcular prev year
   if (calculo === 'yoy') {
-    const valor = await resolverMetrica(supabase, empresa.id, metrica, desde, hasta, ids, artIds, cfg);
+    const valor = await resolverMetrica(supabase, empresa.id, metrica, desde, hasta, ids, artIds, cfg, ventas);
     const desdePrev = `${anio - 1}${desde.slice(4)}`;
     const hastaPrev = `${anio - 1}${hasta.slice(4)}`;
     const idsPrev = await resolverIds(supabase, empresa.id, cfg, desdePrev, hastaPrev);
-    const valorPrev = await resolverMetrica(supabase, empresa.id, metrica, desdePrev, hastaPrev, idsPrev, artIds, cfg);
+    const valorPrev = await resolverMetrica(supabase, empresa.id, metrica, desdePrev, hastaPrev, idsPrev, artIds, cfg, ventas);
     return { valor: valorPrev !== 0 ? ((valor - valorPrev) / Math.abs(valorPrev)) * 100 : null, formato: cfg.formato ?? 'pct' };
   }
 
   if (calculo === 'pct_total') {
     const cfgSinFiltros = { ...cfg, filtros: { ejercicio: cfg.filtros?.ejercicio, fecha_desde: cfg.filtros?.fecha_desde, fecha_hasta: cfg.filtros?.fecha_hasta } };
     const idsTotal = await resolverIds(supabase, empresa.id, cfgSinFiltros, desde, hasta);
-    const valor = await resolverMetrica(supabase, empresa.id, metrica, desde, hasta, ids, artIds, cfg);
-    const valorTotal = await resolverMetrica(supabase, empresa.id, metrica, desde, hasta, idsTotal, null, cfgSinFiltros);
+    const valor = await resolverMetrica(supabase, empresa.id, metrica, desde, hasta, ids, artIds, cfg, ventas);
+    const valorTotal = await resolverMetrica(supabase, empresa.id, metrica, desde, hasta, idsTotal, null, cfgSinFiltros, ventas);
     return { valor: valorTotal > 0 ? (valor / valorTotal) * 100 : null, formato: 'pct' };
   }
 
-  const valor = await resolverMetrica(supabase, empresa.id, metrica, desde, hasta, ids, artIds, cfg);
+  const valor = await resolverMetrica(supabase, empresa.id, metrica, desde, hasta, ids, artIds, cfg, ventas);
   return { valor, formato: cfg.formato ?? METRICAS[metrica]?.formatoDefault ?? 'numero' };
 }
 
@@ -419,26 +486,27 @@ async function resolverMetrica(
   ids: Set<string> | null,
   artIds: Set<string> | null,
   cfg: KpiConfig,
+  ventas: VentasLoader,
 ): Promise<number> {
   switch (metrica) {
     case 'ventas_netas':
-      return handleVentasNetas(supabase, empId, desde, hasta, ids, artIds);
+      return handleVentasNetas(supabase, empId, desde, hasta, ids, artIds, ventas);
     case 'unidades':
-      return handleUnidades(supabase, empId, desde, hasta, ids, artIds);
+      return handleUnidades(supabase, empId, desde, hasta, ids, artIds, ventas);
     case 'num_clientes':
-      return handleNumClientes(supabase, empId, desde, hasta, ids);
+      return handleNumClientes(supabase, empId, desde, hasta, ids, ventas);
     case 'ticket_medio':
-      return handleTicketMedio(supabase, empId, desde, hasta, ids, artIds);
+      return handleTicketMedio(supabase, empId, desde, hasta, ids, artIds, ventas);
     case 'dso':
       return handleDso(supabase, empId, ids);
     case 'pct_devoluciones':
-      return handlePctDevoluciones(supabase, empId, desde, hasta, ids, artIds);
+      return handlePctDevoluciones(supabase, empId, desde, hasta, ids, artIds, ventas);
     case 'cumplimiento':
-      return handleCumplimiento(supabase, empId, cfg.filtros?.ejercicio ? Number(cfg.filtros.ejercicio) : new Date().getFullYear(), ids, artIds, cfg.filtros);
+      return handleCumplimiento(supabase, empId, cfg.filtros?.ejercicio ? Number(cfg.filtros.ejercicio) : new Date().getFullYear(), ids, artIds, cfg.filtros, ventas);
     case 'margen_pct':
-      return handleMargen(supabase, empId, desde, hasta, ids, artIds, true);
+      return handleMargen(supabase, empId, desde, hasta, ids, artIds, true, ventas);
     case 'margen_abs':
-      return handleMargen(supabase, empId, desde, hasta, ids, artIds, false);
+      return handleMargen(supabase, empId, desde, hasta, ids, artIds, false, ventas);
     default:
       return 0;
   }
