@@ -46,6 +46,10 @@ type FilaFacturaPedido = {
   pedido_id: string | null;
   fecha: string | null;
   tipo_documento: string | null;
+  pedido_fecha: string | null;
+  pedido_entrega: string | null;
+  base_imponible: number | string | null;
+  total: number | string | null;
 };
 
 export type PedidoDetalle = {
@@ -212,31 +216,42 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
   const antiguedadMediaCartera =
     antiguedades.length > 0 ? antiguedades.reduce((s, d) => s + d, 0) / antiguedades.length : 0;
 
-  // Plazo real de entrada → entrega: solo pedidos normales (sin fecha programada),
-  // midiendo desde la fecha de registro hasta la fecha de la primera factura.
+  // Plazo real pedido → factura. Se mide con las fechas que la ingesta copia del
+  // pedido a la factura (migración 0046): pedido_fecha y pedido_entrega. Si aún no
+  // hay ninguna factura con esos datos, el KPI queda a null (no se inventa).
+  const facturasConPedido = await todasLasFilas<FilaFacturaPedido>((offset) => {
+    let q = supabase
+      .from('facturas')
+      .select('fecha, pedido_fecha, pedido_entrega, base_imponible, total')
+      .eq('empresa_id', empresa.id)
+      .not('pedido_fecha', 'is', null)
+      .gte('fecha', `${anio}-01-01`)
+      .lte('fecha', `${anio}-12-31`);
+    if (filtros?.cliente) q = q.eq('cliente_id', filtros.cliente);
+    return q.range(offset, offset + TAMANO_PAGINA - 1);
+  });
+
   const plazos: number[] = [];
-  for (const p of servidosList) {
-    if (esProgramado(p)) continue;
-    const entrada = entradaDe(p);
-    const factura = facturaPorPedido.get(p.id);
-    if (entrada && factura) plazos.push(diasEntre(entrada, factura));
+  const programadasEnFecha: boolean[] = [];
+  let programados = 0;
+  let importeProgramado = 0;
+  for (const f of facturasConPedido) {
+    if (!f.pedido_fecha || !f.fecha) continue;
+    const esProgramada = Boolean(f.pedido_entrega && f.pedido_entrega !== f.pedido_fecha);
+    if (esProgramada) {
+      programados += 1;
+      importeProgramado += Number(f.base_imponible ?? f.total ?? 0);
+      programadasEnFecha.push(f.fecha <= (f.pedido_entrega as string));
+    } else {
+      plazos.push(diasEntre(f.pedido_fecha, f.fecha));
+    }
   }
+
   const plazoMedioEntrega =
     plazos.length > 0 ? plazos.reduce((s, d) => s + d, 0) / plazos.length : null;
-
-  const programadosList = pedidos.filter((p) => !esAnulado(p) && esProgramado(p));
-  const importeProgramado = programadosList.reduce((s, p) => s + importeDe(p), 0);
-
-  // Cumplimiento: de los pedidos con fecha programada ya facturados, cuántos
-  // salieron en fecha (fecha de factura <= fecha prometida).
-  const programadosServidos = programadosList.filter((p) => esServido(p));
-  const enFecha = programadosServidos.filter((p) => {
-    const factura = facturaPorPedido.get(p.id);
-    return Boolean(factura && p.fecha_prometida && factura <= p.fecha_prometida);
-  });
   const cumplimientoFecha =
-    !sinEnlaceFacturas && programadosServidos.length > 0
-      ? (enFecha.length / programadosServidos.length) * 100
+    programadasEnFecha.length > 0
+      ? (programadasEnFecha.filter(Boolean).length / programadasEnFecha.length) * 100
       : null;
 
   // Fuera de plazo: pedidos abiertos cuya entrega prevista ya pasó.
@@ -322,7 +337,7 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
     importeAnulado,
     antiguedadMediaCartera,
     plazoMedioEntrega,
-    programados: programadosList.length,
+    programados,
     importeProgramado,
     cumplimientoFecha,
     fueraPlazo: fueraPlazo.slice(0, MAX_DETALLE),

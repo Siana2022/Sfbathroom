@@ -1,7 +1,7 @@
 import { cfg, a3, empresaInfo, leerArgumentos, hoyISO, menosDias } from './config.js';
 import { leerCuboVentas } from './sqlserver.js';
 import { normalizarRows } from './normalizar.js';
-import { cargarVentas, refrescarVistas } from './supabase.js';
+import { cargarVentas, enlazarFechasPedido, refrescarVistas } from './supabase.js';
 
 type Rango = { desde: string; hasta: string };
 
@@ -23,7 +23,44 @@ function ultimoDiaMes(y: number, m: number): string {
   return `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0')}`;
 }
 
-function tramosMensuales(desde: string, hasta: string): Rango[] {
+function fechaISODe(v: unknown): string | null {
+  if (v === null || v === undefined) return null;
+  if (v instanceof Date) {
+    const y = v.getFullYear();
+    const m = String(v.getMonth() + 1).padStart(2, '0');
+    const d = String(v.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  const s = String(v).trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
+}
+
+function construirSQLFechas(base: string, desde: string, hasta: string): string | null {
+  if (!a3.sqlFechasPedido) return null;
+  const filtro = a3.sqlFechasPedido.filtroFecha.replace('{desde}', desde).replace('{hasta}', hasta);
+  return a3.sqlFechasPedido.consulta.replace('{RANGO}', filtro).replaceAll('{base}', base);
+}
+
+/**
+ * Guarda en cada factura la fecha del pedido de origen y su entrega comprometida.
+ * Es un extra: si falla (migración 0046 sin aplicar), la ingesta de ventas sigue.
+ */
+async function enlazarFechas(empresa: { codigo: string; base: string }, desde: string, hasta: string): Promise<void> {
+  const sql = construirSQLFechas(empresa.base, desde, hasta);
+  if (!sql) return;
+  const filas = await leerCuboVentas(sql, empresa.base);
+  const pares = filas
+    .map((f) => ({
+      factura_numero: String(f.FACTURA_NUMERO ?? '').trim(),
+      pedido_fecha: fechaISODe(f.PEDIDO_FECHA) ?? '',
+      pedido_entrega: fechaISODe(f.PEDIDO_ENTREGA) ?? '',
+    }))
+    .filter((p) => p.factura_numero !== '' && p.pedido_fecha !== '');
+  if (pares.length === 0) return;
+  const res = await enlazarFechasPedido(empresa.codigo, pares);
+  console.log(`[a3erp] fechas pedido→factura: ${pares.length} pares · ${JSON.stringify(res)}`);
+}function tramosMensuales(desde: string, hasta: string): Rango[] {
   const tramos: Rango[] = [];
   const [y0, m0] = desde.split('-').slice(0, 2).map(Number);
   const [y1, m1] = hasta.split('-').slice(0, 2).map(Number);
@@ -78,6 +115,12 @@ async function main(): Promise<void> {
       },
     });
     console.log(`[a3erp] ${t.desde} → ${t.hasta}: ${documentos.length} documentos · ${lineas.length} líneas · ${JSON.stringify(resumen)}`);
+
+    try {
+      await enlazarFechas(empresa, t.desde, t.hasta);
+    } catch (e) {
+      console.error(`[a3erp] enlace pedido→factura (no crítico): ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   console.log(`[a3erp] TOTAL: ${docsTotales} documentos · ${lineasTotales} líneas en ${tramos.length} tramos`);
