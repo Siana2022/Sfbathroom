@@ -1,9 +1,10 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getRol, puedeVerMargenes } from '@/lib/datos/role';
-import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
+import { filtrarPorIds, getFacturaIdsFiltradas, hayFiltros, type Filtros } from '@/lib/datos/filtros';
 import { lineasPorFacturas } from '@/lib/datos/lineas';
 import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
+import { ventasAnioRpc } from '@/lib/datos/ventas';
 
 export type Segmento = {
   marca: string;
@@ -51,6 +52,7 @@ type SegmentoAgregado = Omit<Segmento, 'pct' | 'precioMedio' | 'crecimientoPct' 
 
 async function getSegmentos(
   supabase: ReturnType<typeof createClient>,
+  codigoEmpresa: string,
   empresaId: string,
   anio: number,
   anioPrevio: number,
@@ -58,22 +60,36 @@ async function getSegmentos(
   canalNombre: Map<string, string>,
   filtros?: Filtros,
 ) {
-  const idsFiltrados = await getFacturaIdsFiltradas(supabase, empresaId, filtros ?? {}, `${anioPrevio}-01-01`, `${anio}-12-31`);
-
-  const facturasRaw = await todasLasFilas<FilaFactura>((desde) =>
-    supabase
-      .from('facturas')
-      .select('id, cliente_id, fecha')
-      .eq('empresa_id', empresaId)
-      .in('tipo_documento', ['factura', 'abono', 'nota_cargo'])
-      .gte('fecha', `${anioPrevio}-01-01`)
-      .lte('fecha', `${anio}-12-31`)
-      .range(desde, desde + TAMANO_PAGINA - 1)
-  );
-  const facturas = filtrarPorIds(facturasRaw, idsFiltrados);
-  const ids = facturas.map((f) => f.id);
-
-  const lineas = await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, articulo_id, cantidad, importe, coste_unitario', ids);
+  // Camino rápido sin filtros: facturas + líneas de los dos ejercicios en dos llamadas
+  // (RPC ventas_anio por año) en vez de decenas de round-trips.
+  const sinFiltros = !filtros || !hayFiltros(filtros);
+  let facturas: FilaFactura[] | null = null;
+  let lineas: FilaLinea[] | null = null;
+  if (sinFiltros) {
+    const [va, vaPrev] = await Promise.all([
+      ventasAnioRpc(supabase, codigoEmpresa, anio),
+      ventasAnioRpc(supabase, codigoEmpresa, anioPrevio),
+    ]);
+    if (va && vaPrev) {
+      facturas = [...va.facturas, ...vaPrev.facturas] as unknown as FilaFactura[];
+      lineas = [...va.lineas, ...vaPrev.lineas] as unknown as FilaLinea[];
+    }
+  }
+  if (!facturas || !lineas) {
+    const idsFiltrados = await getFacturaIdsFiltradas(supabase, empresaId, filtros ?? {}, `${anioPrevio}-01-01`, `${anio}-12-31`);
+    const facturasRaw = await todasLasFilas<FilaFactura>((desde) =>
+      supabase
+        .from('facturas')
+        .select('id, cliente_id, fecha')
+        .eq('empresa_id', empresaId)
+        .in('tipo_documento', ['factura', 'abono', 'nota_cargo'])
+        .gte('fecha', `${anioPrevio}-01-01`)
+        .lte('fecha', `${anio}-12-31`)
+        .range(desde, desde + TAMANO_PAGINA - 1)
+    );
+    facturas = filtrarPorIds(facturasRaw, idsFiltrados);
+    lineas = await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, articulo_id, cantidad, importe, coste_unitario', facturas.map((f) => f.id));
+  }
 
   const { data: articulosRaw } = await supabase.from('articulos').select('id, marca_id, marca_blanca_cliente_id, coste_unitario').eq('empresa_id', empresaId);
   const articulos = (articulosRaw ?? []) as FilaArticulo[];
@@ -237,7 +253,7 @@ export async function getCanalMarca(codigoEmpresa: string, anio: number, filtros
     for (const c of (canales ?? []) as FilaCanal[]) canalNombre.set(c.id, c.nombre);
   }
 
-  const r = await getSegmentos(supabase, empresa.id, anio, anioPrevio, clienteCanal, canalNombre, filtros);
+  const r = await getSegmentos(supabase, codigoEmpresa, empresa.id, anio, anioPrevio, clienteCanal, canalNombre, filtros);
 
   if (sinAccesoMargen) {
     for (const s of r.porMarca) {
