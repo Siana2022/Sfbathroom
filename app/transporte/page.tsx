@@ -3,10 +3,11 @@ import {
   getCosteTransporte,
   getCosteTransportePorProveedor,
   getTransporteFacturadoPorCliente,
+  getRentabilidadTransporteCliente,
   type TransporteClienteMes,
   type TransporteProveedorMes,
 } from '@/lib/datos/transporte';
-import { eur } from '@/lib/formato';
+import { eur, decimal } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
 import { ANIO_ACTUAL } from '@/lib/ejercicio';
@@ -122,10 +123,11 @@ function TablaTransporteProveedor({ titulo, anio, filas, total }: { titulo: stri
 export default async function TransportePage() {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
 
-  const [trans, transCli, costeProv] = await Promise.all([
+  const [trans, transCli, costeProv, rent] = await Promise.all([
     getCosteTransporte(empresa, ANIO),
     getTransporteFacturadoPorCliente(empresa, ANIO),
     getCosteTransportePorProveedor(empresa, ANIO),
+    getRentabilidadTransporteCliente(empresa, ANIO),
   ]);
 
   return (
@@ -136,6 +138,77 @@ export default async function TransportePage() {
         Coste de transporte real (flete, aduana y transporte interior) extraído de las facturas de
         compra de A3ERP, y transporte facturado a cliente a partir de las líneas de transporte.
       </p>
+
+      <div className="card">
+        <h2>Rentabilidad de transporte terrestre por cliente · {ANIO}</h2>
+        <p style={{ color: 'var(--muted)', maxWidth: 900 }}>
+          Por cada cliente, lo que se le <strong>factura</strong> de transporte terrestre (líneas ZZ TRANSP
+          interiores) frente a lo que <strong>cuesta</strong> (coste de esas mismas líneas). Margen = facturado − coste.
+          Si no se cobra transporte (precio 0) pero hay coste, el margen sale negativo.
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '8px 0' }}>
+          <DescargarExcel
+            nombre={`rentabilidad-transporte-${ANIO}`}
+            columnas={['Cliente', 'Factura transporte', 'Facturado', 'Coste', 'Margen', 'Margen %']}
+            registros={rent.filas.map((f) => [f.cliente, f.facturaTransporte ? 'Sí' : 'No', f.facturado, f.coste, f.margen, f.margenPct ?? ''])}
+          />
+        </div>
+        {rent.filas.length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>Sin líneas de transporte terrestre en {ANIO}.</p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="tabla">
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Factura transporte</th>
+                  <th className="td-num">Facturado</th>
+                  <th className="td-num">Coste</th>
+                  <th className="td-num">Margen</th>
+                  <th className="td-num">Margen %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rent.filas.map((f) => (
+                  <tr key={f.cliente}>
+                    <td>{f.cliente}</td>
+                    <td>{f.facturaTransporte ? 'Sí' : 'No'}</td>
+                    <td className="td-num">{eur(f.facturado)}</td>
+                    <td className="td-num">{eur(f.coste)}</td>
+                    <td className={`td-num ${f.margen >= 0 ? 'td-pos' : ''}`} style={f.margen < 0 ? { color: '#c0392b' } : undefined}>
+                      {f.margen > 0 ? '+' : ''}{eur(f.margen)}
+                    </td>
+                    <td className="td-num" style={f.margenPct != null && f.margenPct < 0 ? { color: '#c0392b' } : undefined}>
+                      {f.margenPct === null ? '—' : `${decimal(f.margenPct)} %`}
+                    </td>
+                  </tr>
+                ))}
+                <tr>
+                  <td><strong>Total</strong></td>
+                  <td></td>
+                  <td className="td-num"><strong>{eur(rent.totales.facturado)}</strong></td>
+                  <td className="td-num"><strong>{eur(rent.totales.coste)}</strong></td>
+                  <td className="td-num"><strong style={rent.totales.margen < 0 ? { color: '#c0392b' } : undefined}>{eur(rent.totales.margen)}</strong></td>
+                  <td className="td-num"><strong>{rent.totales.margenPct === null ? '—' : `${decimal(rent.totales.margenPct)} %`}</strong></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <TablaTransporteCliente
+          titulo="Facturado de transporte terrestre por mes"
+          anio={ANIO}
+          filas={rent.filas.filter((f) => Math.abs(f.facturado) > 0.005).map((f) => ({ cliente: f.cliente, meses: f.facturadoMeses, total: f.facturado }))}
+          total={rent.totales.facturado}
+        />
+        <TablaTransporteCliente
+          titulo="Coste de transporte terrestre por mes"
+          anio={ANIO}
+          filas={rent.filas.filter((f) => Math.abs(f.coste) > 0.005).map((f) => ({ cliente: f.cliente, meses: f.costeMeses, total: f.coste }))}
+          total={rent.totales.coste}
+        />
+      </div>
 
       <div className="card">
         <h2>Coste de transporte anual · {ANIO}</h2>
