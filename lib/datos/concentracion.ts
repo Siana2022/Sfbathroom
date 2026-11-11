@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
-import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
+import { filtrarPorIds, getFacturaIdsFiltradas, hayFiltros, type Filtros } from '@/lib/datos/filtros';
 import { lineasPorFacturas } from '@/lib/datos/lineas';
 import { enLotes, todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
+import { ventasAnioRpc } from '@/lib/datos/ventas';
 
 export type ConcentracionData = {
   empresa: { id: string; codigo: string; nombre: string };
@@ -107,17 +108,11 @@ export async function getConcentracion(codigoEmpresa: string, anio: number, filt
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
 
-  const [idsFiltrados, filasRes, clisRes, articulosRes, riesgoProveedor] = await Promise.all([
-    getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anio}-01-01`, `${anio}-12-31`),
-    todasLasFilas<Fila>((desde) =>
-      supabase
-        .from('facturas')
-        .select('id, cliente_id, fecha, base_imponible, tipo_documento')
-        .eq('empresa_id', empresa.id)
-        .gte('fecha', `${anio}-01-01`)
-        .lte('fecha', `${anio}-12-31`)
-        .range(desde, desde + TAMANO_PAGINA - 1)
-    ),
+  // Camino rápido sin filtros: facturas + líneas en una sola llamada (RPC ventas_anio).
+  const sinFiltros = !filtros || !hayFiltros(filtros);
+
+  const [ventas, clisRes, articulosRes, riesgoProveedor] = await Promise.all([
+    sinFiltros ? ventasAnioRpc(supabase, codigoEmpresa, anio) : Promise.resolve(null),
     todasLasFilas<FilaCliente>((desde) =>
       supabase
         .from('clientes')
@@ -134,7 +129,31 @@ export async function getConcentracion(codigoEmpresa: string, anio: number, filt
     ),
     getRiesgoProveedorList(supabase, empresa.id),
   ]);
-  const filas = filtrarPorIds(filasRes, idsFiltrados);
+
+  // Facturas y líneas: del RPC si está disponible; si no, camino antiguo (paginado + filtros).
+  let filas: Fila[];
+  let lineasRaw: FilaLinea[];
+  if (ventas) {
+    filas = ventas.facturas as unknown as Fila[];
+    lineasRaw = ventas.lineas as unknown as FilaLinea[];
+  } else {
+    const [idsFiltrados, filasRes] = await Promise.all([
+      getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anio}-01-01`, `${anio}-12-31`),
+      todasLasFilas<Fila>((desde) =>
+        supabase
+          .from('facturas')
+          .select('id, cliente_id, fecha, base_imponible, tipo_documento')
+          .eq('empresa_id', empresa.id)
+          .gte('fecha', `${anio}-01-01`)
+          .lte('fecha', `${anio}-12-31`)
+          .range(desde, desde + TAMANO_PAGINA - 1)
+      ),
+    ]);
+    filas = filtrarPorIds(filasRes, idsFiltrados);
+    lineasRaw = filas.length
+      ? await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, articulo_id, importe', filas.map((f) => f.id))
+      : [];
+  }
 
   const porCliente = new Map<string, number>();
   let netaTotal = 0;
@@ -185,7 +204,6 @@ export async function getConcentracion(codigoEmpresa: string, anio: number, filt
   const porFamiliaPorCliente = new Map<string, Map<string, number>>();
 
   if (filas.length) {
-    const lineasRaw = await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, articulo_id, importe', filas.map((f) => f.id));
     for (const l of lineasRaw) {
       const sign = tipoPorFactura.get(l.factura_id) === 'abono' ? -1 : 1;
       const importe = sign * Number(l.importe ?? 0);
