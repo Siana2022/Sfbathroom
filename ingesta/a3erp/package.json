@@ -14,6 +14,7 @@
     "manual": "tsx --env-file=.env src/vuelo.ts --desde 2024-01-01 --hasta 2026-09-22 --empresa SF",
     "manual:agosto": "tsx --env-file=.env src/vuelo.ts --desde 2026-08-01 --hasta 2026-08-31 --empresa SF",
     "diag:esquema": "node --env-file=.env diag-esquema.mjs",
+    "diag:pedidos": "node --env-file=.env diag-pedidos.mjs",
     "maestros:sf": "tsx --env-file=.env src/vuelo-maestros.ts --empresa SF",
     "maestros:fux": "tsx --env-file=.env src/vuelo-maestros.ts --empresa FUX",
     "maestros:dot": "tsx --env-file=.env src/vuelo-maestros.ts --empresa DOT",
