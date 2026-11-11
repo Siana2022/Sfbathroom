@@ -50,16 +50,25 @@ export async function getStock(codigoEmpresa: string, filtros?: Filtros): Promis
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
 
   const idsArticulo = await getArticuloIdsFiltrados(supabase, empresa.id, filtros ?? {});
+  const desde12m = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
 
-  const { data: filas } = await supabase
-    .from('v_stock_cobertura')
-    .select('articulo_id, articulo, almacen, punto_pedido, stock_disponible, consumo_medio_diario, cobertura_dias, en_transito')
-    .eq('empresa_id', empresa.id);
-  const rows = ((filas ?? []) as FilaCobertura[]).filter((r) => !idsArticulo || idsArticulo.has(r.articulo_id));
+  // Lecturas independientes en paralelo (antes eran 6 round-trips secuenciales).
+  const [filasRes, artsRes, consumoRes, pedidosRes, artsProvRes, provsRes] = await Promise.all([
+    supabase
+      .from('v_stock_cobertura')
+      .select('articulo_id, articulo, almacen, punto_pedido, stock_disponible, consumo_medio_diario, cobertura_dias, en_transito')
+      .eq('empresa_id', empresa.id),
+    supabase.from('articulos').select('id, coste_unitario').eq('empresa_id', empresa.id),
+    supabase.from('v_consumo_diario').select('articulo_id, unidades').eq('empresa_id', empresa.id).gte('fecha', desde12m),
+    supabase.from('pedidos').select('id, estado').eq('empresa_id', empresa.id).in('estado', ['servido', 'parcial', 'captado', 'aceptado']),
+    supabase.from('articulos').select('id, proveedor_id').eq('empresa_id', empresa.id),
+    supabase.from('proveedores').select('id, nombre, plazo_entrega_dias'),
+  ]);
 
-  const { data: arts } = await supabase.from('articulos').select('id, coste_unitario').eq('empresa_id', empresa.id);
+  const rows = ((filasRes.data ?? []) as FilaCobertura[]).filter((r) => !idsArticulo || idsArticulo.has(r.articulo_id));
+
   const costeUnit = new Map<string, number>();
-  for (const a of arts ?? []) {
+  for (const a of artsRes.data ?? []) {
     const costo = Number((a as { coste_unitario: number | null }).coste_unitario ?? 0);
     costeUnit.set((a as { id: string }).id, costo);
   }
@@ -121,12 +130,7 @@ export async function getStock(codigoEmpresa: string, filtros?: Filtros): Promis
   aprovisionamiento.sort((a, b) => b.propuesta - a.propuesta);
   if (aprovisionamiento.length > 15) aprovisionamiento.length = 15;
 
-  const desde12m = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
-  const { data: consumoRaw } = await supabase
-    .from('v_consumo_diario')
-    .select('articulo_id, unidades')
-    .eq('empresa_id', empresa.id)
-    .gte('fecha', desde12m);
+  const consumoRaw = consumoRes.data;
   const ventasArticulo = new Map<string, number>();
   for (const c of consumoRaw ?? []) {
     const id = (c as { articulo_id: string }).articulo_id;
@@ -157,28 +161,27 @@ export async function getStock(codigoEmpresa: string, filtros?: Filtros): Promis
   }
   const rotacionTop = rotaciones.sort((a, b) => b.rotacion - a.rotacion).slice(0, 10);
 
-  const { data: pedidosS } = await supabase
-    .from('pedidos')
-    .select('id, estado')
-    .eq('empresa_id', empresa.id)
-    .in('estado', ['servido', 'parcial', 'captado', 'aceptado']);
-  const pedidosEstados = (pedidosS ?? []) as { id: string; estado: string }[];
+  const pedidosEstados = (pedidosRes.data ?? []) as { id: string; estado: string }[];
   const porIdServ = new Map(pedidosEstados.map((p) => [p.id, p.estado]));
   let fillNum = 0;
   let fillDen = 0;
   let estimationLost = 0;
   const ventaPerdidaRaw = new Map<string, { unidades: number; importe: number; nombre: string }>();
   const pedidoIds = pedidosEstados.map((p) => p.id);
+  // pedido_lineas se usaba dos veces (fill rate / venta perdida y cartera); se trae UNA sola vez.
+  const lineasPedidos: FilaPedidoLinea[] = pedidoIds.length
+    ? await enLotes<FilaPedidoLinea>(
+        (lote, desde) =>
+          supabase
+            .from('pedido_lineas')
+            .select('pedido_id, articulo_id, cantidad, cantidad_servida, precio_unitario, descuento_pct')
+            .in('pedido_id', lote)
+            .range(desde, desde + TAMANO_PAGINA - 1),
+        pedidoIds,
+      )
+    : [];
   if (pedidoIds.length) {
-    const lineasS = await enLotes<FilaPedidoLinea>(
-      (lote, desde) =>
-        supabase
-          .from('pedido_lineas')
-          .select('pedido_id, articulo_id, cantidad, cantidad_servida, precio_unitario, descuento_pct')
-          .in('pedido_id', lote)
-          .range(desde, desde + TAMANO_PAGINA - 1),
-      pedidoIds,
-    );
+    const lineasS = lineasPedidos;
     for (const l of lineasS) {
       const estado = porIdServ.get(l.pedido_id);
       if (!estado || estado === 'anulado') continue;
@@ -236,15 +239,7 @@ export async function getStock(codigoEmpresa: string, filtros?: Filtros): Promis
 
   const carteraArticulo = new Map<string, number>();
   if (pedidoIds.length) {
-    const lineasC = await enLotes<FilaPedidoLinea>(
-      (lote, desde) =>
-        supabase
-          .from('pedido_lineas')
-          .select('pedido_id, articulo_id, cantidad, cantidad_servida, precio_unitario, descuento_pct')
-          .in('pedido_id', lote)
-          .range(desde, desde + TAMANO_PAGINA - 1),
-      pedidoIds,
-    );
+    const lineasC = lineasPedidos;
     const carteraSet = new Set(['captado', 'aceptado', 'parcial']);
     for (const l of lineasC) {
       const estado = porIdServ.get(l.pedido_id);
@@ -271,13 +266,9 @@ export async function getStock(codigoEmpresa: string, filtros?: Filtros): Promis
   if (cruceCoberturaCartera.length > 15) cruceCoberturaCartera.length = 15;
 
   // Predicción de rotura: cobertura actual < plazo de entrega del proveedor
-  const { data: artsProv } = await supabase
-    .from('articulos')
-    .select('id, proveedor_id')
-    .eq('empresa_id', empresa.id);
-  const proveedorDeArticulo = new Map<string, string | null>((artsProv ?? [] as { id: string; proveedor_id: string | null }[]).map((a) => [a.id, a.proveedor_id]));
-  const { data: provs } = await supabase.from('proveedores').select('id, nombre, plazo_entrega_dias');
-  const provInfo = new Map((provs ?? [] as { id: string; nombre: string; plazo_entrega_dias: number | null }[]).map((p) => [p.id, p]));
+  // (artsProv y provs se trajeron en paralelo arriba).
+  const proveedorDeArticulo = new Map<string, string | null>((artsProvRes.data ?? [] as { id: string; proveedor_id: string | null }[]).map((a) => [a.id, a.proveedor_id]));
+  const provInfo = new Map((provsRes.data ?? [] as { id: string; nombre: string; plazo_entrega_dias: number | null }[]).map((p) => [p.id, p]));
   const prediccionRotura: StockData['prediccionRotura'] = [];
   for (const r of rows) {
     const cobertura = r.cobertura_dias != null ? Number(r.cobertura_dias) : null;
