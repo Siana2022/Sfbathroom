@@ -19,7 +19,7 @@
     "filtroFecha": "WHERE c.FECHA >= CONVERT(datetime, '{desde}', 120) AND c.FECHA <= CONVERT(datetime, '{hasta}', 120)"
   },
   "sqlFechasPedido": {
-    "consulta": "SELECT LTRIM(RTRIM(f.SERIE)) + '-' + CAST(f.NUMDOC AS varchar(20)) AS FACTURA_NUMERO, MAX(p.FECHA) AS PEDIDO_FECHA, MAX(p.FECENTREGA) AS PEDIDO_ENTREGA FROM [{base}].dbo.CABEFACV f JOIN [{base}].dbo.LINEFACT l ON l.IDFACV = f.IDFACV AND l.ESCOMPONENTE = 'F' JOIN [{base}].dbo.CABEPEDV p ON p.IDPEDV = l.IDPEDV {RANGO} GROUP BY LTRIM(RTRIM(f.SERIE)), f.NUMDOC",
+    "consulta": "SELECT LTRIM(RTRIM(f.SERIE)) + '-' + CAST(f.NUMDOC AS varchar(20)) AS FACTURA_NUMERO, CAST(f.NUMDOC AS varchar(20)) AS FACTURA_NUMDOC, MAX(p.FECHA) AS PEDIDO_FECHA, MAX(p.FECENTREGA) AS PEDIDO_ENTREGA FROM [{base}].dbo.CABEFACV f JOIN [{base}].dbo.LINEFACT l ON l.IDFACV = f.IDFACV AND l.ESCOMPONENTE = 'F' JOIN [{base}].dbo.CABEPEDV p ON p.IDPEDV = l.IDPEDV {RANGO} GROUP BY LTRIM(RTRIM(f.SERIE)), f.NUMDOC",
     "filtroFecha": "WHERE f.FECHA >= CONVERT(datetime, '{desde}', 120) AND f.FECHA <= CONVERT(datetime, '{hasta}', 120)"
   },
   "tiposDocumento": {

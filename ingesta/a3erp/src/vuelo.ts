@@ -53,6 +53,7 @@ async function enlazarFechas(empresa: { codigo: string; base: string }, desde: s
   const pares = filas
     .map((f) => ({
       factura_numero: String(f.FACTURA_NUMERO ?? '').trim(),
+      factura_numero_alt: String(f.FACTURA_NUMDOC ?? '').trim(),
       pedido_fecha: fechaISODe(f.PEDIDO_FECHA) ?? '',
       pedido_entrega: fechaISODe(f.PEDIDO_ENTREGA) ?? '',
     }))

@@ -59,7 +59,7 @@ export async function refrescarVistas(): Promise<void> {
  */
 export async function enlazarFechasPedido(
   empresaCodigo: string,
-  pares: { factura_numero: string; pedido_fecha: string; pedido_entrega: string }[],
+  pares: { factura_numero: string; factura_numero_alt: string; pedido_fecha: string; pedido_entrega: string }[],
 ): Promise<unknown> {
   const res = await envio(`${cfg.supabaseUrl}/rest/v1/rpc/enlazar_fechas_pedido`, {
     method: 'POST',
