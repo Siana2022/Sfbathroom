@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
-import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
+import { filtrarPorIds, getFacturaIdsFiltradas, hayFiltros, type Filtros } from '@/lib/datos/filtros';
 import { lineasPorFacturas } from '@/lib/datos/lineas';
-import { enLotes, todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
+import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
+import { ventasAnioRpc } from '@/lib/datos/ventas';
 
 export type FilaDesvio = {
   nombre: string;
@@ -28,19 +29,31 @@ type FilaArticulo = { id: string; familia: string | null };
 export async function getDesvioPresupuesto(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<DesvioPresupuesto> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
-  const idsFiltrados = await getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anio}-01-01`, `${anio}-12-31`);
+  // Camino rápido sin filtros: facturas + líneas del año en una sola llamada (RPC ventas_anio).
+  const sinFiltros = !filtros || !hayFiltros(filtros);
+  const ventas = sinFiltros ? await ventasAnioRpc(supabase, codigoEmpresa, anio) : null;
 
-  const filasRaw = await todasLasFilas<FilaFactura>((desde) =>
-    supabase
-      .from('facturas')
-      .select('id, cliente_id, comercial_id, base_imponible, tipo_documento')
-      .eq('empresa_id', empresa.id)
-      .gte('fecha', `${anio}-01-01`)
-      .lte('fecha', `${anio}-12-31`)
-      .range(desde, desde + TAMANO_PAGINA - 1)
-  );
-  const facturas = filtrarPorIds(filasRaw, idsFiltrados);
-  const ids = facturas.map((f) => f.id);
+  let facturas: FilaFactura[];
+  let lineas: FilaLinea[];
+  if (ventas) {
+    facturas = ventas.facturas as unknown as FilaFactura[];
+    lineas = ventas.lineas as unknown as FilaLinea[];
+  } else {
+    const idsFiltrados = await getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anio}-01-01`, `${anio}-12-31`);
+    const filasRaw = await todasLasFilas<FilaFactura>((desde) =>
+      supabase
+        .from('facturas')
+        .select('id, cliente_id, comercial_id, base_imponible, tipo_documento')
+        .eq('empresa_id', empresa.id)
+        .gte('fecha', `${anio}-01-01`)
+        .lte('fecha', `${anio}-12-31`)
+        .range(desde, desde + TAMANO_PAGINA - 1)
+    );
+    facturas = filtrarPorIds(filasRaw, idsFiltrados);
+    lineas = facturas.length
+      ? await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, articulo_id, importe', facturas.map((f) => f.id))
+      : [];
+  }
 
   const netaCliente = new Map<string, number>();
   const netaComercial = new Map<string, number>();
@@ -51,32 +64,7 @@ export async function getDesvioPresupuesto(codigoEmpresa: string, anio: number, 
   }
   const tipoFactura = new Map(facturas.map((f) => [f.id, f.tipo_documento]));
 
-  const netaFamilia = new Map<string, number>();
-  if (ids.length) {
-    const lineas = await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, articulo_id, importe', ids);
-    const artIds = [...new Set(lineas.map((l) => l.articulo_id).filter(Boolean))] as string[];
-    const familiaDeArticulo = new Map<string, string | null>();
-    if (artIds.length) {
-      const articulosRaw = await enLotes<FilaArticulo>(
-        (lote, desde) =>
-          supabase
-            .from('articulos')
-            .select('id, familia')
-            .in('id', lote)
-            .range(desde, desde + TAMANO_PAGINA - 1),
-        artIds,
-      );
-      for (const a of articulosRaw) familiaDeArticulo.set(a.id, a.familia);
-    }
-    for (const l of lineas) {
-      const fam = l.articulo_id ? familiaDeArticulo.get(l.articulo_id) : null;
-      if (!fam) continue;
-      const signo = tipoFactura.get(l.factura_id) === 'abono' ? -1 : 1;
-      netaFamilia.set(fam, (netaFamilia.get(fam) ?? 0) + signo * Number(l.importe ?? 0));
-    }
-  }
-
-  const [presCli, presCom, presFam, cli, com, fam] = await Promise.all([
+  const [presCli, presCom, presFam, cli, com, fam, articulosFam] = await Promise.all([
     supabase.from('presupuesto').select('cliente_id, importe').eq('empresa_id', empresa.id).eq('ejercicio', anio),
     supabase.from('presupuesto').select('comercial_id, importe').eq('empresa_id', empresa.id).eq('ejercicio', anio),
     supabase.from('presupuesto').select('familia_id, importe').eq('empresa_id', empresa.id).eq('ejercicio', anio),
@@ -89,7 +77,24 @@ export async function getDesvioPresupuesto(codigoEmpresa: string, anio: number, 
     ),
     supabase.from('comerciales').select('id, nombre'),
     supabase.from('familias_articulo').select('id, nombre'),
+    todasLasFilas<FilaArticulo>((desde) =>
+      supabase
+        .from('articulos')
+        .select('id, familia')
+        .eq('empresa_id', empresa.id)
+        .range(desde, desde + TAMANO_PAGINA - 1)
+    ),
   ]);
+
+  const familiaDeArticulo = new Map<string, string | null>();
+  for (const a of articulosFam) familiaDeArticulo.set(a.id, a.familia);
+  const netaFamilia = new Map<string, number>();
+  for (const l of lineas) {
+    const famLinea = l.articulo_id ? familiaDeArticulo.get(l.articulo_id) : null;
+    if (!famLinea) continue;
+    const signo = tipoFactura.get(l.factura_id) === 'abono' ? -1 : 1;
+    netaFamilia.set(famLinea, (netaFamilia.get(famLinea) ?? 0) + signo * Number(l.importe ?? 0));
+  }
 
   const suma = (filas: { [k: string]: string | number }[] | null, clave: string) => {
     const m = new Map<string, number>();
