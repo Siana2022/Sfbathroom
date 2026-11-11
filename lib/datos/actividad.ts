@@ -2,10 +2,11 @@ import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getConfiguracionUmbrales } from '@/lib/datos/configuracion';
 import { getRol, puedeVerMargenes } from '@/lib/datos/role';
-import { filtrarPorIds, getFacturaIdsFiltradas, type Filtros } from '@/lib/datos/filtros';
+import { filtrarPorIds, getFacturaIdsFiltradas, hayFiltros, type Filtros } from '@/lib/datos/filtros';
 import { netaDeDocumento } from '@/lib/datos/neta';
 import { lineasPorFacturas } from '@/lib/datos/lineas';
-import { enLotes, todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
+import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
+import { ventasAnioRpc } from '@/lib/datos/ventas';
 
 export type ComercialRow = {
   id: string;
@@ -51,8 +52,12 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
   const anioPrevio = anio - 1;
 
   const idsComunes = await getFacturaIdsFiltradas(supabase, empresa.id, filtros ?? {}, `${anioPrevio}-01-01`, `${anio}-12-31`);
+  // Camino rápido sin filtros: líneas del año en una sola llamada (RPC ventas_anio) y coste de
+  // artículos en una sola consulta de catálogo, en paralelo con el resto.
+  const sinFiltros = !filtros || !hayFiltros(filtros);
 
-  const [filasRes, filasPreviasRes, pedidosRes, presupuestoRes, config] = await Promise.all([
+  const [ventasAnio, filasRes, filasPreviasRes, pedidosRes, presupuestoRes, config, articulosCosteRaw] = await Promise.all([
+    sinFiltros ? ventasAnioRpc(supabase, codigoEmpresa, anio) : Promise.resolve(null),
     todasLasFilas<Fila>((desde) =>
       supabase
         .from('facturas')
@@ -84,6 +89,13 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
     ),
     supabase.from('presupuesto').select('comercial_id, importe').eq('empresa_id', empresa.id).eq('ejercicio', anio),
     getConfiguracionUmbrales(),
+    todasLasFilas<FilaArticulo>((desde) =>
+      supabase
+        .from('articulos')
+        .select('id, coste_unitario')
+        .eq('empresa_id', empresa.id)
+        .range(desde, desde + TAMANO_PAGINA - 1)
+    ),
   ]);
 
   const filas = filtrarPorIds(filasRes, idsComunes);
@@ -105,26 +117,16 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
     comercialDeFactura.set(f.id, f.comercial_id);
   }
 
+  // Líneas del año: del RPC ventas_anio si está disponible; si no, camino antiguo.
   let lineas: FilaLinea[] = [];
-  if (ids.length) {
+  if (ventasAnio) {
+    lineas = ventasAnio.lineas as unknown as FilaLinea[];
+  } else if (ids.length) {
     lineas = await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, articulo_id, cantidad, importe, coste_unitario', ids);
   }
+  // Coste por artículo (catálogo completo, traído en paralelo arriba).
   const articuloCoste = new Map<string, number | null>();
-  if (lineas.length) {
-    const artIds = [...new Set(lineas.map((l) => l.articulo_id).filter(Boolean))] as string[];
-    if (artIds.length) {
-      const articulosRaw = await enLotes<FilaArticulo>(
-        (lote, desde) =>
-          supabase
-            .from('articulos')
-            .select('id, coste_unitario')
-            .in('id', lote)
-            .range(desde, desde + TAMANO_PAGINA - 1),
-        artIds,
-      );
-      for (const a of articulosRaw) articuloCoste.set(a.id, a.coste_unitario);
-    }
-  }
+  for (const a of articulosCosteRaw) articuloCoste.set(a.id, a.coste_unitario);
 
   const porComercial = new Map<
     string,
