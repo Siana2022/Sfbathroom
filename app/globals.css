@@ -441,6 +441,49 @@ ul.tablas { color: var(--muted); font-size: 13px; margin: 8px 0 0; padding-left:
   gap: 14px;
 }
 
+/* Rejilla fija de 4 columnas (para los 8 KPIs de facturación en 2 filas de 4+4). */
+.grid-kpis-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+@media (max-width: 980px) {
+  .grid-kpis-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 560px) {
+  .grid-kpis-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Paneles desplegables (12 meses / 12 semanas / 30 días), cerrados por defecto. */
+.panel-desplegable > summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  padding: 2px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  user-select: none;
+}
+.panel-desplegable > summary::-webkit-details-marker {
+  display: none;
+}
+.panel-desplegable > summary::before {
+  content: '▸';
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+.panel-desplegable[open] > summary::before {
+  transform: rotate(90deg);
+}
+.panel-desplegable[open] > summary {
+  margin-bottom: 12px;
+}
+
 .kpi {
   position: relative;
   background: var(--panel);
