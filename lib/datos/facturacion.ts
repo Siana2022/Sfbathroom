@@ -514,6 +514,54 @@ export async function getFacturacion(codigoEmpresa: string, anio: number, filtro
   };
 }
 
+// ─── Serie mensual de KPIs (año actual + previo) para el gráfico de evolución (RPC 0044) ───
+export type SerieMensualKpi = {
+  mes: number;
+  netaCur: number;
+  netaPrev: number | null;
+  facturasCur: number;
+  facturasPrev: number;
+  unidadesCur: number;
+  unidadesPrev: number;
+  presupuesto: number;
+};
+
+export async function getSeriesKpisMensual(
+  codigoEmpresa: string,
+  anio: number,
+  filtros?: Filtros,
+): Promise<SerieMensualKpi[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('perf_series_kpis_mensual', {
+    p_codigo_empresa: codigoEmpresa,
+    p_anio: anio,
+    p_cliente: filtros?.cliente ?? null,
+    p_comercial: filtros?.comercial ?? null,
+    p_familia: filtros?.familia ?? null,
+    p_marca: filtros?.marca ?? null,
+  });
+  if (error || !Array.isArray(data)) return [];
+  return (data as {
+    mes?: number;
+    neta_cur?: number;
+    neta_prev?: number | null;
+    facturas_cur?: number;
+    facturas_prev?: number;
+    unidades_cur?: number;
+    unidades_prev?: number;
+    presupuesto_cur?: number;
+  }[]).map((s) => ({
+    mes: Number(s.mes ?? 0),
+    netaCur: Number(s.neta_cur ?? 0),
+    netaPrev: s.neta_prev == null ? null : Number(s.neta_prev),
+    facturasCur: Number(s.facturas_cur ?? 0),
+    facturasPrev: Number(s.facturas_prev ?? 0),
+    unidadesCur: Number(s.unidades_cur ?? 0),
+    unidadesPrev: Number(s.unidades_prev ?? 0),
+    presupuesto: Number(s.presupuesto_cur ?? 0),
+  }));
+}
+
 // ─── Rankings de la pestaña Facturación (RPC perf_rankings_facturacion, 0043) ───
 export type RankingReferencia = { articulo: string; codigo: string | null; unidades: number; neta: number };
 export type RankingCliente = { cliente: string; neta: number; unidades: number; comercial: string; netaPrev: number };

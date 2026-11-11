@@ -1,12 +1,12 @@
 import { cookies } from 'next/headers';
 import Link from 'next/link';
-import { getFacturacion, getVariacion, getRankingsFacturacion } from '@/lib/datos/facturacion';
+import { getFacturacion, getVariacion, getRankingsFacturacion, getSeriesKpisMensual } from '@/lib/datos/facturacion';
 import { getVistasTemporales } from '@/lib/datos/vistas';
 import { getDesvioPresupuesto } from '@/lib/datos/desvioPresupuesto';
 import { parseFiltros, getOpcionesFiltros, type SearchParams } from '@/lib/datos/filtros';
 import { decimal, eur, numero, pct } from '@/lib/formato';
-import Kpi from '@/components/Kpi';
 import GraficoBarras, { type Barra } from '@/components/GraficoBarras';
+import KpisFacturacion, { type KpiFact } from '@/components/KpisFacturacion';
 import DescargarExcel from '@/components/DescargarExcel';
 import Filtros from '@/components/Filtros';
 import Aviso from '@/components/Aviso';
@@ -50,13 +50,14 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
   const filtros = parseFiltros(searchParams);
   // Todas las consultas en paralelo (antes eran 7 awaits en serie → 10-15 s con filtros).
-  const [opciones, d, t, v, desvio, rk] = await Promise.all([
+  const [opciones, d, t, v, desvio, rk, seriesKpis] = await Promise.all([
     getOpcionesFiltros(empresa, { fuente: 'facturas', anio: ANIO }),
     getFacturacion(empresa, ANIO, filtros),
     getVistasTemporales(empresa, ANIO, filtros),
     getVariacion(empresa, ANIO, filtros),
     getDesvioPresupuesto(empresa, ANIO, filtros),
     getRankingsFacturacion(empresa, ANIO, filtros),
+    getSeriesKpisMensual(empresa, ANIO, filtros),
   ]);
   const previo = d.anioPrevio;
   const delta = d.netaPrevioTotal > 0 ? pct(((d.neta - d.netaPrevioTotal) / d.netaPrevioTotal) * 100) : '—';
@@ -67,6 +68,17 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
     valor2: s.netaPrevio,
     titulo: `${NOMBRE_MES[s.mes]} ${d.anio}`,
   }));
+
+  const kpisFact: KpiFact[] = [
+    { clave: 'neta', etiqueta: `Facturación neta ${d.anio}`, valor: eur(d.neta), nota: `vs ${previo}: ${delta}` },
+    { clave: 'ytd', etiqueta: `Facturación acumulada ${t.proyeccion.anio} (YTD)`, valor: eur(t.proyeccion.ytd), nota: `ritmo diario ${eur(t.proyeccion.ritmoDiario)}` },
+    { clave: 'proyeccion', etiqueta: 'Proyección de cierre de año', valor: eur(t.proyeccion.proyectado), nota: `${t.proyeccion.diasRestantes} días por delante` },
+    { clave: 'cumplimiento_proy', etiqueta: 'Cumplimiento presupuesto proyectado', valor: t.proyeccion.cumplimientoProyectado === null ? '—' : `${decimal(t.proyeccion.cumplimientoProyectado)} %`, nota: `presupuesto ${eur(t.proyeccion.presupuesto)}` },
+    { clave: 'desviacion', etiqueta: 'Desviación presupuesto', valor: d.cumplimiento === null ? '—' : `${decimal(d.cumplimiento)} %`, nota: d.cumplimiento === null ? 'sin presupuesto' : `presupuesto ${eur(d.presupuesto)}` },
+    { clave: 'unidades', etiqueta: 'Unidades facturadas', valor: numero(d.unidades), nota: `${d.nFacturas} facturas emitidas` },
+    { clave: 'ticket', etiqueta: 'Ticket medio por factura', valor: eur(d.ticketMedio), nota: 'sobre facturas netas' },
+    { clave: 'precio', etiqueta: 'Precio medio de venta', valor: eur(d.precioMedio), nota: 'por unidad facturada' },
+  ];
 
   return (
     <div>
@@ -89,16 +101,10 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
         </Aviso>
       )}
 
-      <ul className="grid-kpis grid-kpis-4">
-        <Kpi etiqueta={`Facturación neta ${d.anio}`} valor={eur(d.neta)} nota={`vs ${previo}: ${delta}`} />
-        <Kpi etiqueta={`Facturación acumulada ${t.proyeccion.anio} (YTD)`} valor={eur(t.proyeccion.ytd)} nota={`ritmo diario ${eur(t.proyeccion.ritmoDiario)}`} />
-        <Kpi etiqueta="Proyección de cierre de año" valor={eur(t.proyeccion.proyectado)} nota={`${t.proyeccion.diasRestantes} días por delante`} />
-        <Kpi etiqueta="Cumplimiento presupuesto proyectado" valor={t.proyeccion.cumplimientoProyectado === null ? '—' : `${decimal(t.proyeccion.cumplimientoProyectado)} %`} nota={`presupuesto ${eur(t.proyeccion.presupuesto)}`} />
-        <Kpi etiqueta="Desviación presupuesto" valor={d.cumplimiento === null ? '—' : `${decimal(d.cumplimiento)} %`} nota={d.cumplimiento === null ? 'sin presupuesto' : `presupuesto ${eur(d.presupuesto)}`} />
-        <Kpi etiqueta="Unidades facturadas" valor={numero(d.unidades)} nota={`${d.nFacturas} facturas emitidas`} />
-        <Kpi etiqueta="Ticket medio por factura" valor={eur(d.ticketMedio)} nota="sobre facturas netas" />
-        <Kpi etiqueta="Precio medio de venta" valor={eur(d.precioMedio)} nota="por unidad facturada" />
-      </ul>
+      <p style={{ color: 'var(--muted)', fontSize: 13, margin: '0 0 10px' }}>
+        Pincha cualquier KPI para ver su evolución mensual ({d.anio} vs {previo}).
+      </p>
+      <KpisFacturacion kpis={kpisFact} series={seriesKpis} anio={d.anio} anioPrevio={previo} />
 
       <div className="card">
         <h2>Evolución mensual · {d.anio} frente a {previo}</h2>
