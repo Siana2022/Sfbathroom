@@ -204,8 +204,11 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
         </Aviso>
       )}
 
-      <ul className="grid-kpis">
+      <ul className="grid-kpis grid-kpis-4">
         <Kpi etiqueta={`Facturación neta ${d.anio}`} valor={eur(d.neta)} nota={`vs ${previo}: ${delta}`} />
+        <Kpi etiqueta={`Facturación acumulada ${t.proyeccion.anio} (YTD)`} valor={eur(t.proyeccion.ytd)} nota={`ritmo diario ${eur(t.proyeccion.ritmoDiario)}`} />
+        <Kpi etiqueta="Proyección de cierre de año" valor={eur(t.proyeccion.proyectado)} nota={`${t.proyeccion.diasRestantes} días por delante`} />
+        <Kpi etiqueta="Cumplimiento presupuesto proyectado" valor={t.proyeccion.cumplimientoProyectado === null ? '—' : `${decimal(t.proyeccion.cumplimientoProyectado)} %`} nota={`presupuesto ${eur(t.proyeccion.presupuesto)}`} />
         <Kpi etiqueta="Desviación presupuesto" valor={d.cumplimiento === null ? '—' : `${decimal(d.cumplimiento)} %`} nota={d.cumplimiento === null ? 'sin presupuesto' : `presupuesto ${eur(d.presupuesto)}`} />
         <Kpi etiqueta="Unidades facturadas" valor={numero(d.unidades)} nota={`${d.nFacturas} facturas emitidas`} />
         <Kpi etiqueta="Ticket medio por factura" valor={eur(d.ticketMedio)} nota="sobre facturas netas" />
@@ -257,14 +260,8 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
         </div>
       </div>
 
-      <ul className="grid-kpis">
-        <Kpi etiqueta={`Facturación acumulada ${t.proyeccion.anio} (YTD)`} valor={eur(t.proyeccion.ytd)} nota={`ritmo diario ${eur(t.proyeccion.ritmoDiario)}`} />
-        <Kpi etiqueta="Proyección de cierre de año" valor={eur(t.proyeccion.proyectado)} nota={`${t.proyeccion.diasRestantes} días por delante`} />
-        <Kpi etiqueta="Cumplimiento presupuesto proyectado" valor={t.proyeccion.cumplimientoProyectado === null ? '—' : `${decimal(t.proyeccion.cumplimientoProyectado)} %`} nota={`presupuesto ${eur(t.proyeccion.presupuesto)}`} />
-      </ul>
-
-      <div className="card">
-        <h2>Últimos 12 meses rodantes</h2>
+      <details className="card panel-desplegable">
+        <summary>Últimos 12 meses rodantes</summary>
         <table className="tabla">
           <thead>
             <tr>
@@ -281,10 +278,10 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
             ))}
           </tbody>
         </table>
-      </div>
+      </details>
 
-      <div className="card">
-        <h2>Últimas 12 semanas (ISO)</h2>
+      <details className="card panel-desplegable">
+        <summary>Últimas 12 semanas (ISO)</summary>
         <table className="tabla">
           <thead>
             <tr>
@@ -303,10 +300,10 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
             ))}
           </tbody>
         </table>
-      </div>
+      </details>
 
-      <div className="card">
-        <h2>Últimos 30 días</h2>
+      <details className="card panel-desplegable">
+        <summary>Últimos 30 días</summary>
         <table className="tabla">
           <thead>
             <tr>
@@ -333,7 +330,7 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
             etiqueta="Exportar últimas vistas temporales"
           />
         </div>
-      </div>
+      </details>
 
       <div className="card">
         <h2>Cumplimiento de presupuesto por mes</h2>
