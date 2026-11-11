@@ -1,7 +1,7 @@
 import { cfg, a3, empresaInfo, leerArgumentos, hoyISO, menosDias } from './config.js';
 import { leerCuboVentas } from './sqlserver.js';
 import { normalizarRows } from './normalizar.js';
-import { cargarVentas } from './supabase.js';
+import { cargarVentas, refrescarVistas } from './supabase.js';
 
 type Rango = { desde: string; hasta: string };
 
@@ -81,6 +81,17 @@ async function main(): Promise<void> {
   }
 
   console.log(`[a3erp] TOTAL: ${docsTotales} documentos · ${lineasTotales} líneas en ${tramos.length} tramos`);
+
+  // Al terminar la carga, refresca la vista materializada de rendimiento para que la app
+  // sirva los agregados mensuales ya calculados (ver 0038_perf_vistas_materializadas.sql).
+  // No debe romper la ingesta si falla: los datos ya están cargados y la vista se puede
+  // refrescar manualmente con `select public.refresh_mv_perf();`.
+  try {
+    await refrescarVistas();
+    console.log('[a3erp] refresh_mv_perf: OK');
+  } catch (e) {
+    console.error(`[a3erp] refresh_mv_perf (no crítico): ${e instanceof Error ? e.message : String(e)}`);
+  }
 }
 
 main().catch((e) => {
