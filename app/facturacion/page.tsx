@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import Link from 'next/link';
-import { getFacturacion, getVariacion } from '@/lib/datos/facturacion';
+import { getFacturacion, getVariacion, getRankingsFacturacion } from '@/lib/datos/facturacion';
 import { getVistasTemporales } from '@/lib/datos/vistas';
 import {
   getCosteTransporte,
@@ -163,7 +163,7 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
   const filtros = parseFiltros(searchParams);
   // Todas las consultas en paralelo (antes eran 7 awaits en serie → 10-15 s con filtros).
-  const [opciones, d, t, v, trans, transCli, costeProv, desvio] = await Promise.all([
+  const [opciones, d, t, v, trans, transCli, costeProv, desvio, rk] = await Promise.all([
     getOpcionesFiltros(empresa, { fuente: 'facturas', anio: ANIO }),
     getFacturacion(empresa, ANIO, filtros),
     getVistasTemporales(empresa, ANIO, filtros),
@@ -172,6 +172,7 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
     getTransporteFacturadoPorCliente(empresa, ANIO),
     getCosteTransportePorProveedor(empresa, ANIO),
     getDesvioPresupuesto(empresa, ANIO, filtros),
+    getRankingsFacturacion(empresa, ANIO, filtros),
   ]);
   const previo = d.anioPrevio;
   const delta = d.netaPrevioTotal > 0 ? pct(((d.neta - d.netaPrevioTotal) / d.netaPrevioTotal) * 100) : '—';
@@ -258,6 +259,102 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
             etiqueta="Exportar evolución mensual"
           />
         </div>
+      </div>
+
+      <div className="card">
+        <h2>TOP 10 referencias vendidas · {filtros.cliente ? 'cliente seleccionado' : 'global'} {d.anio}</h2>
+        {rk.topReferencias.length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>Sin datos para la selección.</p>
+        ) : (
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Referencia</th>
+                <th className="td-num">Unidades</th>
+                <th className="td-num">Facturado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rk.topReferencias.map((r, i) => (
+                <tr key={i}>
+                  <td>{r.codigo ? `${r.codigo} · ` : ''}{r.articulo}</td>
+                  <td className="td-num">{numero(r.unidades)}</td>
+                  <td className="td-num">{eur(r.neta)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="card">
+        <h2>TOP 20 clientes por facturación · {d.anio}</h2>
+        {rk.topClientes.length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>Sin datos.</p>
+        ) : (
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th className="td-num">Facturado</th>
+                <th className="td-num">Unidades</th>
+                <th>Comercial</th>
+                <th className="td-num">vs {previo}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rk.topClientes.map((c, i) => {
+                const vp = c.netaPrev > 0 ? ((c.neta - c.netaPrev) / c.netaPrev) * 100 : null;
+                return (
+                  <tr key={i}>
+                    <td>{c.cliente}</td>
+                    <td className="td-num">{eur(c.neta)}</td>
+                    <td className="td-num">{numero(c.unidades)}</td>
+                    <td>{c.comercial}</td>
+                    <td className={`td-num ${vp != null && vp >= 0 ? 'td-pos' : ''}`}>
+                      {vp === null ? '—' : `${vp > 0 ? '+' : ''}${decimal(vp)} %`}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="card">
+        <h2>Comerciales por facturación · {d.anio}</h2>
+        {rk.comerciales.length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>Sin datos.</p>
+        ) : (
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Comercial</th>
+                <th className="td-num">Año</th>
+                <th className="td-num">Importe vendido</th>
+                <th className="td-num">Unidades</th>
+                <th className="td-num">vs {previo}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rk.comerciales.map((c, i) => {
+                const vp = c.importePrev > 0 ? ((c.importe - c.importePrev) / c.importePrev) * 100 : null;
+                return (
+                  <tr key={i}>
+                    <td>{c.comercial}</td>
+                    <td className="td-num">{c.anio}</td>
+                    <td className="td-num">{eur(c.importe)}</td>
+                    <td className="td-num">{numero(c.unidades)}</td>
+                    <td className={`td-num ${vp != null && vp >= 0 ? 'td-pos' : ''}`}>
+                      {vp === null ? '—' : `${vp > 0 ? '+' : ''}${decimal(vp)} %`}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
 
       <details className="card panel-desplegable">

@@ -513,3 +513,61 @@ export async function getFacturacion(codigoEmpresa: string, anio: number, filtro
     topClientes,
   };
 }
+
+// ─── Rankings de la pestaña Facturación (RPC perf_rankings_facturacion, 0043) ───
+export type RankingReferencia = { articulo: string; codigo: string | null; unidades: number; neta: number };
+export type RankingCliente = { cliente: string; neta: number; unidades: number; comercial: string; netaPrev: number };
+export type RankingComercial = { comercial: string; anio: number; importe: number; unidades: number; importePrev: number };
+export type RankingsFacturacion = {
+  topReferencias: RankingReferencia[];
+  topClientes: RankingCliente[];
+  comerciales: RankingComercial[];
+};
+
+// TOP 10 referencias (respeta filtros), TOP 20 clientes y comerciales (global del año), con
+// comparativa del año anterior. Todo calculado en SQL (una llamada). Devuelve listas vacías si el
+// RPC no está desplegado o falla.
+export async function getRankingsFacturacion(
+  codigoEmpresa: string,
+  anio: number,
+  filtros?: Filtros,
+): Promise<RankingsFacturacion> {
+  const supabase = createClient();
+  const vacio: RankingsFacturacion = { topReferencias: [], topClientes: [], comerciales: [] };
+  const { data, error } = await supabase.rpc('perf_rankings_facturacion', {
+    p_codigo_empresa: codigoEmpresa,
+    p_anio: anio,
+    p_cliente: filtros?.cliente ?? null,
+    p_comercial: filtros?.comercial ?? null,
+    p_familia: filtros?.familia ?? null,
+    p_marca: filtros?.marca ?? null,
+  });
+  if (error || !data) return vacio;
+  const d = data as {
+    top_referencias?: { articulo?: string; codigo?: string | null; unidades?: number; neta?: number }[];
+    top_clientes?: { cliente?: string; neta?: number; unidades?: number; comercial?: string; neta_prev?: number }[];
+    comerciales?: { comercial?: string; anio?: number; importe?: number; unidades?: number; importe_prev?: number }[];
+  };
+  return {
+    topReferencias: (d.top_referencias ?? []).map((r) => ({
+      articulo: r.articulo ?? '—',
+      codigo: r.codigo ?? null,
+      unidades: Number(r.unidades ?? 0),
+      neta: Number(r.neta ?? 0),
+    })),
+    topClientes: (d.top_clientes ?? []).map((c) => ({
+      cliente: c.cliente ?? '—',
+      neta: Number(c.neta ?? 0),
+      unidades: Number(c.unidades ?? 0),
+      comercial: c.comercial ?? '—',
+      netaPrev: Number(c.neta_prev ?? 0),
+    })),
+    comerciales: (d.comerciales ?? []).map((c) => ({
+      comercial: c.comercial ?? '—',
+      anio: Number(c.anio ?? anio),
+      importe: Number(c.importe ?? 0),
+      unidades: Number(c.unidades ?? 0),
+      importePrev: Number(c.importe_prev ?? 0),
+    })),
+  };
+}
