@@ -495,6 +495,33 @@ ul.tablas { color: var(--muted); font-size: 13px; margin: 8px 0 0; padding-left:
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+/* KPI clicable (despliega el gráfico de evolución). */
+.kpi-boton {
+  appearance: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 30px;
+}
+.kpi-boton:hover {
+  border-color: #c0392b;
+}
+.kpi-boton.activo {
+  border-color: #c0392b;
+  box-shadow: 0 0 0 2px rgba(192, 57, 43, 0.18);
+}
+.kpi-boton .kpi-ver {
+  position: absolute;
+  left: 20px;
+  bottom: 10px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
 .kpi::before {
   content: '';
   position: absolute;
