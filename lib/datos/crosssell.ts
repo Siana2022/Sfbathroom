@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { enLotes, todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
+import { ventasAnioRpc } from '@/lib/datos/ventas';
 
 type Recomendacion = {
   familia: string;
@@ -29,43 +30,48 @@ export async function getCrossSell(codigoEmpresa: string, clienteId: string, ani
   );
   const familiaDeArticulo = new Map<string, string | null>(articulosFilas.map((a) => [a.id, a.familia]));
 
-  // facturas del año con cliente
-  const filasF = await todasLasFilas<{ id: string; cliente_id: string | null }>((desde) =>
-    supabase
-      .from('facturas')
-      .select('id, cliente_id')
-      .eq('empresa_id', empresa.id)
-      .gte('fecha', `${anio}-01-01`)
-      .lte('fecha', `${anio}-12-31`)
-      .range(desde, desde + TAMANO_PAGINA - 1)
-  );
+  // facturas + líneas del año: en una sola llamada (RPC ventas_anio) o camino antiguo.
+  const ventas = await ventasAnioRpc(supabase, codigoEmpresa, anio);
+  let filasF: { id: string; cliente_id: string | null }[];
+  let lineasAnio: { factura_id: string; articulo_id: string | null; cantidad: number }[];
+  if (ventas) {
+    filasF = ventas.facturas as unknown as { id: string; cliente_id: string | null }[];
+    lineasAnio = ventas.lineas as unknown as { factura_id: string; articulo_id: string | null; cantidad: number }[];
+  } else {
+    filasF = await todasLasFilas<{ id: string; cliente_id: string | null }>((desde) =>
+      supabase
+        .from('facturas')
+        .select('id, cliente_id')
+        .eq('empresa_id', empresa.id)
+        .gte('fecha', `${anio}-01-01`)
+        .lte('fecha', `${anio}-12-31`)
+        .range(desde, desde + TAMANO_PAGINA - 1)
+    );
+    lineasAnio = await enLotes<{ factura_id: string; articulo_id: string | null; cantidad: number }>(
+      (lote, desde) =>
+        supabase
+          .from('factura_lineas')
+          .select('factura_id, articulo_id, cantidad')
+          .in('factura_id', lote)
+          .range(desde, desde + TAMANO_PAGINA - 1),
+      filasF.map((f) => f.id),
+    );
+  }
   const clienteDeFactura = new Map(filasF.filter((f) => f.cliente_id).map((f) => [f.id, f.cliente_id!]));
 
   // familias compradas por cliente (año actual, clientes con >= 2 facturas = "establecidos")
   const familiasPorCliente = new Map<string, Set<string>>();
   const facturasUnicasCliente = new Map<string, Set<string>>();
-  const idsAnio = filasF.map((f) => f.id);
-  {
-    const lineasAll = await enLotes<FilaLinea>(
-      (lote, desde) =>
-        supabase
-          .from('factura_lineas')
-          .select('factura_id, articulo_id')
-          .in('factura_id', lote)
-          .range(desde, desde + TAMANO_PAGINA - 1),
-      idsAnio,
-    );
-    for (const l of lineasAll) {
-      const cli = clienteDeFactura.get(l.factura_id);
-      const fam = l.articulo_id ? familiaDeArticulo.get(l.articulo_id) : null;
-      if (!cli || !fam) continue;
-      const s = familiasPorCliente.get(cli) ?? new Set<string>();
-      s.add(fam);
-      familiasPorCliente.set(cli, s);
-      const factSet = facturasUnicasCliente.get(cli) ?? new Set<string>();
-      factSet.add(l.factura_id);
-      facturasUnicasCliente.set(cli, factSet);
-    }
+  for (const l of lineasAnio) {
+    const cli = clienteDeFactura.get(l.factura_id);
+    const fam = l.articulo_id ? familiaDeArticulo.get(l.articulo_id) : null;
+    if (!cli || !fam) continue;
+    const s = familiasPorCliente.get(cli) ?? new Set<string>();
+    s.add(fam);
+    familiasPorCliente.set(cli, s);
+    const factSet = facturasUnicasCliente.get(cli) ?? new Set<string>();
+    factSet.add(l.factura_id);
+    facturasUnicasCliente.set(cli, factSet);
   }
 
   // co-ocurrencia por pares de familias (client-level, con clientes únicos)
@@ -119,23 +125,12 @@ export async function getCrossSell(codigoEmpresa: string, clienteId: string, ani
     .slice(0, 5);
 
   const articulosPorFamilia = new Map<string, Map<string, number>>();
-  {
-    const lineasAll = await enLotes<{ factura_id: string; articulo_id: string | null; cantidad: number }>(
-      (lote, desde) =>
-        supabase
-          .from('factura_lineas')
-          .select('factura_id, articulo_id, cantidad')
-          .in('factura_id', lote)
-          .range(desde, desde + TAMANO_PAGINA - 1),
-      idsAnio,
-    );
-    for (const l of lineasAll) {
-      const fam = l.articulo_id ? familiaDeArticulo.get(l.articulo_id) : null;
-      if (!fam || !l.articulo_id) continue;
-      const m = articulosPorFamilia.get(fam) ?? new Map<string, number>();
-      m.set(l.articulo_id, (m.get(l.articulo_id) ?? 0) + Number(l.cantidad ?? 0));
-      articulosPorFamilia.set(fam, m);
-    }
+  for (const l of lineasAnio) {
+    const fam = l.articulo_id ? familiaDeArticulo.get(l.articulo_id) : null;
+    if (!fam || !l.articulo_id) continue;
+    const m = articulosPorFamilia.get(fam) ?? new Map<string, number>();
+    m.set(l.articulo_id, (m.get(l.articulo_id) ?? 0) + Number(l.cantidad ?? 0));
+    articulosPorFamilia.set(fam, m);
   }
 
   const recomendaciones: Recomendacion[] = [];
