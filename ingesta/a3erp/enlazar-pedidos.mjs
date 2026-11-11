@@ -120,9 +120,12 @@ function resolver(par, indice) {
 }
 
 
-/** Mapa número de pedido → uuid (composite y simple). */
+/** Mapa número de pedido → uuid. El número simple solo se usa si es único. */
 async function indicePedidos(empresaId) {
+  const compuestos = new Map();
   const porNumero = new Map();
+  const repetidos = new Set();
+  const muestra = [];
   for (let desde = 0; ; desde += 1000) {
     const filas = await getSupabase(
       `pedidos?select=id,serie,numero_erp&empresa_id=eq.${empresaId}&order=numero_erp&limit=1000&offset=${desde}`,
@@ -131,12 +134,18 @@ async function indicePedidos(empresaId) {
       const num = norm(p.numero_erp);
       const serie = norm(p.serie);
       if (!num) continue;
-      if (!porNumero.has(num)) porNumero.set(num, p.id);
-      if (serie && !porNumero.has(`${serie}-${num}`)) porNumero.set(`${serie}-${num}`, p.id);
+      if (muestra.length < 5) muestra.push(`${serie}|${num}`);
+      if (serie) compuestos.set(`${serie}-${num}`, p.id);
+      if (porNumero.has(num)) repetidos.add(num);
+      else porNumero.set(num, p.id);
     }
     if (filas.length < 1000) break;
   }
-  return porNumero;
+  const mapa = new Map(compuestos);
+  for (const [num, id] of porNumero) {
+    if (!repetidos.has(num) && !mapa.has(num)) mapa.set(num, id);
+  }
+  return { mapa, muestra };
 }
 
 async function rpcEntregaPedidos(pares) {
@@ -152,7 +161,7 @@ async function rpcEntregaPedidos(pares) {
 
 /** Copia CABEPEDV.FECENTREGA a pedidos.fecha_prometida. */
 async function sincronizarPedidos(e, empresaId, pool) {
-  const indice = await indicePedidos(empresaId);
+  const { mapa: indice, muestra } = await indicePedidos(empresaId);
   const sql = `SELECT LTRIM(RTRIM(SERIE)) + '-' + CAST(CAST(NUMDOC AS bigint) AS varchar(20)) AS COMPUESTO,
                       CAST(CAST(NUMDOC AS bigint) AS varchar(20)) AS NUMERO,
                       CONVERT(varchar(10), FECENTREGA, 120) AS ENTREGA
@@ -160,6 +169,7 @@ async function sincronizarPedidos(e, empresaId, pool) {
   const filas = (await pool.request().query(sql)).recordset;
 
   const pares = [];
+  const sinCasar = [];
   let conEntrega = 0;
   let sinEntrega = 0;
   for (const f of filas) {
@@ -170,6 +180,7 @@ async function sincronizarPedidos(e, empresaId, pool) {
     conEntrega += 1;
     const id = indice.get(compuesto) ?? indice.get(numero) ?? null;
     if (id) pares.push({ pedido_id: id, fecha_prometida: entrega });
+    else if (sinCasar.length < 5) sinCasar.push(`${compuesto} / ${numero}`);
   }
 
   let actualizados = 0;
@@ -180,6 +191,8 @@ async function sincronizarPedidos(e, empresaId, pool) {
   console.log(
     `  pedidos: ${filas.length} en ERP · ${conEntrega} con FECENTREGA · ${sinEntrega} sin fecha · ${pares.length} emparejados · ${actualizados} actualizados`,
   );
+  if (sinCasar.length) console.log(`  pedidos sin emparejar (muestra): ${sinCasar.join(' · ')}`);
+  if (muestra.length) console.log(`  claves en Supabase (muestra): ${muestra.join(' · ')}`);
 }
 
 async function rpcPorId(pares) {
