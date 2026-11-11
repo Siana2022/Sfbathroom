@@ -78,6 +78,8 @@ export type CarteraCliente = {
   pendiente: number;
   antiguedadMedia: number;
   entradaMasAntigua: string | null;
+  proximaEntrega: string | null;
+  diasHastaEntrega: number | null;
 };
 
 export type EstadoPedidos = {
@@ -198,18 +200,26 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
   const anuladosList = pedidos.filter(esAnulado);
   const pendientesList = pedidos.filter((p) => !esAnulado(p) && !esServido(p));
 
+  // Cartera = entregas programadas que aún no han vencido. En este ERP los
+  // pedidos no tienen estado "en curso": todo está servido o anulado, así que lo
+  // único que representa trabajo pendiente es una fecha de entrega futura.
+  const carteraList = pedidos.filter(
+    (p) => !esAnulado(p) && Boolean(p.fecha_prometida) && (p.fecha_prometida as string) >= hoy,
+  );
+
   const importeCaptado = pedidos.reduce((s, p) => s + importeDe(p), 0);
   const importeServido = servidosList.reduce((s, p) => s + importeDe(p), 0);
   const importeAnulado = anuladosList.reduce((s, p) => s + importeDe(p), 0);
-  const importePendiente = pendientesList.reduce((s, p) => s + importeDe(p), 0);
+  const importePendiente = carteraList.reduce((s, p) => s + importeDe(p), 0);
+  const importeAbierto = pendientesList.reduce((s, p) => s + importeDe(p), 0);
   const captados = pedidos.length;
   const noAnulados = captados - anuladosList.length;
   const importeNoAnulado = importeCaptado - importeAnulado;
 
   const ticketMedio = noAnulados > 0 ? importeNoAnulado / noAnulados : 0;
 
-  // Antigüedad de la cartera: días desde la entrada de los pedidos abiertos.
-  const antiguedades = pendientesList
+  // Antigüedad de la cartera: días desde la entrada de las entregas programadas.
+  const antiguedades = carteraList
     .map((p) => entradaDe(p))
     .filter((f): f is string => Boolean(f))
     .map((f) => Math.max(0, diasEntre(f, hoy)));
@@ -271,10 +281,10 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
   fueraPlazo.sort((a, b) => b.diasRetraso - a.diasRetraso);
 
   // Cartera por cliente: pedidos abiertos, importe y antigüedad del más viejo.
-  const porCliente = new Map<string, { pedidos: number; pendiente: number; dias: number[]; minima: string | null }>();
-  for (const p of pendientesList) {
+  const porCliente = new Map<string, { pedidos: number; pendiente: number; dias: number[]; minima: string | null; proxima: string | null }>();
+  for (const p of carteraList) {
     const nombre = p.cliente_nombre ?? 'Cliente desconocido';
-    const actual = porCliente.get(nombre) ?? { pedidos: 0, pendiente: 0, dias: [], minima: null };
+    const actual = porCliente.get(nombre) ?? { pedidos: 0, pendiente: 0, dias: [], minima: null, proxima: null };
     actual.pedidos += 1;
     actual.pendiente += importeDe(p);
     const entrada = entradaDe(p);
@@ -282,6 +292,8 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
       actual.dias.push(Math.max(0, diasEntre(entrada, hoy)));
       if (!actual.minima || entrada < actual.minima) actual.minima = entrada;
     }
+    const entrega = p.fecha_prometida as string | null;
+    if (entrega && (!actual.proxima || entrega < actual.proxima)) actual.proxima = entrega;
     porCliente.set(nombre, actual);
   }
   const carteraCliente: CarteraCliente[] = [...porCliente.entries()]
@@ -291,8 +303,10 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
       pendiente: v.pendiente,
       antiguedadMedia: v.dias.length > 0 ? v.dias.reduce((s, d) => s + d, 0) / v.dias.length : 0,
       entradaMasAntigua: v.minima,
+      proximaEntrega: v.proxima,
+      diasHastaEntrega: v.proxima ? diasEntre(hoy, v.proxima) : null,
     }))
-    .sort((a, b) => b.pendiente - a.pendiente);
+    .sort((a, b) => (a.proximaEntrega ?? '9999').localeCompare(b.proximaEntrega ?? '9999'));
 
   // Detalle para los desplegables de "Pedidos por estado".
   function detalleDe(lista: FilaPedido[]): PedidoDetalle[] {
@@ -318,7 +332,7 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
   }
 
   const porEstado: EstadoPedidos[] = [
-    { estado: 'pendiente', label: 'Pendiente', pedidos: pendientesList.length, importe: importePendiente, total: pendientesList.length, detalle: detalleDe(pendientesList) },
+    { estado: 'pendiente', label: 'Pendiente', pedidos: pendientesList.length, importe: importeAbierto, total: pendientesList.length, detalle: detalleDe(pendientesList) },
     { estado: 'servido', label: 'Servido', pedidos: servidosList.length, importe: importeServido, total: servidosList.length, detalle: detalleDe(servidosList) },
     { estado: 'anulado', label: 'Anulado', pedidos: anuladosList.length, importe: importeAnulado, total: anuladosList.length, detalle: detalleDe(anuladosList) },
   ];

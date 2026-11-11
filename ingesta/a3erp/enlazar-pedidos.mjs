@@ -119,6 +119,69 @@ function resolver(par, indice) {
   );
 }
 
+
+/** Mapa número de pedido → uuid (composite y simple). */
+async function indicePedidos(empresaId) {
+  const porNumero = new Map();
+  for (let desde = 0; ; desde += 1000) {
+    const filas = await getSupabase(
+      `pedidos?select=id,serie,numero_erp&empresa_id=eq.${empresaId}&order=numero_erp&limit=1000&offset=${desde}`,
+    );
+    for (const p of filas) {
+      const num = norm(p.numero_erp);
+      const serie = norm(p.serie);
+      if (!num) continue;
+      if (!porNumero.has(num)) porNumero.set(num, p.id);
+      if (serie && !porNumero.has(`${serie}-${num}`)) porNumero.set(`${serie}-${num}`, p.id);
+    }
+    if (filas.length < 1000) break;
+  }
+  return porNumero;
+}
+
+async function rpcEntregaPedidos(pares) {
+  const res = await fetch(`${SUPABASE}/rest/v1/rpc/actualizar_entrega_pedidos`, {
+    method: 'POST',
+    headers: CABECERAS_SUPA,
+    body: JSON.stringify({ p_pares: pares }),
+  });
+  const texto = await res.text();
+  if (!res.ok) throw new Error(`actualizar_entrega_pedidos: ${res.status} ${texto}`);
+  return JSON.parse(texto || '{}');
+}
+
+/** Copia CABEPEDV.FECENTREGA a pedidos.fecha_promedida. */
+async function sincronizarPedidos(e, empresaId, pool) {
+  const indice = await indicePedidos(empresaId);
+  const sql = `SELECT LTRIM(RTRIM(SERIE)) + '-' + CAST(CAST(NUMDOC AS bigint) AS varchar(20)) AS COMPUESTO,
+                      CAST(CAST(NUMDOC AS bigint) AS varchar(20)) AS NUMERO,
+                      CONVERT(varchar(10), FECENTREGA, 120) AS ENTREGA
+               FROM [${e.base}].dbo.CABEPEDV`;
+  const filas = (await pool.request().query(sql)).recordset;
+
+  const pares = [];
+  let conEntrega = 0;
+  let sinEntrega = 0;
+  for (const f of filas) {
+    const compuesto = norm(f.COMPUESTO);
+    const numero = norm(f.NUMERO);
+    const entrega = norm(f.ENTREGA);
+    if (!entrega) { sinEntrega += 1; continue; }
+    conEntrega += 1;
+    const id = indice.get(compuesto) ?? indice.get(numero) ?? null;
+    if (id) pares.push({ pedido_id: id, fecha_prometida: entrega });
+  }
+
+  let actualizados = 0;
+  for (let i = 0; i < pares.length; i += 500) {
+    const res = await rpcEntregaPedidos(pares.slice(i, i + 500));
+    actualizados += Number(res.pedidos_actualizados ?? 0);
+  }
+  console.log(
+    `  pedidos: ${filas.length} en ERP · ${conEntrega} con FECENTREGA · ${sinEntrega} sin fecha · ${pares.length} emparejados · ${actualizados} actualizados`,
+  );
+}
+
 async function rpcPorId(pares) {
   const res = await fetch(`${SUPABASE}/rest/v1/rpc/enlazar_fechas_pedido_por_id`, {
     method: 'POST',
@@ -202,6 +265,8 @@ async function main() {
         }
         console.log(`  ${t.desde} → ${t.hasta}: ${pares.length} pares · ${conId.length} emparejados`);
       }
+
+      await sincronizarPedidos(e, empresaId, pool);
     }
   } finally {
     await pool.close();

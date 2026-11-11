@@ -44,7 +44,7 @@ export default async function PedidosPage({ searchParams }: { searchParams: Sear
 
       <ul className="grid-kpis">
         <Kpi etiqueta={`Pedidos captados ${d.anio}`} valor={numero(d.captados)} nota={`importe ${eur(d.importeCaptado)}`} />
-        <Kpi etiqueta="Cartera pendiente" valor={eur(d.importePendiente)} nota={`${numero(d.pendientes)} pedidos sin facturar`} />
+        <Kpi etiqueta="Cartera pendiente" valor={eur(d.importePendiente)} nota={`${numero(d.pendientes)} entregas programadas`} />
         <Kpi etiqueta="Pedidos servidos" valor={numero(d.servidos)} nota={`importe ${eur(d.importeServido)}`} />
         <Kpi etiqueta="Pedidos anulados" valor={numero(d.anulados)} nota={`importe ${eur(d.importeAnulado)}`} />
         <Kpi etiqueta="Ticket medio por pedido" valor={eur(d.ticketMedio)} nota="importe captado entre pedidos no anulados" />
@@ -116,13 +116,13 @@ export default async function PedidosPage({ searchParams }: { searchParams: Sear
           <h2>Cartera pendiente por cliente</h2>
           <DescargarExcel
             nombre={`pedidos-cartera-por-cliente-${d.anio}`}
-            columnas={['Cliente', 'Pedidos', 'Pendiente', 'Entrada más antigua', 'Antigüedad media']}
+            columnas={['Cliente', 'Pedidos', 'Pendiente', 'Próxima entrega', 'Días']}
             registros={d.carteraCliente.map((c) => [
               c.nombre,
               c.pedidos,
               c.pendiente,
-              c.entradaMasAntigua ?? '',
-              Math.round(c.antiguedadMedia),
+              c.proximaEntrega ?? '',
+              c.diasHastaEntrega ?? '',
             ])}
           />
         </div>
@@ -135,8 +135,8 @@ export default async function PedidosPage({ searchParams }: { searchParams: Sear
                 <th>Cliente</th>
                 <th className="td-num">Pedidos</th>
                 <th className="td-num">Pendiente</th>
-                <th>Entrada más antigua</th>
-                <th className="td-num">Antigüedad media</th>
+                <th>Próxima entrega</th>
+                <th className="td-num">Días</th>
               </tr>
             </thead>
             <tbody>
@@ -145,8 +145,8 @@ export default async function PedidosPage({ searchParams }: { searchParams: Sear
                   <td>{c.nombre}</td>
                   <td className="td-num">{numero(c.pedidos)}</td>
                   <td className="td-num">{eur(c.pendiente)}</td>
-                  <td>{fecha(c.entradaMasAntigua)}</td>
-                  <td className="td-num">{Math.round(c.antiguedadMedia)} días</td>
+                  <td>{fecha(c.proximaEntrega)}</td>
+                  <td className="td-num">{c.diasHastaEntrega === null ? '—' : `${c.diasHastaEntrega} días`}</td>
                 </tr>
               ))}
             </tbody>
