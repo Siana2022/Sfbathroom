@@ -199,15 +199,73 @@ async function main() {
           );
         }
       } else {
-        console.log('No encuentro una columna que marque el albarán como facturado (IDFACV / FACTURADO).');
-        if (aCerrado) {
+        console.log('No hay columna IDFACV/FACTURADO en CABEALBV: busco otras señales de facturación.');
+
+        const importeCol = aTotal ?? aBase;
+        const selImporte = importeCol ? `, SUM(${importeCol}) AS importe` : '';
+
+        if (aSituacion) {
           pintar(
-            `Albaranes · por ${aCerrado}`,
+            'Albaranes · por SITUACION',
             await consulta(
-              `SELECT ${aCerrado} AS cerrado, COUNT(*) AS albaranes FROM ${base}.dbo.CABEALBV GROUP BY ${aCerrado}`,
+              `SELECT ${aSituacion} AS situacion, COUNT(*) AS albaranes${selImporte}
+               FROM ${base}.dbo.CABEALBV GROUP BY ${aSituacion} ORDER BY albaranes DESC`,
             ),
           );
         }
+
+        for (const [nombre, col] of [
+          ['FACTURABLE', buscar(colsAlb, 'FACTURABLE')],
+          ['COMPLETO', buscar(colsAlb, 'COMPLETO')],
+          ['ENVIADO', buscar(colsAlb, 'ENVIADO')],
+        ]) {
+          if (!col) continue;
+          pintar(
+            `Albaranes · por ${nombre}`,
+            await consulta(
+              `SELECT ${col} AS valor, COUNT(*) AS albaranes FROM ${base}.dbo.CABEALBV GROUP BY ${col} ORDER BY albaranes DESC`,
+            ),
+          );
+        }
+
+        const pdt = buscar(colsAlb, 'IMPNET_PDTE');
+        if (pdt) {
+          pintar(
+            'Albaranes · importe neto pendiente (IMPNET_PDTE)',
+            await consulta(
+              `SELECT COUNT(*) AS total,
+                      SUM(CASE WHEN ${pdt} > 0 THEN 1 ELSE 0 END) AS con_pendiente,
+                      SUM(CASE WHEN ${pdt} > 0 THEN ${pdt} ELSE 0 END) AS importe_pendiente
+               FROM ${base}.dbo.CABEALBV`,
+            ),
+          );
+          const detallePdt = [aNum, aSerie, aFecha, aCli, aNom, importeCol, pdt]
+            .filter(Boolean)
+            .join(', ');
+          if (detallePdt) {
+            pintar(
+              'Albaranes · muestra con importe pendiente',
+              await consulta(
+                `SELECT TOP 10 ${detallePdt}
+                 FROM ${base}.dbo.CABEALBV
+                 WHERE ${pdt} > 0
+                 ${aFecha ? `ORDER BY ${aFecha} DESC` : ''}`,
+              ),
+            );
+          }
+        }
+
+        // Qué tabla referencia los albaranes (para enlazar albarán ↔ factura).
+        pintar(
+          'Tablas/columnas que referencian albaranes',
+          await consulta(
+            `SELECT t.name AS tabla, c.name AS columna
+             FROM ${base}.sys.tables t
+             JOIN ${base}.sys.columns c ON c.object_id = t.object_id
+             WHERE c.name LIKE '%ALB%'
+             ORDER BY t.name, c.name`,
+          ),
+        );
       }
     }
   } finally {
