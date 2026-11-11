@@ -267,6 +267,52 @@ async function main() {
           ),
         );
       }
+
+      // ---------------- Albaranes sin factura (LINEFACT.IDALBV) ----------------
+      const colsLin = await columnasDe(base, 'LINEFACT');
+      if (!colsLin.includes('IDALBV')) {
+        console.log('LINEFACT no tiene IDALBV: no se puede medir la facturación de albaranes.');
+        continue;
+      }
+      if (!aFecha) {
+        console.log('CABEALBV no tiene FECHA: no se puede agrupar por año.');
+        continue;
+      }
+
+      const importeCol2 = aTotal ?? aBase;
+      const selImporte2 = importeCol2 ? `, SUM(CASE WHEN l.IDALBV IS NULL THEN ${importeCol2} ELSE 0 END) AS importe_sin_facturar` : '';
+
+      pintar(
+        'Albaranes SIN línea de factura (por año)',
+        await consulta(
+          `SELECT YEAR(a.${aFecha}) AS anio,
+                  COUNT(*) AS albaranes,
+                  SUM(CASE WHEN l.IDALBV IS NULL THEN 1 ELSE 0 END) AS sin_facturar${selImporte2}
+           FROM ${base}.dbo.CABEALBV a
+           LEFT JOIN (SELECT DISTINCT IDALBV FROM ${base}.dbo.LINEFACT WHERE IDALBV IS NOT NULL) l
+             ON l.IDALBV = a.IDALBV
+           GROUP BY YEAR(a.${aFecha})
+           ORDER BY anio DESC`,
+        ),
+      );
+
+      const detalleSin = [aNum, aSerie, aFecha, aCli, aNom, importeCol2, aSituacion]
+        .filter(Boolean)
+        .join(', ');
+      if (detalleSin) {
+        pintar(
+          'Albaranes · muestra de los servidos SIN factura',
+          await consulta(
+            `SELECT TOP 15 ${detalleSin.split(', ').map((c) => `a.${c}`).join(', ')}
+             FROM ${base}.dbo.CABEALBV a
+             LEFT JOIN (SELECT DISTINCT IDALBV FROM ${base}.dbo.LINEFACT WHERE IDALBV IS NOT NULL) l
+               ON l.IDALBV = a.IDALBV
+             WHERE l.IDALBV IS NULL
+               ${aSituacion ? `AND a.${aSituacion} = 'S'` : ''}
+             ORDER BY a.${aFecha} DESC`,
+          ),
+        );
+      }
     }
   } finally {
     await pool.close();
