@@ -184,12 +184,21 @@ export type RentabilidadTransporteFila = {
   coste: number;
   margen: number;
   margenPct: number | null;
+  facturacion: number; // facturación neta total del cliente (todas las líneas) en el año
+  pctSobreFacturacion: number | null; // margen de transporte / facturación × 100
 };
 
 export type RentabilidadTransporte = {
   anio: number;
   filas: RentabilidadTransporteFila[];
-  totales: { facturado: number; coste: number; margen: number; margenPct: number | null };
+  totales: {
+    facturado: number;
+    coste: number;
+    margen: number;
+    margenPct: number | null;
+    facturacionEmpresa: number; // facturación neta total de la empresa en el año
+    pctSobreFacturacion: number | null; // margen transporte total / facturación empresa × 100
+  };
 };
 
 export async function getRentabilidadTransporteCliente(
@@ -202,7 +211,7 @@ export async function getRentabilidadTransporteCliente(
   const vacio = (): RentabilidadTransporte => ({
     anio,
     filas: [],
-    totales: { facturado: 0, coste: 0, margen: 0, margenPct: null },
+    totales: { facturado: 0, coste: 0, margen: 0, margenPct: null, facturacionEmpresa: 0, pctSobreFacturacion: null },
   });
 
   const articulos = await todasLasFilas<{ id: string; codigo_erp: string; nombre: string }>((desde) =>
@@ -227,10 +236,10 @@ export async function getRentabilidadTransporteCliente(
   if (esInterior.size === 0) return vacio();
 
   const [facturas, clientes] = await Promise.all([
-    todasLasFilas<{ id: string; cliente_id: string | null; fecha: string }>((desde) =>
+    todasLasFilas<{ id: string; cliente_id: string | null; fecha: string; base_imponible: number | null }>((desde) =>
       supabase
         .from('facturas')
-        .select('id, cliente_id, fecha')
+        .select('id, cliente_id, fecha, base_imponible')
         .eq('empresa_id', empresa.id)
         .gte('fecha', `${anio}-01-01`)
         .lte('fecha', `${anio}-12-31`)
@@ -247,11 +256,15 @@ export async function getRentabilidadTransporteCliente(
 
   const nombreCliente = new Map(clientes.map((c) => [c.id, c.nombre]));
   const facturaInfo = new Map<string, { cliente: string; mes: number }>();
+  // Facturación neta total (cabecera, todas las líneas) por cliente y de la empresa.
+  const facturacionPorCliente = new Map<string, number>();
+  let facturacionEmpresa = 0;
   for (const f of facturas) {
-    facturaInfo.set(f.id, {
-      cliente: (f.cliente_id && nombreCliente.get(f.cliente_id)) || 'Sin cliente',
-      mes: Number(f.fecha.slice(5, 7)),
-    });
+    const cliente = (f.cliente_id && nombreCliente.get(f.cliente_id)) || 'Sin cliente';
+    facturaInfo.set(f.id, { cliente, mes: Number(f.fecha.slice(5, 7)) });
+    const base = Number(f.base_imponible ?? 0);
+    facturacionPorCliente.set(cliente, (facturacionPorCliente.get(cliente) ?? 0) + base);
+    facturacionEmpresa += base;
   }
 
   const lineas = await enLotes<{ factura_id: string; articulo_id: string | null; importe: number; cantidad: number; coste_unitario: number | null }>(
@@ -286,6 +299,7 @@ export async function getRentabilidadTransporteCliente(
       const facturado = facturadoMeses.reduce((s, v) => s + v, 0);
       const coste = costeMeses.reduce((s, v) => s + v, 0);
       const margen = facturado - coste;
+      const facturacion = facturacionPorCliente.get(cliente) ?? 0;
       return {
         cliente,
         facturaTransporte: facturado > 0.005,
@@ -295,6 +309,8 @@ export async function getRentabilidadTransporteCliente(
         coste,
         margen,
         margenPct: facturado > 0.005 ? (margen / facturado) * 100 : null,
+        facturacion,
+        pctSobreFacturacion: Math.abs(facturacion) > 0.005 ? (margen / facturacion) * 100 : null,
       };
     })
     .filter((f) => Math.abs(f.facturado) > 0.005 || Math.abs(f.coste) > 0.005)
@@ -312,6 +328,8 @@ export async function getRentabilidadTransporteCliente(
       coste: tCoste,
       margen: tMargen,
       margenPct: tFacturado > 0.005 ? (tMargen / tFacturado) * 100 : null,
+      facturacionEmpresa,
+      pctSobreFacturacion: facturacionEmpresa > 0.005 ? (tMargen / facturacionEmpresa) * 100 : null,
     },
   };
 }
