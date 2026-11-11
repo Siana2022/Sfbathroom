@@ -50,3 +50,26 @@ export async function ventasAnioRpc(
   if (!Array.isArray(d.facturas) || !Array.isArray(d.lineas)) return null;
   return { facturas: d.facturas, lineas: d.lineas };
 }
+
+/** Cabecera de factura con numero_erp (para módulos con ventana de fechas arbitraria). */
+export type FacturaVentaCab = FacturaVenta & { numero_erp: string | null };
+
+/**
+ * Cabeceras de factura de una empresa en [desde, hasta] en una sola llamada (RPC
+ * ventas_facturas_rango, ver 0041). Para módulos con ventana de fechas que no es un año natural
+ * (clientes, actividad). Devuelve null si el RPC no está desplegado o falla.
+ */
+export async function ventasFacturasRangoRpc(
+  supabase: ReturnType<typeof createClient>,
+  codigoEmpresa: string,
+  desde: string,
+  hasta: string,
+): Promise<FacturaVentaCab[] | null> {
+  const { data, error } = await supabase.rpc('ventas_facturas_rango', {
+    p_codigo_empresa: codigoEmpresa,
+    p_desde: desde,
+    p_hasta: hasta,
+  });
+  if (error || !data || !Array.isArray(data)) return null;
+  return data as FacturaVentaCab[];
+}

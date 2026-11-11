@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { enLotes, todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
-import { getArticuloIdsFiltrados, type Filtros } from '@/lib/datos/filtros';
+import { getArticuloIdsFiltrados, hayFiltros, type Filtros } from '@/lib/datos/filtros';
 import { getCosteTransportePorProveedor } from '@/lib/datos/transporte';
+import { ventasAnioRpc } from '@/lib/datos/ventas';
 
 const RE_ABONO = /(ABON|DEVOL)/i;
 
@@ -59,17 +60,11 @@ export async function getRentabilidadClientes(
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
 
   const idsArticulo = await getArticuloIdsFiltrados(supabase, empresa.id, filtros ?? {});
+  // Camino rápido sin filtros: facturas + líneas del año en una sola llamada (RPC ventas_anio).
+  const sinFiltros = !filtros || !hayFiltros(filtros);
 
-  const [facturasRaw, clientesRaw] = await Promise.all([
-    todasLasFilas<FilaFactura>((desde) =>
-      supabase
-        .from('facturas')
-        .select('id, cliente_id, fecha, tipo_documento, numero_erp')
-        .eq('empresa_id', empresa.id)
-        .gte('fecha', `${anio}-01-01`)
-        .lte('fecha', `${anio}-12-31`)
-        .range(desde, desde + TAMANO_PAGINA - 1),
-    ),
+  const [ventas, clientesRaw] = await Promise.all([
+    sinFiltros ? ventasAnioRpc(supabase, codigoEmpresa, anio) : Promise.resolve(null),
     todasLasFilas<FilaCliente>((desde) =>
       supabase
         .from('clientes')
@@ -80,9 +75,31 @@ export async function getRentabilidadClientes(
     ),
   ]);
 
-  let facturas = facturasRaw;
-  if (filtros?.cliente) {
-    facturas = facturas.filter((f) => f.cliente_id === filtros.cliente);
+  let facturas: FilaFactura[];
+  let lineas: FilaLinea[];
+  if (ventas) {
+    facturas = ventas.facturas as unknown as FilaFactura[];
+    lineas = ventas.lineas as unknown as FilaLinea[];
+  } else {
+    const facturasRaw = await todasLasFilas<FilaFactura>((desde) =>
+      supabase
+        .from('facturas')
+        .select('id, cliente_id, fecha, tipo_documento, numero_erp')
+        .eq('empresa_id', empresa.id)
+        .gte('fecha', `${anio}-01-01`)
+        .lte('fecha', `${anio}-12-31`)
+        .range(desde, desde + TAMANO_PAGINA - 1),
+    );
+    facturas = filtros?.cliente ? facturasRaw.filter((f) => f.cliente_id === filtros.cliente) : facturasRaw;
+    lineas = await enLotes<FilaLinea>(
+      (lote, desde) =>
+        supabase
+          .from('factura_lineas')
+          .select('factura_id, articulo_id, importe, cantidad, coste_unitario')
+          .in('factura_id', lote)
+          .range(desde, desde + TAMANO_PAGINA - 1),
+      facturas.map((f) => f.id),
+    );
   }
 
   const clienteNombre = new Map(clientesRaw.map((c) => [c.id, c.nombre]));
@@ -90,16 +107,6 @@ export async function getRentabilidadClientes(
   for (const f of facturas) {
     if (f.cliente_id) facturaInfo.set(f.id, f);
   }
-
-  const lineas = await enLotes<FilaLinea>(
-    (lote, desde) =>
-      supabase
-        .from('factura_lineas')
-        .select('factura_id, articulo_id, importe, cantidad, coste_unitario')
-        .in('factura_id', lote)
-        .range(desde, desde + TAMANO_PAGINA - 1),
-    facturas.map((f) => f.id),
-  );
 
   const [costes, costeProv] = await Promise.all([
     todasLasFilas<{ articulo_id: string; coste_completo_unitario: number | null }>((desde) =>
