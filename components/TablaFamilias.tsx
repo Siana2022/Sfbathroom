@@ -12,10 +12,10 @@ export default function TablaFamilias({ familias }: { familias: MargenFamilia[] 
       <thead>
         <tr>
           <th>Familia</th>
-          <th className="td-num">Importe vendido</th>
-          <th className="td-num">Coste</th>
-          <th className="td-num">Margen</th>
-          <th className="td-num">Margen %</th>
+          <th className="td-num" title="Importe vendido neto (base imponible).">Importe vendido</th>
+          <th className="td-num" title="Coste de la mercancía vendida.">Coste</th>
+          <th className="td-num" title="Importe vendido menos coste.">Margen</th>
+          <th className="td-num" title="Margen sobre el importe vendido.">Margen %</th>
         </tr>
       </thead>
       <tbody>
@@ -29,7 +29,7 @@ export default function TablaFamilias({ familias }: { familias: MargenFamilia[] 
                 aria-expanded={expandida}
               >
                 <td>
-                  <span className="caret">{expandida ? '▾' : '▸'}</span> {f.familia}
+                  <span className="caret">{expandida ? '▾' : '▸'}</span> <span title={`Familia ${f.familia}. Pincha para ver el top 10 de clientes.`}>{f.familia}</span>
                 </td>
                 <td className="td-num">{eur(f.importe)}</td>
                 <td className="td-num">{eur(f.coste)}</td>
@@ -47,16 +47,16 @@ export default function TablaFamilias({ familias }: { familias: MargenFamilia[] 
                         <thead>
                           <tr>
                             <th>Cliente</th>
-                            <th className="td-num">Importe vendido</th>
-                            <th className="td-num">Coste</th>
-                            <th className="td-num">Margen</th>
-                            <th className="td-num">Margen %</th>
+                            <th className="td-num" title="Importe vendido neto (base imponible).">Importe vendido</th>
+                            <th className="td-num" title="Coste de la mercancía vendida.">Coste</th>
+                            <th className="td-num" title="Importe vendido menos coste.">Margen</th>
+                            <th className="td-num" title="Margen sobre el importe vendido.">Margen %</th>
                           </tr>
                         </thead>
                         <tbody>
                           {f.clientes.map((c) => (
                             <tr key={c.nombre}>
-                              <td>{c.nombre}</td>
+                              <td title={c.nombre}>{c.nombre}</td>
                               <td className="td-num">{eur(c.importe)}</td>
                               <td className="td-num">{eur(c.coste)}</td>
                               <td className="td-num">{eur(c.margen)}</td>
