@@ -15,6 +15,7 @@ export default function TablaStock({ grupos }: { grupos: GrupoStock[] }) {
     <table className="tabla">
       <thead>
         <tr>
+          <th style={{ width: 110 }}>SKU</th>
           <th>Artículo</th>
           <th className="td-num" title="Unidades en stock sumando todos los almacenes y lotes.">Unidades</th>
           <th className="td-num" title="Valor a coste real de compra (precio x cambio del lote).">Valor</th>
@@ -27,10 +28,11 @@ export default function TablaStock({ grupos }: { grupos: GrupoStock[] }) {
           return (
             <Fragment key={g.clave}>
               <tr className="fila-clic" onClick={() => setAbierto(expandido ? null : g.clave)} aria-expanded={expandido}>
+                <td style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12.5 }}>
+                  {g.filas[0]?.articulo_codigo}
+                </td>
                 <td>
-                  <span className="caret">{expandido ? '▾' : '▸'}</span>{' '}
-                  <span style={{ color: 'var(--muted)', fontSize: 12.5 }}>{g.filas[0]?.articulo_codigo}</span>{' '}
-                  {g.nombre}
+                  <span className="caret">{expandido ? '▾' : '▸'}</span> {g.nombre}
                 </td>
                 <td className="td-num">{numero(g.unidades)}</td>
                 <td className="td-num">{eur2(g.valor)}</td>
@@ -38,7 +40,7 @@ export default function TablaStock({ grupos }: { grupos: GrupoStock[] }) {
               </tr>
               {expandido && (
                 <tr>
-                  <td colSpan={4} style={{ background: 'var(--bg)', padding: '10px 14px' }}>
+                  <td colSpan={5} style={{ background: 'var(--bg)', padding: '10px 14px' }}>
                     <table className="tabla">
                       <thead>
                         <tr>
