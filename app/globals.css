@@ -1121,3 +1121,82 @@ table.tabla .td-pos { color: var(--verde); }
   .topbar { padding: 12px 18px; }
   .topbar-fecha { display: none; }
 }
+
+/* ---------------- Tarta y layout en dos columnas ---------------- */
+
+.split-columnas {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+  margin-top: 12px;
+}
+
+@media (max-width: 980px) {
+  .split-columnas { grid-template-columns: 1fr; }
+}
+
+.tarta { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+
+.tarta-circulo {
+  width: 210px;
+  height: 210px;
+  border-radius: 50%;
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.tarta-hueco {
+  position: absolute;
+  inset: 21%;
+  background: var(--panel);
+  border-radius: 50%;
+}
+
+.tarta-leyenda {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+}
+
+.tarta-leyenda li { display: flex; align-items: center; gap: 8px; }
+
+.tarta-leyenda i { width: 10px; height: 10px; border-radius: 2px; flex: 0 0 auto; }
+
+.tarta-etiqueta {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.tarta-valor { font-variant-numeric: tabular-nums; }
+
+.caret { color: var(--muted); font-size: 11px; }
+
+.form-erosion { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; margin: 8px 0 4px; }
+
+.form-erosion label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.form-erosion input {
+  width: 90px;
+  padding: 7px 9px;
+  border: 1px solid var(--border-2);
+  border-radius: 8px;
+  font: inherit;
+  background: var(--panel);
+  color: inherit;
+}
