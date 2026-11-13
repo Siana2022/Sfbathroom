@@ -12,13 +12,22 @@ export type FilaStockAlmacen = {
   lote: string;
   unidades: number;
   coste_medio: number | null;
-  fecha_caducidad: string | null;
   ubicacion: string | null;
+};
+
+/** Agrupación por artículo: una cabecera con sus modelos/almacenes/lotes dentro. */
+export type GrupoStock = {
+  clave: string;
+  nombre: string;
+  unidades: number;
+  valor: number;
+  filas: FilaStockAlmacen[];
 };
 
 export type StockAlmacenResumen = {
   empresa: { codigo: string; nombre: string };
   filas: FilaStockAlmacen[];
+  grupos: GrupoStock[];
   totalFilas: number;
   referencias: number;
   refsConStock: number;
@@ -48,7 +57,7 @@ export async function getStockAlmacen(
     let query = supabase
       .from('stock_almacen')
       .select(
-        'articulo_codigo, articulo_nombre, almacen_codigo, almacen_nombre, lote, unidades, coste_medio, fecha_caducidad, ubicacion',
+        'articulo_codigo, articulo_nombre, almacen_codigo, almacen_nombre, lote, unidades, coste_medio, ubicacion',
       )
       .eq('empresa_id', empresa.id)
       .order('articulo_codigo')
@@ -99,9 +108,27 @@ export async function getStockAlmacen(
     }
   }
 
+  const gruposMap = new Map<string, GrupoStock>();
+  for (const f of filas) {
+    const nombre = (f.articulo_nombre ?? '').trim() || f.articulo_codigo;
+    const clave = nombre.toLocaleUpperCase('es');
+    const g = gruposMap.get(clave) ?? { clave, nombre, unidades: 0, valor: 0, filas: [] };
+    g.unidades += Number(f.unidades ?? 0);
+    g.valor += Number(f.unidades ?? 0) * Number(f.coste_medio ?? 0);
+    g.filas.push(f);
+    gruposMap.set(clave, g);
+  }
+  const grupos = [...gruposMap.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  for (const g of grupos) {
+    g.filas.sort((a, b) =>
+      `${a.articulo_codigo}|${a.almacen_codigo}|${a.lote}`.localeCompare(`${b.articulo_codigo}|${b.almacen_codigo}|${b.lote}`),
+    );
+  }
+
   return {
     empresa: { codigo: empresa.codigo, nombre: empresa.nombre },
     filas,
+    grupos,
     totalFilas: filas.length,
     referencias: todasRefs.size,
     refsConStock: conStock.size,
