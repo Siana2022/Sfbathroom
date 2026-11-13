@@ -18,7 +18,7 @@ export default function TablaStock({ grupos }: { grupos: GrupoStock[] }) {
           <th>Artículo</th>
           <th className="td-num" title="Unidades en stock sumando todos los almacenes y lotes.">Unidades</th>
           <th className="td-num" title="Valor a coste real de compra (precio x cambio del lote).">Valor</th>
-          <th className="td-num" title="Unidades pedidas a proveedor pendientes de recibir (stock en mar).">En mar</th>
+          <th className="td-num" title="Unidades pedidas a proveedor pendientes de recibir (stock en mar).">Stock en mar</th>
         </tr>
       </thead>
       <tbody>

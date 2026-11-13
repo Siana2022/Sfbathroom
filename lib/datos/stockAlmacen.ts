@@ -43,6 +43,9 @@ export type StockAlmacenResumen = {
   filas: FilaStockAlmacen[];
   grupos: GrupoStock[];
   alertas: AlertaStock[];
+  totalEnMar: number;
+  articulosEnMar: number;
+  enMarFilas: { articulo_codigo: string; articulo_nombre: string | null; unidades: number; pedidos: number }[];
   totalFilas: number;
   referencias: number;
   refsConStock: number;
@@ -126,11 +129,12 @@ export async function getStockAlmacen(
         .order('fecha', { ascending: true })
         .range(desde, desde + TAMANO_PAGINA - 1),
     ),
-    todasLasFilas<{ articulo_codigo: string; unidades: number }>((desde) =>
+    todasLasFilas<{ articulo_codigo: string; articulo_nombre: string | null; unidades: number; pedidos: number }>((desde) =>
       supabase
         .from('stock_en_mar')
-        .select('articulo_codigo, unidades')
+        .select('articulo_codigo, articulo_nombre, unidades, pedidos')
         .eq('empresa_id', empresa.id)
+        .order('unidades', { ascending: false })
         .range(desde, desde + TAMANO_PAGINA - 1),
     ),
   ]);
@@ -144,9 +148,20 @@ export async function getStockAlmacen(
     costeArticulo.set(l.articulo_codigo, coste);
   }
   const enMarPorArticulo = new Map<string, number>();
+  let totalEnMar = 0;
   for (const m of marRes) {
-    enMarPorArticulo.set(m.articulo_codigo, (enMarPorArticulo.get(m.articulo_codigo) ?? 0) + Number(m.unidades ?? 0));
+    const u = Number(m.unidades ?? 0);
+    enMarPorArticulo.set(m.articulo_codigo, (enMarPorArticulo.get(m.articulo_codigo) ?? 0) + u);
+    totalEnMar += u;
   }
+  const enMarFilas = marRes
+    .map((m) => ({
+      articulo_codigo: m.articulo_codigo,
+      articulo_nombre: m.articulo_nombre,
+      unidades: Number(m.unidades ?? 0),
+      pedidos: Number(m.pedidos ?? 0),
+    }))
+    .sort((a, b) => b.unidades - a.unidades);
   const filasConCoste: FilaStockAlmacen[] = filas.map((f) => ({
     ...f,
     coste:
@@ -211,17 +226,17 @@ export async function getStockAlmacen(
   alertas.sort((a, b) => Number(b.rotura) - Number(a.rotura) || b.propuesta - a.propuesta);
 
   const gruposMap = new Map<string, GrupoStock>();
+  const codigosPorGrupo = new Map<string, Set<string>>();
   for (const f of filasConCoste) {
     const nombre = (f.articulo_nombre ?? '').trim() || f.articulo_codigo;
     const clave = nombre.toLocaleUpperCase('es');
-    const g = gruposMap.get(clave) ?? {
-      clave,
-      nombre,
-      unidades: 0,
-      valor: 0,
-      enMar: enMarPorArticulo.get(f.articulo_codigo) ?? 0,
-      filas: [],
-    };
+    const g = gruposMap.get(clave) ?? { clave, nombre, unidades: 0, valor: 0, enMar: 0, filas: [] };
+    const codigos = codigosPorGrupo.get(clave) ?? new Set<string>();
+    if (!codigos.has(f.articulo_codigo)) {
+      codigos.add(f.articulo_codigo);
+      g.enMar += enMarPorArticulo.get(f.articulo_codigo) ?? 0;
+    }
+    codigosPorGrupo.set(clave, codigos);
     g.unidades += Number(f.unidades ?? 0);
     g.valor += Number(f.unidades ?? 0) * f.coste;
     g.filas.push(f);
@@ -239,6 +254,9 @@ export async function getStockAlmacen(
     filas: filasConCoste,
     grupos,
     alertas: alertas.slice(0, 25),
+    totalEnMar,
+    articulosEnMar: enMarFilas.length,
+    enMarFilas,
     totalFilas: filas.length,
     referencias: todasRefs.size,
     refsConStock: conStock.size,
