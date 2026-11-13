@@ -13,6 +13,7 @@ export type FilaStockAlmacen = {
   unidades: number;
   coste_medio: number | null;
   coste: number;
+  enMar: number;
   ubicacion: string | null;
 };
 
@@ -168,6 +169,7 @@ export async function getStockAlmacen(
       costeLote.get(`${f.articulo_codigo}|${f.lote ?? ''}`) ??
       costeArticulo.get(f.articulo_codigo) ??
       Number(f.coste_medio ?? 0),
+    enMar: enMarPorArticulo.get(f.articulo_codigo) ?? 0,
   }));
 
   const conStock = new Set<string>();
