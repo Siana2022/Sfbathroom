@@ -1208,3 +1208,28 @@ table.tabla td[title] { cursor: help; }
   background: var(--panel);
   color: inherit;
 }
+
+/* Tarta: gráfico a la izquierda, leyenda a la derecha, con tooltip propio. */
+.tarta { display: block; }
+.tarta-fila { display: flex; align-items: center; justify-content: center; gap: 28px; flex-wrap: wrap; }
+.tarta-lienzo { position: relative; width: 260px; max-width: 100%; flex: 0 0 auto; }
+.tarta-lienzo .tarta-svg { width: 100%; height: auto; display: block; overflow: visible; }
+.tarta-leyenda { min-width: 240px; max-width: 380px; }
+.tarta-leyenda li { cursor: default; border-radius: 6px; padding: 2px 5px; margin: 0 -5px; }
+.tarta-leyenda li.activo { background: var(--wash); }
+.tarta-leyenda li.activo .tarta-etiqueta { color: var(--text); }
+.tarta-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--panel);
+  border: 1px solid var(--border-2);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text);
+  box-shadow: var(--sombra);
+  transform: translate(-50%, -130%);
+  white-space: nowrap;
+  z-index: 5;
+}
+.split-columnas > .tarta { max-width: 760px; margin: 20px auto 4px; }
