@@ -117,16 +117,22 @@ async function main() {
       // 2. Stock en mar (pedidos de compra pendientes)
       const sqlMar = `SELECT LTRIM(RTRIM(l.CODART)) AS ARTICULO,
                              MAX(a.DESCART) AS NOMBRE,
-                             SUM(CASE WHEN l.UNIDADES - ISNULL(l.UNIDADESSTOCK, 0) > 0
-                                      THEN l.UNIDADES - ISNULL(l.UNIDADESSTOCK, 0) ELSE 0 END) AS UNIDADES,
+                             SUM(CASE WHEN l.UNIDADES - ISNULL(r.RECIBIDAS, 0) > 0
+                                      THEN l.UNIDADES - ISNULL(r.RECIBIDAS, 0) ELSE 0 END) AS UNIDADES,
                              COUNT(DISTINCT c.IDPEDC) AS PEDIDOS
                       FROM [${e.base}].dbo.CABEPEDC c
                       JOIN [${e.base}].dbo.LINEPEDI l ON l.IDPEDC = c.IDPEDC
+                      LEFT JOIN (
+                        SELECT IDPEDC, LTRIM(RTRIM(CODART)) AS CODART, SUM(UNIDADES) AS RECIBIDAS
+                        FROM [${e.base}].dbo.LINEALBA
+                        WHERE IDPEDC IS NOT NULL AND IDALBC IS NOT NULL
+                        GROUP BY IDPEDC, LTRIM(RTRIM(CODART))
+                      ) r ON r.IDPEDC = l.IDPEDC AND r.CODART = LTRIM(RTRIM(l.CODART))
                       LEFT JOIN [${e.base}].dbo.ARTICULO a ON a.CODART = l.CODART
-                      WHERE l.CODART IS NOT NULL
+                      WHERE l.CODART IS NOT NULL AND c.SITUACION <> 'A'
                       GROUP BY LTRIM(RTRIM(l.CODART))
-                      HAVING SUM(CASE WHEN l.UNIDADES - ISNULL(l.UNIDADESSTOCK, 0) > 0
-                                      THEN l.UNIDADES - ISNULL(l.UNIDADESSTOCK, 0) ELSE 0 END) > 0`;
+                      HAVING SUM(CASE WHEN l.UNIDADES - ISNULL(r.RECIBIDAS, 0) > 0
+                                      THEN l.UNIDADES - ISNULL(r.RECIBIDAS, 0) ELSE 0 END) > 0`;
       const filasMar = (await pool.request().query(sqlMar)).recordset;
       const mar = filasMar.map((f) => ({
         empresa_id: empresaId,
