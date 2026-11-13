@@ -17,7 +17,8 @@ export default function TablaStock({ grupos }: { grupos: GrupoStock[] }) {
         <tr>
           <th>Artículo</th>
           <th className="td-num" title="Unidades en stock sumando todos los almacenes y lotes.">Unidades</th>
-          <th className="td-num" title="Valor a coste medio de A3ERP.">Valor</th>
+          <th className="td-num" title="Valor a coste real de compra (precio x cambio del lote).">Valor</th>
+          <th className="td-num" title="Unidades pedidas a proveedor pendientes de recibir (stock en mar).">Stock en mar</th>
         </tr>
       </thead>
       <tbody>
@@ -31,10 +32,11 @@ export default function TablaStock({ grupos }: { grupos: GrupoStock[] }) {
                 </td>
                 <td className="td-num">{numero(g.unidades)}</td>
                 <td className="td-num">{eur(g.valor)}</td>
+                <td className="td-num">{g.enMar > 0 ? numero(g.enMar) : '—'}</td>
               </tr>
               {expandido && (
                 <tr>
-                  <td colSpan={3} style={{ background: 'var(--bg)', padding: '10px 14px' }}>
+                  <td colSpan={4} style={{ background: 'var(--bg)', padding: '10px 14px' }}>
                     <table className="tabla">
                       <thead>
                         <tr>
@@ -42,7 +44,7 @@ export default function TablaStock({ grupos }: { grupos: GrupoStock[] }) {
                           <th>Almacén</th>
                           <th>Lote</th>
                           <th className="td-num">Stock</th>
-                          <th className="td-num">Coste medio</th>
+                          <th className="td-num" title="Precio de compra del lote por el cambio de la factura; si no hay, el último del artículo.">Coste</th>
                           <th className="td-num">Valor</th>
                           <th>Ubicación</th>
                         </tr>
@@ -54,8 +56,8 @@ export default function TablaStock({ grupos }: { grupos: GrupoStock[] }) {
                             <td>{f.almacen_codigo}{f.almacen_nombre ? ` · ${f.almacen_nombre}` : ''}</td>
                             <td>{f.lote || '—'}</td>
                             <td className="td-num">{numero(f.unidades)}</td>
-                            <td className="td-num">{f.coste_medio === null ? '—' : eur(f.coste_medio)}</td>
-                            <td className="td-num">{eur(f.unidades * Number(f.coste_medio ?? 0))}</td>
+                            <td className="td-num">{f.coste === null ? '—' : eur(f.coste)}</td>
+                            <td className="td-num">{eur(f.unidades * Number(f.coste ?? 0))}</td>
                             <td>{f.ubicacion || '—'}</td>
                           </tr>
                         ))}

@@ -49,7 +49,8 @@ export default async function StockPage({ searchParams }: { searchParams: Search
         <Kpi etiqueta="Referencias con stock" valor={numero(d.refsConStock)} nota={`de ${numero(d.referencias)} referencias`} />
         <Kpi etiqueta="Referencias sin stock" valor={numero(d.refsSinStock)} nota="a cero en todos los almacenes" />
         <Kpi etiqueta="Unidades en stock" valor={numero(d.unidades)} nota="suma de todos los almacenes y lotes" />
-        <Kpi etiqueta="Valor de stock" valor={eur(d.valor)} nota="a coste medio de A3ERP" />
+        <Kpi etiqueta="Valor de stock" valor={eur(d.valor)} nota="a coste real de compra" />
+        <Kpi etiqueta="Stock en mar" valor={numero(d.totalEnMar)} nota={`${numero(d.articulosEnMar)} artículos pendientes de recibir`} />
       </ul>
 
 
@@ -68,7 +69,8 @@ export default async function StockPage({ searchParams }: { searchParams: Search
                 <th className="td-num" title="Unidades en stock sumando almacenes y lotes.">Stock</th>
                 <th className="td-num" title="Punto de pedido configurado en el artículo.">Punto pedido</th>
                 <th className="td-num" title="Unidades vendidas en 90 días dividido entre 90.">Consumo/día</th>
-                <th className="td-num" title="Unidades sugeridas a comprar para cubrir 45 días.">Comprar</th>
+                <th className="td-num" title="Pedidas a proveedor pendientes de recibir.">En mar</th>
+                <th className="td-num" title="Unidades sugeridas a comprar para cubrir 45 días, descontando lo que ya viene.">Comprar</th>
               </tr>
             </thead>
             <tbody>
@@ -81,6 +83,7 @@ export default async function StockPage({ searchParams }: { searchParams: Search
                   <td className="td-num">{numero(a.stock)}</td>
                   <td className="td-num">{a.punto > 0 ? numero(a.punto) : '—'}</td>
                   <td className="td-num">{a.mediaDiaria.toFixed(2)}</td>
+                  <td className="td-num">{a.enMar > 0 ? numero(a.enMar) : '—'}</td>
                   <td className="td-num">{a.propuesta > 0 ? numero(a.propuesta) : '—'}</td>
                 </tr>
               ))}
@@ -92,7 +95,9 @@ export default async function StockPage({ searchParams }: { searchParams: Search
       <div className="card">
         <h2>Existencias por artículo</h2>
         <p className="nota" style={{ color: 'var(--muted)', marginTop: 0 }}>
-          Cada artículo agrupa sus modelos, almacenes y lotes. Pincha para desplegarlos.
+          Cada artículo agrupa sus modelos, almacenes y lotes. Pincha para desplegarlos. El coste sale
+          del precio de compra por el cambio de la factura del lote; si no hay compra de ese lote, se
+          usa la última del artículo.
         </p>
         <form method="get" action="/stock" style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'end', marginBottom: 16 }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -127,7 +132,7 @@ export default async function StockPage({ searchParams }: { searchParams: Search
           <div style={{ marginLeft: 'auto' }}>
             <DescargarExcel
               nombre={`stock-${d.empresa.codigo.toLowerCase()}`}
-              columnas={['Artículo', 'Nombre', 'Almacén', 'Almacén nombre', 'Lote', 'Stock', 'Coste medio', 'Valor', 'Ubicación']}
+              columnas={['Artículo', 'Nombre', 'Almacén', 'Almacén nombre', 'Lote', 'Stock', 'Coste', 'Valor', 'Ubicación']}
               registros={d.filas.map((f) => [
                 f.articulo_codigo,
                 f.articulo_nombre ?? '',
@@ -135,8 +140,8 @@ export default async function StockPage({ searchParams }: { searchParams: Search
                 f.almacen_nombre ?? '',
                 f.lote,
                 f.unidades,
-                f.coste_medio ?? '',
-                f.unidades * Number(f.coste_medio ?? 0),
+                f.coste ?? '',
+                f.unidades * Number(f.coste ?? 0),
                 f.ubicacion ?? '',
               ])}
             />
@@ -157,6 +162,38 @@ export default async function StockPage({ searchParams }: { searchParams: Search
             </span>
             {paginaActual < totalPaginas ? <a href={enlacePagina(paginaActual + 1)}>Siguiente →</a> : <span />}
           </div>
+        )}
+      </div>
+
+      <div className="card">
+        <h2>Stock en mar</h2>
+        <p className="nota" style={{ color: 'var(--muted)', marginTop: 0 }}>
+          Mercancía pedida a proveedor que todavía no se ha recibido. No hay reservas de clientes: en
+          A3ERP las reservas de stock son pedidos al proveedor.
+        </p>
+        {d.enMarFilas.length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>No hay pedidos pendientes de recibir.</p>
+        ) : (
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Artículo</th>
+                <th>Nombre</th>
+                <th className="td-num" title="Unidades pedidas pendientes de recibir.">Unidades</th>
+                <th className="td-num" title="Número de pedidos de compra que las incluyen.">Pedidos</th>
+              </tr>
+            </thead>
+            <tbody>
+              {d.enMarFilas.map((m) => (
+                <tr key={m.articulo_codigo}>
+                  <td>{m.articulo_codigo}</td>
+                  <td title={m.articulo_nombre ?? ''}>{m.articulo_nombre ?? '—'}</td>
+                  <td className="td-num">{numero(m.unidades)}</td>
+                  <td className="td-num">{numero(m.pedidos)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
     </div>
