@@ -50,47 +50,9 @@ export default async function StockPage({ searchParams }: { searchParams: Search
         <Kpi etiqueta="Referencias sin stock" valor={numero(d.refsSinStock)} nota="a cero en todos los almacenes" />
         <Kpi etiqueta="Unidades en stock" valor={numero(d.unidades)} nota="suma de todos los almacenes y lotes" />
         <Kpi etiqueta="Valor de stock" valor={eur(d.valor)} nota="a coste real de compra" />
-        <Kpi etiqueta="Stock en mar" valor={numero(d.totalEnMar)} nota={`${numero(d.articulosEnMar)} artículos pendientes de recibir`} />
+        <Kpi etiqueta="Stock pendiente" valor={numero(d.totalEnMar)} nota={`${numero(d.articulosEnMar)} artículos pendientes de recibir`} />
       </ul>
 
-
-      {d.alertas.length > 0 && (
-        <div className="card">
-          <h2>Alertas de stock</h2>
-          <p className="nota" style={{ color: 'var(--muted)', marginTop: 0 }}>
-            Roturas y artículos por debajo del punto de pedido. La propuesta de compra usa el consumo
-            de los últimos 90 días y 45 días de cobertura.
-          </p>
-          <table className="tabla">
-            <thead>
-              <tr>
-                <th>Artículo</th>
-                <th title="Rotura: sin stock y con ventas. Bajo punto: por debajo del punto de pedido configurado.">Estado</th>
-                <th className="td-num" title="Unidades en stock sumando almacenes y lotes.">Stock</th>
-                <th className="td-num" title="Punto de pedido configurado en el artículo.">Punto pedido</th>
-                <th className="td-num" title="Unidades vendidas en 90 días dividido entre 90.">Consumo/día</th>
-                <th className="td-num" title="Pedidas a proveedor pendientes de recibir.">En mar</th>
-                <th className="td-num" title="Unidades sugeridas a comprar para cubrir 45 días, descontando lo que ya viene.">Comprar</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.alertas.map((a) => (
-                <tr key={a.codigo}>
-                  <td title={a.articulo}>{a.articulo}</td>
-                  <td style={a.rotura ? { color: 'var(--rojo)', fontWeight: 600 } : undefined}>
-                    {a.rotura ? 'Rotura' : a.punto > 0 && a.stock < a.punto ? 'Bajo punto' : '—'}
-                  </td>
-                  <td className="td-num">{numero(a.stock)}</td>
-                  <td className="td-num">{a.punto > 0 ? numero(a.punto) : '—'}</td>
-                  <td className="td-num">{a.mediaDiaria.toFixed(2)}</td>
-                  <td className="td-num">{a.enMar > 0 ? numero(a.enMar) : '—'}</td>
-                  <td className="td-num">{a.propuesta > 0 ? numero(a.propuesta) : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
 
       <div className="card">
         <h2>Existencias por artículo</h2>
@@ -166,10 +128,9 @@ export default async function StockPage({ searchParams }: { searchParams: Search
       </div>
 
       <div className="card">
-        <h2>Stock en mar</h2>
+        <h2>Stock pendiente</h2>
         <p className="nota" style={{ color: 'var(--muted)', marginTop: 0 }}>
-          Mercancía pedida a proveedor que todavía no se ha recibido. No hay reservas de clientes: en
-          A3ERP las reservas de stock son pedidos al proveedor.
+          Mercancía pedida a proveedor que todavía no se ha recibido. En A3ERP no hay reservas de clientes: lo pendiente son pedidos de compra sin recepción.
         </p>
         {d.enMarFilas.length === 0 ? (
           <p style={{ color: 'var(--muted)' }}>No hay pedidos pendientes de recibir.</p>
@@ -196,6 +157,45 @@ export default async function StockPage({ searchParams }: { searchParams: Search
           </table>
         )}
       </div>
+      {d.alertas.length > 0 && (
+        <div className="card">
+          <h2>Alertas de stock</h2>
+          <p className="nota" style={{ color: 'var(--muted)', marginTop: 0 }}>
+            Roturas y artículos por debajo del punto de pedido. La propuesta de compra usa el consumo
+            de los últimos 90 días y 45 días de cobertura.
+          </p>
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Artículo</th>
+                <th title="Rotura: sin stock y con ventas. Bajo punto: por debajo del punto de pedido configurado.">Estado</th>
+                <th className="td-num" title="Unidades en stock sumando almacenes y lotes.">Stock</th>
+                <th className="td-num" title="Punto de pedido configurado en el artículo.">Punto pedido</th>
+                <th className="td-num" title="Unidades vendidas en 90 días dividido entre 90.">Consumo/día</th>
+                <th className="td-num" title="Pedidas a proveedor pendientes de recibir.">En mar</th>
+                <th className="td-num" title="Unidades sugeridas a comprar para cubrir 45 días, descontando lo que ya viene.">Comprar</th>
+              </tr>
+            </thead>
+            <tbody>
+              {d.alertas.map((a) => (
+                <tr key={a.codigo}>
+                  <td title={a.articulo}>{a.articulo}</td>
+                  <td style={a.rotura ? { color: 'var(--rojo)', fontWeight: 600 } : undefined}>
+                    {a.rotura ? 'Rotura' : a.punto > 0 && a.stock < a.punto ? 'Bajo punto' : '—'}
+                  </td>
+                  <td className="td-num">{numero(a.stock)}</td>
+                  <td className="td-num">{a.punto > 0 ? numero(a.punto) : '—'}</td>
+                  <td className="td-num">{a.mediaDiaria.toFixed(2)}</td>
+                  <td className="td-num">{a.enMar > 0 ? numero(a.enMar) : '—'}</td>
+                  <td className="td-num">{a.propuesta > 0 ? numero(a.propuesta) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+
     </div>
   );
 }
