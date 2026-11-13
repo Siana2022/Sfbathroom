@@ -65,6 +65,48 @@ async function main() {
                  ORDER BY c.FECHA DESC`),
       );
 
+
+      console.log('Pendiente por año del pedido (pedidos no anulados):');
+      console.table(
+        await q(`SELECT YEAR(c.FECHA) AS anio,
+                        SUM(CASE WHEN l.UNIDADES - ISNULL(r.RECIBIDAS, 0) > 0
+                                 THEN l.UNIDADES - ISNULL(r.RECIBIDAS, 0) ELSE 0 END) AS pendiente,
+                        COUNT(DISTINCT c.IDPEDC) AS pedidos
+                 FROM ${base}.dbo.CABEPEDC c
+                 JOIN ${base}.dbo.LINEPEDI l ON l.IDPEDC = c.IDPEDC
+                 LEFT JOIN (
+                   SELECT IDPEDC, LTRIM(RTRIM(CODART)) AS CODART, SUM(UNIDADES) AS RECIBIDAS
+                   FROM ${base}.dbo.LINEALBA
+                   WHERE IDPEDC IS NOT NULL AND IDALBC IS NOT NULL
+                   GROUP BY IDPEDC, LTRIM(RTRIM(CODART))
+                 ) r ON r.IDPEDC = l.IDPEDC AND r.CODART = LTRIM(RTRIM(l.CODART))
+                 WHERE c.SITUACION <> 'A'
+                 GROUP BY YEAR(c.FECHA)
+                 ORDER BY anio DESC`),
+      );
+
+      console.log('Top 10 artículos pendientes con la fecha del pedido más antiguo:');
+      console.table(
+        await q(`SELECT TOP 10 LTRIM(RTRIM(l.CODART)) AS ARTICULO,
+                        SUM(CASE WHEN l.UNIDADES - ISNULL(r.RECIBIDAS, 0) > 0
+                                 THEN l.UNIDADES - ISNULL(r.RECIBIDAS, 0) ELSE 0 END) AS pendiente,
+                        MIN(CONVERT(varchar(10), c.FECHA, 120)) AS pedido_mas_antiguo,
+                        MAX(CONVERT(varchar(10), c.FECHA, 120)) AS pedido_mas_reciente
+                 FROM ${base}.dbo.CABEPEDC c
+                 JOIN ${base}.dbo.LINEPEDI l ON l.IDPEDC = c.IDPEDC
+                 LEFT JOIN (
+                   SELECT IDPEDC, LTRIM(RTRIM(CODART)) AS CODART, SUM(UNIDADES) AS RECIBIDAS
+                   FROM ${base}.dbo.LINEALBA
+                   WHERE IDPEDC IS NOT NULL AND IDALBC IS NOT NULL
+                   GROUP BY IDPEDC, LTRIM(RTRIM(CODART))
+                 ) r ON r.IDPEDC = l.IDPEDC AND r.CODART = LTRIM(RTRIM(l.CODART))
+                 WHERE c.SITUACION <> 'A'
+                 GROUP BY LTRIM(RTRIM(l.CODART))
+                 HAVING SUM(CASE WHEN l.UNIDADES - ISNULL(r.RECIBIDAS, 0) > 0
+                                 THEN l.UNIDADES - ISNULL(r.RECIBIDAS, 0) ELSE 0 END) > 0
+                 ORDER BY pendiente DESC`),
+      );
+
       const cols = await q(`SELECT COLUMN_NAME AS col FROM ${base}.INFORMATION_SCHEMA.COLUMNS
                             WHERE TABLE_NAME = 'CABEPEDC' AND (COLUMN_NAME LIKE '%RECEP%' OR COLUMN_NAME LIKE '%SITUAC%'
                                OR COLUMN_NAME LIKE '%PEND%' OR COLUMN_NAME LIKE '%FECHAENTREGA%' OR COLUMN_NAME LIKE '%ENTREGA%')
