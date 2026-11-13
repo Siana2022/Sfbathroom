@@ -140,7 +140,7 @@ export async function getAlertas(codigoEmpresa: string, anio: number): Promise<A
     return mediaHistorica > 0 && c.dso > mediaHistorica * umbralDso;
   }).length;
   const umbralErosion = umbralDe(configMap, 'ventas.erosion_precio');
-  const erosionPrecio = margen.sinAcceso ? null : margen.erosionTarifa.filter((e) => e.erosionPct > umbralErosion).length;
+  const erosionPrecio = margen.sinAcceso ? null : margen.erosionFacturas.filter((e) => e.descuentoPct > umbralErosion).length;
   const conAlerta = (n: number) => (n > 0 ? ('critico' as const) : ('ok' as const));
 
   const satImporte = umbralDe(configMap, 'comerciales.saturacion_importe');
