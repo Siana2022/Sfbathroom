@@ -163,9 +163,10 @@ export async function getStockAlmacen(
       pedidos: Number(m.pedidos ?? 0),
     }))
     .sort((a, b) => b.unidades - a.unidades);
+  // Fuera artículos sin codificar ('0') y los internos de servicio (ZZ…, YY…).
   const filasUtiles = filas.filter((f) => {
     const codigo = (f.articulo_codigo ?? '').trim();
-    return codigo !== '' && codigo !== '0';
+    return codigo !== '' && codigo !== '0' && !/^(zz|yy)/i.test(codigo);
   });
   const filasConCoste: FilaStockAlmacen[] = filasUtiles.map((f) => ({
     ...f,
