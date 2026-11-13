@@ -1140,6 +1140,12 @@ table.tabla td[title] { cursor: help; }
 
 .tarta { display: flex; flex-direction: column; align-items: center; gap: 14px; }
 
+.tarta-svg { display: block; overflow: visible; }
+
+.tarta-sector { cursor: pointer; transition: opacity 0.12s ease; }
+
+.tarta-sector:hover { opacity: 0.8; }
+
 .tarta-circulo {
   width: 210px;
   height: 210px;
@@ -1166,7 +1172,7 @@ table.tabla td[title] { cursor: help; }
   font-size: 12.5px;
 }
 
-.tarta-leyenda li { display: flex; align-items: center; gap: 8px; }
+.tarta-leyenda li { display: flex; align-items: center; gap: 8px; cursor: help; }
 
 .tarta-leyenda i { width: 10px; height: 10px; border-radius: 2px; flex: 0 0 auto; }
 
