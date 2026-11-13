@@ -3,9 +3,10 @@ import { getStockAlmacen } from '@/lib/datos/stockAlmacen';
 import { eur, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
+import TablaStock from '@/components/TablaStock';
 import type { SearchParams } from '@/lib/datos/filtros';
 
-const TAMANO_PAGINA_VISTA = 100;
+const TAMANO_PAGINA_VISTA = 50;
 
 function valorParam(sp: SearchParams, clave: string): string {
   const v = sp[clave];
@@ -20,10 +21,10 @@ export default async function StockPage({ searchParams }: { searchParams: Search
   const pagina = Math.max(1, Number(valorParam(searchParams, 'pagina') || '1') || 1);
 
   const d = await getStockAlmacen(empresa, { q, estado, almacen });
-  const totalPaginas = Math.max(1, Math.ceil(d.filas.length / TAMANO_PAGINA_VISTA));
+  const totalPaginas = Math.max(1, Math.ceil(d.grupos.length / TAMANO_PAGINA_VISTA));
   const paginaActual = Math.min(pagina, totalPaginas);
   const inicio = (paginaActual - 1) * TAMANO_PAGINA_VISTA;
-  const visibles = d.filas.slice(inicio, inicio + TAMANO_PAGINA_VISTA);
+  const visibles = d.grupos.slice(inicio, inicio + TAMANO_PAGINA_VISTA);
   const conFiltro = Boolean(q || d.filtros.estado !== 'todos' || almacen);
 
   const enlacePagina = (n: number) => {
@@ -51,8 +52,48 @@ export default async function StockPage({ searchParams }: { searchParams: Search
         <Kpi etiqueta="Valor de stock" valor={eur(d.valor)} nota="a coste medio de A3ERP" />
       </ul>
 
+
+      {d.alertas.length > 0 && (
+        <div className="card">
+          <h2>Alertas de stock</h2>
+          <p className="nota" style={{ color: 'var(--muted)', marginTop: 0 }}>
+            Roturas y artículos por debajo del punto de pedido. La propuesta de compra usa el consumo
+            de los últimos 90 días y 45 días de cobertura.
+          </p>
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Artículo</th>
+                <th title="Rotura: sin stock y con ventas. Bajo punto: por debajo del punto de pedido configurado.">Estado</th>
+                <th className="td-num" title="Unidades en stock sumando almacenes y lotes.">Stock</th>
+                <th className="td-num" title="Punto de pedido configurado en el artículo.">Punto pedido</th>
+                <th className="td-num" title="Unidades vendidas en 90 días dividido entre 90.">Consumo/día</th>
+                <th className="td-num" title="Unidades sugeridas a comprar para cubrir 45 días.">Comprar</th>
+              </tr>
+            </thead>
+            <tbody>
+              {d.alertas.map((a) => (
+                <tr key={a.codigo}>
+                  <td title={a.articulo}>{a.articulo}</td>
+                  <td style={a.rotura ? { color: 'var(--rojo)', fontWeight: 600 } : undefined}>
+                    {a.rotura ? 'Rotura' : a.punto > 0 && a.stock < a.punto ? 'Bajo punto' : '—'}
+                  </td>
+                  <td className="td-num">{numero(a.stock)}</td>
+                  <td className="td-num">{a.punto > 0 ? numero(a.punto) : '—'}</td>
+                  <td className="td-num">{a.mediaDiaria.toFixed(2)}</td>
+                  <td className="td-num">{a.propuesta > 0 ? numero(a.propuesta) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       <div className="card">
         <h2>Existencias por artículo</h2>
+        <p className="nota" style={{ color: 'var(--muted)', marginTop: 0 }}>
+          Cada artículo agrupa sus modelos, almacenes y lotes. Pincha para desplegarlos.
+        </p>
         <form method="get" action="/stock" style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'end', marginBottom: 16 }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span>Buscar</span>
@@ -86,7 +127,7 @@ export default async function StockPage({ searchParams }: { searchParams: Search
           <div style={{ marginLeft: 'auto' }}>
             <DescargarExcel
               nombre={`stock-${d.empresa.codigo.toLowerCase()}`}
-              columnas={['Artículo', 'Nombre', 'Almacén', 'Almacén nombre', 'Lote', 'Stock', 'Coste medio', 'Valor', 'Ubicación', 'Caducidad']}
+              columnas={['Artículo', 'Nombre', 'Almacén', 'Almacén nombre', 'Lote', 'Stock', 'Coste medio', 'Valor', 'Ubicación']}
               registros={d.filas.map((f) => [
                 f.articulo_codigo,
                 f.articulo_nombre ?? '',
@@ -97,52 +138,16 @@ export default async function StockPage({ searchParams }: { searchParams: Search
                 f.coste_medio ?? '',
                 f.unidades * Number(f.coste_medio ?? 0),
                 f.ubicacion ?? '',
-                f.fecha_caducidad ?? '',
               ])}
             />
           </div>
         </form>
 
         <p style={{ color: 'var(--muted)' }}>
-          {numero(d.totalFilas)} líneas · mostrando {visibles.length === 0 ? 0 : inicio + 1}–{inicio + visibles.length}
+          {numero(d.grupos.length)} artículos · mostrando {visibles.length === 0 ? 0 : inicio + 1}–{inicio + visibles.length}
         </p>
 
-        {visibles.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>No hay existencias que cumplan el filtro.</p>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="tabla">
-              <thead>
-                <tr>
-                  <th>Código</th>
-                  <th>Artículo</th>
-                  <th>Almacén</th>
-                  <th>Lote</th>
-                  <th className="td-num">Stock</th>
-                  <th className="td-num">Coste medio</th>
-                  <th className="td-num">Valor</th>
-                  <th>Ubicación</th>
-                  <th>Caducidad</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibles.map((f) => (
-                  <tr key={`${f.articulo_codigo}|${f.almacen_codigo}|${f.lote}`}>
-                    <td>{f.articulo_codigo}</td>
-                    <td>{f.articulo_nombre ?? '—'}</td>
-                    <td>{f.almacen_codigo}{f.almacen_nombre ? ` · ${f.almacen_nombre}` : ''}</td>
-                    <td>{f.lote || '—'}</td>
-                    <td className="td-num">{numero(f.unidades)}</td>
-                    <td className="td-num">{f.coste_medio === null ? '—' : eur(f.coste_medio)}</td>
-                    <td className="td-num">{eur(f.unidades * Number(f.coste_medio ?? 0))}</td>
-                    <td>{f.ubicacion || '—'}</td>
-                    <td>{f.fecha_caducidad || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <TablaStock grupos={visibles} />
 
         {totalPaginas > 1 && (
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 16 }}>
