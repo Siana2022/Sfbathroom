@@ -1,3 +1,7 @@
+'use client';
+import { useState } from 'react';
+import { eur } from '@/lib/formato';
+
 const COLORES = [
   '#2f6f8f',
   '#7aa6c2',
@@ -15,7 +19,6 @@ export type PorcionTarta = { etiqueta: string; valor: number };
 
 type Props = {
   datos: PorcionTarta[];
-  formato: (v: number) => string;
   /** Máximo de porciones con nombre; el resto se agrupa en "Otros". */
   maximo?: number;
 };
@@ -29,7 +32,10 @@ function punto(radio: number, angulo: number): [number, number] {
   return [CENTRO + radio * Math.cos(angulo), CENTRO + radio * Math.sin(angulo)];
 }
 
-export default function Tarta({ datos, formato, maximo = 8 }: Props) {
+export default function Tarta({ datos, maximo = 8 }: Props) {
+  const [activo, setActivo] = useState<number | null>(null);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+
   const limpios = datos.filter((d) => Number.isFinite(d.valor) && d.valor > 0);
   const ordenados = [...limpios].sort((a, b) => b.valor - a.valor);
 
@@ -45,7 +51,6 @@ export default function Tarta({ datos, formato, maximo = 8 }: Props) {
     return <p style={{ color: 'var(--muted)' }}>Sin datos para el gráfico.</p>;
   }
 
-  // Una sola porción: anillo completo (el arco de 360º se degenera).
   const unica = porciones.length === 1;
 
   let angulo = -Math.PI / 2;
@@ -56,58 +61,76 @@ export default function Tarta({ datos, formato, maximo = 8 }: Props) {
     return { ...d, inicio, fin, color: COLORES[i % COLORES.length] };
   });
 
+  const mover = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+  };
+
   return (
     <div className="tarta">
-      <svg
-        className="tarta-svg"
-        viewBox={`0 0 ${TAMANO} ${TAMANO}`}
-        width="100%"
-        style={{ maxWidth: 300 }}
-        role="img"
-        aria-label="Distribución por importe"
-      >
-        {unica ? (
-          <circle
-            cx={CENTRO}
-            cy={CENTRO}
-            r={(RADIO + RADIO_INTERIOR) / 2}
-            fill="none"
-            stroke={COLORES[0]}
-            strokeWidth={RADIO - RADIO_INTERIOR}
-          >
-            <title>{`${sectores[0].etiqueta}: ${formato(sectores[0].valor)}`}</title>
-          </circle>
-        ) : (
-          sectores.map((s) => {
-            const grande = s.fin - s.inicio > Math.PI ? 1 : 0;
-            const [x1, y1] = punto(RADIO, s.inicio);
-            const [x2, y2] = punto(RADIO, s.fin);
-            const [x3, y3] = punto(RADIO_INTERIOR, s.fin);
-            const [x4, y4] = punto(RADIO_INTERIOR, s.inicio);
-            const d = [
-              `M ${x1.toFixed(2)} ${y1.toFixed(2)}`,
-              `A ${RADIO} ${RADIO} 0 ${grande} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`,
-              `L ${x3.toFixed(2)} ${y3.toFixed(2)}`,
-              `A ${RADIO_INTERIOR} ${RADIO_INTERIOR} 0 ${grande} 0 ${x4.toFixed(2)} ${y4.toFixed(2)}`,
-              'Z',
-            ].join(' ');
-            return (
-              <path key={s.etiqueta} d={d} fill={s.color} className="tarta-sector">
-                <title>{`${s.etiqueta}: ${formato(s.valor)}`}</title>
-              </path>
-            );
-          })
-        )}
-      </svg>
-      <ul className="tarta-leyenda">
-        {sectores.map((d) => (
-          <li key={d.etiqueta} title={`${d.etiqueta}: ${formato(d.valor)}`}>
-            <i style={{ background: d.color }} />
-            <span className="tarta-etiqueta">{d.etiqueta}</span>
-            <span className="tarta-valor">{formato(d.valor)}</span>
-          </li>
-        ))}
-      </ul>
+      <div className="tarta-fila">
+        <div className="tarta-lienzo" onMouseMove={mover} onMouseLeave={() => setActivo(null)}>
+          <svg viewBox={`0 0 ${TAMANO} ${TAMANO}`} className="tarta-svg" role="img" aria-label="Distribución por importe">
+            {unica ? (
+              <circle
+                cx={CENTRO}
+                cy={CENTRO}
+                r={(RADIO + RADIO_INTERIOR) / 2}
+                fill="none"
+                stroke={COLORES[0]}
+                strokeWidth={RADIO - RADIO_INTERIOR}
+                onMouseEnter={() => setActivo(0)}
+              />
+            ) : (
+              sectores.map((s, i) => {
+                const grande = s.fin - s.inicio > Math.PI ? 1 : 0;
+                const [x1, y1] = punto(RADIO, s.inicio);
+                const [x2, y2] = punto(RADIO, s.fin);
+                const [x3, y3] = punto(RADIO_INTERIOR, s.fin);
+                const [x4, y4] = punto(RADIO_INTERIOR, s.inicio);
+                const d = [
+                  `M ${x1.toFixed(2)} ${y1.toFixed(2)}`,
+                  `A ${RADIO} ${RADIO} 0 ${grande} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`,
+                  `L ${x3.toFixed(2)} ${y3.toFixed(2)}`,
+                  `A ${RADIO_INTERIOR} ${RADIO_INTERIOR} 0 ${grande} 0 ${x4.toFixed(2)} ${y4.toFixed(2)}`,
+                  'Z',
+                ].join(' ');
+                return (
+                  <path
+                    key={s.etiqueta}
+                    d={d}
+                    fill={s.color}
+                    className="tarta-sector"
+                    fillOpacity={activo === null || activo === i ? 1 : 0.45}
+                    onMouseEnter={() => setActivo(i)}
+                  />
+                );
+              })
+            )}
+          </svg>
+          {activo !== null && (
+            <div className="tarta-tooltip" style={{ left: pos.x, top: pos.y }}>
+              <strong>{sectores[activo].etiqueta}</strong>
+              <span> · {eur(sectores[activo].valor)}</span>
+            </div>
+          )}
+        </div>
+
+        <ul className="tarta-leyenda">
+          {sectores.map((s, i) => (
+            <li
+              key={s.etiqueta}
+              className={activo === i ? 'activo' : undefined}
+              onMouseEnter={() => setActivo(i)}
+              onMouseLeave={() => setActivo(null)}
+            >
+              <i style={{ background: s.color }} />
+              <span className="tarta-etiqueta">{s.etiqueta}</span>
+              <span className="tarta-valor">{eur(s.valor)}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }

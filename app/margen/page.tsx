@@ -92,7 +92,7 @@ export default async function MargenPage({ searchParams }: { searchParams: Searc
         </p>
         <div className="split-columnas">
           <TablaFamilias familias={d.porFamilia} />
-          <Tarta datos={d.porFamilia.map((f) => ({ etiqueta: f.familia, valor: f.importe }))} formato={eur} />
+          <Tarta datos={d.porFamilia.map((f) => ({ etiqueta: f.familia, valor: f.importe }))} />
         </div>
       </div>
 
@@ -123,7 +123,7 @@ export default async function MargenPage({ searchParams }: { searchParams: Searc
               ))}
             </tbody>
           </table>
-          <Tarta datos={d.porArticulo.map((a) => ({ etiqueta: a.articulo, valor: a.margen }))} formato={eur} />
+          <Tarta datos={d.porArticulo.map((a) => ({ etiqueta: a.articulo, valor: a.margen }))} />
         </div>
       </div>
 
@@ -163,7 +163,7 @@ export default async function MargenPage({ searchParams }: { searchParams: Searc
               ))}
             </tbody>
           </table>
-          <Tarta datos={d.porComercial.map((c) => ({ etiqueta: c.nombre, valor: c.importe }))} formato={eur} />
+          <Tarta datos={d.porComercial.map((c) => ({ etiqueta: c.nombre, valor: c.importe }))} />
         </div>
       </div>
 
@@ -193,7 +193,7 @@ export default async function MargenPage({ searchParams }: { searchParams: Searc
               ))}
             </tbody>
           </table>
-          <Tarta datos={d.porCliente.map((c) => ({ etiqueta: c.nombre, valor: c.importe }))} formato={eur} />
+          <Tarta datos={d.porCliente.map((c) => ({ etiqueta: c.nombre, valor: c.importe }))} />
         </div>
       </div>
 
@@ -222,7 +222,7 @@ export default async function MargenPage({ searchParams }: { searchParams: Searc
               ))}
             </tbody>
           </table>
-          <Tarta datos={d.porPais.map((p) => ({ etiqueta: p.nombre, valor: p.importe }))} formato={eur} />
+          <Tarta datos={d.porPais.map((p) => ({ etiqueta: p.nombre, valor: p.importe }))} />
         </div>
       </div>
 
@@ -249,7 +249,7 @@ export default async function MargenPage({ searchParams }: { searchParams: Searc
               ))}
             </tbody>
           </table>
-          <Tarta datos={d.facturasPorTramo.map((t) => ({ etiqueta: t.tramo, valor: t.importe }))} formato={eur} />
+          <Tarta datos={d.facturasPorTramo.map((t) => ({ etiqueta: t.tramo, valor: t.importe }))} />
         </div>
       </div>
 
@@ -308,7 +308,7 @@ export default async function MargenPage({ searchParams }: { searchParams: Searc
               </tbody>
             </table>
           )}
-          <Tarta datos={erosionCliente} formato={eur} />
+          <Tarta datos={erosionCliente} />
         </div>
       </div>
 
