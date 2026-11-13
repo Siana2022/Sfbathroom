@@ -44,18 +44,24 @@ export default function TablaStock({ grupos }: { grupos: GrupoStock[] }) {
                           <th>Almacén</th>
                           <th>Lote</th>
                           <th className="td-num">Stock</th>
+                          <th className="td-num" title="Unidades pedidas a proveedor pendientes de recibir para este artículo.">Stock en mar</th>
                           <th className="td-num" title="Precio de compra del lote por el cambio de la factura; si no hay, el último del artículo.">Coste</th>
                           <th className="td-num">Valor</th>
                           <th>Ubicación</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {g.filas.map((f) => (
+                        {g.filas.map((f, i) => (
                           <tr key={`${f.articulo_codigo}|${f.almacen_codigo}|${f.lote}`}>
                             <td>{f.articulo_codigo}</td>
                             <td>{f.almacen_codigo}{f.almacen_nombre ? ` · ${f.almacen_nombre}` : ''}</td>
                             <td>{f.lote || '—'}</td>
                             <td className="td-num">{numero(f.unidades)}</td>
+                            <td className="td-num">
+                              {f.enMar > 0 && g.filas.findIndex((x) => x.articulo_codigo === f.articulo_codigo) === i
+                                ? numero(f.enMar)
+                                : '—'}
+                            </td>
                             <td className="td-num">{f.coste === null ? '—' : eur2(f.coste)}</td>
                             <td className="td-num">{eur2(f.unidades * Number(f.coste ?? 0))}</td>
                             <td>{f.ubicacion || '—'}</td>
