@@ -1,6 +1,6 @@
 'use client';
 import { Fragment, useState } from 'react';
-import { eur, numero } from '@/lib/formato';
+import { eur, eur2, numero } from '@/lib/formato';
 import type { GrupoStock } from '@/lib/datos/stockAlmacen';
 
 /** Existencias agrupadas por artículo; al pinchar se abren sus modelos, almacenes y lotes. */
@@ -31,7 +31,7 @@ export default function TablaStock({ grupos }: { grupos: GrupoStock[] }) {
                   <span className="caret">{expandido ? '▾' : '▸'}</span> {g.nombre}
                 </td>
                 <td className="td-num">{numero(g.unidades)}</td>
-                <td className="td-num">{eur(g.valor)}</td>
+                <td className="td-num">{eur2(g.valor)}</td>
                 <td className="td-num">{g.enMar > 0 ? numero(g.enMar) : '—'}</td>
               </tr>
               {expandido && (
@@ -56,8 +56,8 @@ export default function TablaStock({ grupos }: { grupos: GrupoStock[] }) {
                             <td>{f.almacen_codigo}{f.almacen_nombre ? ` · ${f.almacen_nombre}` : ''}</td>
                             <td>{f.lote || '—'}</td>
                             <td className="td-num">{numero(f.unidades)}</td>
-                            <td className="td-num">{f.coste === null ? '—' : eur(f.coste)}</td>
-                            <td className="td-num">{eur(f.unidades * Number(f.coste ?? 0))}</td>
+                            <td className="td-num">{f.coste === null ? '—' : eur2(f.coste)}</td>
+                            <td className="td-num">{eur2(f.unidades * Number(f.coste ?? 0))}</td>
                             <td>{f.ubicacion || '—'}</td>
                           </tr>
                         ))}
