@@ -90,13 +90,16 @@ async function main() {
       const sqlLotes = `SELECT LTRIM(RTRIM(l.CODART)) AS ARTICULO,
                                COALESCE(LTRIM(RTRIM(l.LOTE)), '') AS LOTE,
                                CONVERT(varchar(10), c.FECHA, 120) AS FECHA,
-                               l.UNIDADES,
-                               l.PRECIO,
-                               ISNULL(c.CAMBIO, 1) AS CAMBIO,
+                               SUM(l.UNIDADES) AS UNIDADES,
+                               CASE WHEN SUM(l.UNIDADES) > 0
+                                    THEN SUM(l.UNIDADES * l.PRECIO * ISNULL(c.CAMBIO, 1)) / SUM(l.UNIDADES)
+                                    ELSE 0 END AS COSTE,
                                LTRIM(RTRIM(ISNULL(c.SERIE, ''))) + '-' + CAST(CAST(c.NUMDOC AS bigint) AS varchar(20)) AS DOCUMENTO
                         FROM [${e.base}].dbo.CABEALBC c
                         JOIN [${e.base}].dbo.LINEALBA l ON l.IDALBC = c.IDALBC
-                        WHERE l.CODART IS NOT NULL AND l.UNIDADES > 0`;
+                        WHERE l.CODART IS NOT NULL AND l.UNIDADES > 0
+                        GROUP BY LTRIM(RTRIM(l.CODART)), COALESCE(LTRIM(RTRIM(l.LOTE)), ''), CONVERT(varchar(10), c.FECHA, 120),
+                                 LTRIM(RTRIM(ISNULL(c.SERIE, ''))) + '-' + CAST(CAST(c.NUMDOC AS bigint) AS varchar(20))`;
       const filasLotes = (await pool.request().query(sqlLotes)).recordset;
       const lotes = filasLotes.map((f) => ({
         empresa_id: empresaId,
@@ -104,7 +107,7 @@ async function main() {
         lote: norm(f.LOTE),
         fecha: norm(f.FECHA),
         unidades: Number(f.UNIDADES ?? 0),
-        coste_unitario: Math.round(Number(f.PRECIO ?? 0) * Number(f.CAMBIO ?? 1) * 100) / 100,
+        coste_unitario: Math.round(Number(f.COSTE ?? 0) * 100) / 100,
         documento: norm(f.DOCUMENTO),
       })).filter((f) => f.articulo_codigo !== '' && f.fecha !== '');
 
