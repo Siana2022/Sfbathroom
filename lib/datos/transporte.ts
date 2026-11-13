@@ -316,7 +316,7 @@ export async function getRentabilidadTransporteCliente(
         facturado,
         coste,
         margen,
-        margenPct: facturado > 0.005 ? (margen / facturado) * 100 : null,
+        margenPct: Math.abs(facturacion - facturado) > 0.005 ? (coste / (facturacion - facturado)) * 100 : null,
         facturacion,
         facturacionMeses: facturacionMesesPorCliente.get(cliente) ?? new Array(12).fill(0),
         pctSobreFacturacion: Math.abs(facturacion) > 0.005 ? (margen / facturacion) * 100 : null,
@@ -336,7 +336,10 @@ export async function getRentabilidadTransporteCliente(
       facturado: tFacturado,
       coste: tCoste,
       margen: tMargen,
-      margenPct: tFacturado > 0.005 ? (tMargen / tFacturado) * 100 : null,
+      margenPct:
+        Math.abs(facturacionEmpresa - tFacturado) > 0.005
+          ? (tCoste / (facturacionEmpresa - tFacturado)) * 100
+          : null,
       facturacionEmpresa,
       pctSobreFacturacion: facturacionEmpresa > 0.005 ? (tMargen / facturacionEmpresa) * 100 : null,
     },
