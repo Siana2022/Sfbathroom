@@ -102,8 +102,7 @@ function agruparComercial(nombre: string, sufijos: Map<string, number>): { base:
         .replace(new RegExp(token, 'ig'), '')
         .replace(/^[\s\-–—|/]+|[\s\-–—|/]+$/g, '')
         .trim();
-      const base = token.charAt(0) + token.slice(1).toLowerCase();
-      return { base, seccion: resto === '' ? null : resto };
+      return { base: token, seccion: resto === '' ? null : resto };
     }
   }
   const i = nombre.indexOf(' - ');
