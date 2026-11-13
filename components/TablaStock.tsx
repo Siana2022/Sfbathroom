@@ -18,7 +18,7 @@ export default function TablaStock({ grupos }: { grupos: GrupoStock[] }) {
           <th>Artículo</th>
           <th className="td-num" title="Unidades en stock sumando todos los almacenes y lotes.">Unidades</th>
           <th className="td-num" title="Valor a coste real de compra (precio x cambio del lote).">Valor</th>
-          <th className="td-num" title="Unidades pedidas a proveedor pendientes de recibir (stock en mar).">Stock en mar</th>
+          <th className="td-num" title="Unidades pedidas a proveedor pendientes de recibir (stock pendiente).">Stock pendiente</th>
         </tr>
       </thead>
       <tbody>
@@ -28,7 +28,9 @@ export default function TablaStock({ grupos }: { grupos: GrupoStock[] }) {
             <Fragment key={g.clave}>
               <tr className="fila-clic" onClick={() => setAbierto(expandido ? null : g.clave)} aria-expanded={expandido}>
                 <td>
-                  <span className="caret">{expandido ? '▾' : '▸'}</span> {g.nombre}
+                  <span className="caret">{expandido ? '▾' : '▸'}</span>{' '}
+                  <span style={{ color: 'var(--muted)', fontSize: 12.5 }}>{g.filas[0]?.articulo_codigo}</span>{' '}
+                  {g.nombre}
                 </td>
                 <td className="td-num">{numero(g.unidades)}</td>
                 <td className="td-num">{eur2(g.valor)}</td>
@@ -44,7 +46,7 @@ export default function TablaStock({ grupos }: { grupos: GrupoStock[] }) {
                           <th>Almacén</th>
                           <th>Lote</th>
                           <th className="td-num">Stock</th>
-                          <th className="td-num" title="Unidades pedidas a proveedor pendientes de recibir para este artículo.">Stock en mar</th>
+                          <th className="td-num" title="Unidades pedidas a proveedor pendientes de recibir para este artículo.">Stock pendiente</th>
                           <th className="td-num" title="Precio de compra del lote por el cambio de la factura; si no hay, el último del artículo.">Coste</th>
                           <th className="td-num">Valor</th>
                           <th>Ubicación</th>

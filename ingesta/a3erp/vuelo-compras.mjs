@@ -130,7 +130,8 @@ async function main() {
                       ) r ON r.IDPEDC = l.IDPEDC AND r.CODART = LTRIM(RTRIM(l.CODART))
                       LEFT JOIN [${e.base}].dbo.ARTICULO a ON a.CODART = l.CODART
                       WHERE l.CODART IS NOT NULL AND c.SITUACION <> 'A'
-                        AND c.FECENTREGA >= CAST(GETDATE() AS date)
+                        AND LTRIM(RTRIM(l.CODART)) NOT LIKE 'ZZ%'
+                        AND LTRIM(RTRIM(l.CODART)) <> '0'
                       GROUP BY LTRIM(RTRIM(l.CODART))
                       HAVING SUM(CASE WHEN l.UNIDADES - ISNULL(r.RECIBIDAS, 0) > 0
                                       THEN l.UNIDADES - ISNULL(r.RECIBIDAS, 0) ELSE 0 END) > 0`;

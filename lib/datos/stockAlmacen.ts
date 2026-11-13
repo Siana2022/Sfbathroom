@@ -163,7 +163,11 @@ export async function getStockAlmacen(
       pedidos: Number(m.pedidos ?? 0),
     }))
     .sort((a, b) => b.unidades - a.unidades);
-  const filasConCoste: FilaStockAlmacen[] = filas.map((f) => ({
+  const filasUtiles = filas.filter((f) => {
+    const codigo = (f.articulo_codigo ?? '').trim();
+    return codigo !== '' && codigo !== '0';
+  });
+  const filasConCoste: FilaStockAlmacen[] = filasUtiles.map((f) => ({
     ...f,
     coste:
       costeLote.get(`${f.articulo_codigo}|${f.lote ?? ''}`) ??
