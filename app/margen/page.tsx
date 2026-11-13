@@ -13,6 +13,18 @@ import { ANIO_ACTUAL } from '@/lib/ejercicio';
 
 const ANIO = ANIO_ACTUAL;
 
+const AYUDA: Record<string, string> = {
+  importe: 'Importe vendido neto (base imponible de las líneas).',
+  coste: 'Coste de la mercancía vendida: coste unitario de la línea o coste completo de llegada por lote.',
+  margen: 'Importe vendido menos coste.',
+  margenPct: 'Margen dividido entre el importe vendido.',
+  margenUnidad: 'Margen medio por unidad vendida.',
+  unidades: 'Unidades vendidas en el periodo.',
+  facturas: 'Número de facturas en el tramo.',
+  aTarifa: 'Lo que habría costado a precio de tarifa (unidades x precio_tarifa).',
+  descuento: 'Diferencia entre el importe a tarifa y el importe vendido real.',
+};
+
 function umbralErosion(sp: SearchParams | undefined): number {
   const raw = sp?.erosion;
   const valor = Number(Array.isArray(raw) ? raw[0] : raw);
@@ -91,17 +103,17 @@ export default async function MargenPage({ searchParams }: { searchParams: Searc
             <thead>
               <tr>
                 <th>Artículo</th>
-                <th className="td-num">Importe vendido</th>
-                <th className="td-num">Coste</th>
-                <th className="td-num">Margen</th>
-                <th className="td-num">Margen %</th>
-                <th className="td-num">Margen/ud</th>
+                <th className="td-num" title={AYUDA.importe}>Importe vendido</th>
+                <th className="td-num" title={AYUDA.coste}>Coste</th>
+                <th className="td-num" title={AYUDA.margen}>Margen</th>
+                <th className="td-num" title={AYUDA.margenPct}>Margen %</th>
+                <th className="td-num" title={AYUDA.margenUnidad}>Margen/ud</th>
               </tr>
             </thead>
             <tbody>
               {d.porArticulo.map((a) => (
                 <tr key={a.articulo}>
-                  <td>{a.articulo}</td>
+                  <td title={a.articulo}>{a.articulo}</td>
                   <td className="td-num">{eur(a.importe)}</td>
                   <td className="td-num">{eur(a.coste)}</td>
                   <td className="td-num">{eur(a.margen)}</td>
@@ -122,10 +134,10 @@ export default async function MargenPage({ searchParams }: { searchParams: Searc
             <thead>
               <tr>
                 <th>Comercial</th>
-                <th className="td-num">Importe vendido</th>
-                <th className="td-num">Coste</th>
-                <th className="td-num">Margen</th>
-                <th className="td-num">Margen %</th>
+                <th className="td-num" title={AYUDA.importe}>Importe vendido</th>
+                <th className="td-num" title={AYUDA.coste}>Coste</th>
+                <th className="td-num" title={AYUDA.margen}>Margen</th>
+                <th className="td-num" title={AYUDA.margenPct}>Margen %</th>
               </tr>
             </thead>
             <tbody>
@@ -163,16 +175,16 @@ export default async function MargenPage({ searchParams }: { searchParams: Searc
             <thead>
               <tr>
                 <th>Cliente</th>
-                <th className="td-num">Importe vendido</th>
-                <th className="td-num">Coste</th>
-                <th className="td-num">Margen</th>
-                <th className="td-num">Margen %</th>
+                <th className="td-num" title={AYUDA.importe}>Importe vendido</th>
+                <th className="td-num" title={AYUDA.coste}>Coste</th>
+                <th className="td-num" title={AYUDA.margen}>Margen</th>
+                <th className="td-num" title={AYUDA.margenPct}>Margen %</th>
               </tr>
             </thead>
             <tbody>
               {d.porCliente.map((c) => (
                 <tr key={c.nombre}>
-                  <td>{c.nombre}</td>
+                  <td title={c.nombre}>{c.nombre}</td>
                   <td className="td-num">{eur(c.importe)}</td>
                   <td className="td-num">{eur(c.coste)}</td>
                   <td className="td-num">{eur(c.margen)}</td>
@@ -192,16 +204,16 @@ export default async function MargenPage({ searchParams }: { searchParams: Searc
             <thead>
               <tr>
                 <th>País</th>
-                <th className="td-num">Importe vendido</th>
-                <th className="td-num">Coste</th>
-                <th className="td-num">Margen</th>
-                <th className="td-num">Margen %</th>
+                <th className="td-num" title={AYUDA.importe}>Importe vendido</th>
+                <th className="td-num" title={AYUDA.coste}>Coste</th>
+                <th className="td-num" title={AYUDA.margen}>Margen</th>
+                <th className="td-num" title={AYUDA.margenPct}>Margen %</th>
               </tr>
             </thead>
             <tbody>
               {d.porPais.map((p) => (
                 <tr key={p.nombre}>
-                  <td>{p.nombre}</td>
+                  <td title={p.nombre}>{p.nombre}</td>
                   <td className="td-num">{eur(p.importe)}</td>
                   <td className="td-num">{eur(p.coste)}</td>
                   <td className="td-num">{eur(p.margen)}</td>
@@ -221,9 +233,9 @@ export default async function MargenPage({ searchParams }: { searchParams: Searc
             <thead>
               <tr>
                 <th>Tramo de margen</th>
-                <th className="td-num">Facturas</th>
+                <th className="td-num" title={AYUDA.facturas}>Facturas</th>
                 <th className="td-num">Importe</th>
-                <th className="td-num">Margen</th>
+                <th className="td-num" title={AYUDA.margen}>Margen</th>
               </tr>
             </thead>
             <tbody>
@@ -274,10 +286,10 @@ export default async function MargenPage({ searchParams }: { searchParams: Searc
                 <tr>
                   <th>Factura</th>
                   <th>Cliente</th>
-                  <th className="td-num">Importe vendido</th>
-                  <th className="td-num">A tarifa</th>
-                  <th className="td-num">Descuento</th>
-                  <th className="td-num">Margen %</th>
+                  <th className="td-num" title={AYUDA.importe}>Importe vendido</th>
+                  <th className="td-num" title={AYUDA.aTarifa}>A tarifa</th>
+                  <th className="td-num" title={AYUDA.descuento}>Descuento</th>
+                  <th className="td-num" title={AYUDA.margenPct}>Margen %</th>
                 </tr>
               </thead>
               <tbody>
@@ -310,13 +322,13 @@ export default async function MargenPage({ searchParams }: { searchParams: Searc
           <thead>
             <tr>
               <th>Mes</th>
-              <th className="td-num">Unidades</th>
+              <th className="td-num" title={AYUDA.unidades}>Unidades</th>
               <th className="td-num">Bruto</th>
-              <th className="td-num">Descuento</th>
+              <th className="td-num" title={AYUDA.descuento}>Descuento</th>
               <th className="td-num">Neto</th>
-              <th className="td-num">Coste</th>
-              <th className="td-num">Margen</th>
-              <th className="td-num">Margen %</th>
+              <th className="td-num" title={AYUDA.coste}>Coste</th>
+              <th className="td-num" title={AYUDA.margen}>Margen</th>
+              <th className="td-num" title={AYUDA.margenPct}>Margen %</th>
             </tr>
           </thead>
           <tbody>

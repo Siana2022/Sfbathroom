@@ -1125,16 +1125,18 @@ table.tabla .td-pos { color: var(--verde); }
 /* ---------------- Tarta y layout en dos columnas ---------------- */
 
 .split-columnas {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 20px;
-  align-items: start;
+  display: block;
   margin-top: 12px;
 }
 
-@media (max-width: 980px) {
-  .split-columnas { grid-template-columns: 1fr; }
+.split-columnas > .tarta {
+  margin: 20px auto 4px;
+  max-width: 460px;
 }
+
+/* Ayuda al pasar el ratón por las cabeceras de tabla. */
+table.tabla th[title] { cursor: help; border-bottom-style: dashed; }
+table.tabla td[title] { cursor: help; }
 
 .tarta { display: flex; flex-direction: column; align-items: center; gap: 14px; }
 
