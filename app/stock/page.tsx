@@ -68,7 +68,8 @@ export default async function StockPage({ searchParams }: { searchParams: Search
                 <th className="td-num" title="Unidades en stock sumando almacenes y lotes.">Stock</th>
                 <th className="td-num" title="Punto de pedido configurado en el artículo.">Punto pedido</th>
                 <th className="td-num" title="Unidades vendidas en 90 días dividido entre 90.">Consumo/día</th>
-                <th className="td-num" title="Unidades sugeridas a comprar para cubrir 45 días.">Comprar</th>
+                <th className="td-num" title="Pedidas a proveedor pendientes de recibir.">En mar</th>
+                <th className="td-num" title="Unidades sugeridas a comprar para cubrir 45 días, descontando lo que ya viene.">Comprar</th>
               </tr>
             </thead>
             <tbody>
@@ -81,6 +82,7 @@ export default async function StockPage({ searchParams }: { searchParams: Search
                   <td className="td-num">{numero(a.stock)}</td>
                   <td className="td-num">{a.punto > 0 ? numero(a.punto) : '—'}</td>
                   <td className="td-num">{a.mediaDiaria.toFixed(2)}</td>
+                  <td className="td-num">{a.enMar > 0 ? numero(a.enMar) : '—'}</td>
                   <td className="td-num">{a.propuesta > 0 ? numero(a.propuesta) : '—'}</td>
                 </tr>
               ))}
@@ -92,7 +94,9 @@ export default async function StockPage({ searchParams }: { searchParams: Search
       <div className="card">
         <h2>Existencias por artículo</h2>
         <p className="nota" style={{ color: 'var(--muted)', marginTop: 0 }}>
-          Cada artículo agrupa sus modelos, almacenes y lotes. Pincha para desplegarlos.
+          Cada artículo agrupa sus modelos, almacenes y lotes. Pincha para desplegarlos. El coste sale
+          del precio de compra por el cambio de la factura del lote; si no hay compra de ese lote, se
+          usa la última del artículo.
         </p>
         <form method="get" action="/stock" style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'end', marginBottom: 16 }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -127,7 +131,7 @@ export default async function StockPage({ searchParams }: { searchParams: Search
           <div style={{ marginLeft: 'auto' }}>
             <DescargarExcel
               nombre={`stock-${d.empresa.codigo.toLowerCase()}`}
-              columnas={['Artículo', 'Nombre', 'Almacén', 'Almacén nombre', 'Lote', 'Stock', 'Coste medio', 'Valor', 'Ubicación']}
+              columnas={['Artículo', 'Nombre', 'Almacén', 'Almacén nombre', 'Lote', 'Stock', 'Coste', 'Valor', 'Ubicación']}
               registros={d.filas.map((f) => [
                 f.articulo_codigo,
                 f.articulo_nombre ?? '',
@@ -135,8 +139,8 @@ export default async function StockPage({ searchParams }: { searchParams: Search
                 f.almacen_nombre ?? '',
                 f.lote,
                 f.unidades,
-                f.coste_medio ?? '',
-                f.unidades * Number(f.coste_medio ?? 0),
+                f.coste ?? '',
+                f.unidades * Number(f.coste ?? 0),
                 f.ubicacion ?? '',
               ])}
             />

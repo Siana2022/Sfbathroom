@@ -36,7 +36,8 @@
     "stock:dot": "tsx --env-file=.env src/vuelo-stock.ts --empresa DOT",
     "stock:todos": "npm run stock:sf && npm run stock:fux && npm run stock:dot",
     "enlazar:pedidos": "node --env-file=.env enlazar-pedidos.mjs",
-    "pedidos": "node --env-file=.env vuelo-pedidos.mjs"
+    "pedidos": "node --env-file=.env vuelo-pedidos.mjs",
+    "compras": "node --env-file=.env vuelo-compras.mjs"
   },
   "dependencies": {
     "mssql": "^11.0.1"
