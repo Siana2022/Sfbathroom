@@ -77,7 +77,21 @@ async function main() {
         console.log(`  clave: ${clave.join(', ')}`);
       }
 
-      // 3. Muestras
+      // 3. Nombres reales de columnas clave (TOP 1 *)
+      for (const tabla of ['LINEALBA', 'LINEPEDI', 'CABEALBC', 'CABEPEDC']) {
+        const fila = await consulta(`SELECT TOP 1 * FROM ${base}.dbo.${tabla}`);
+        if (!fila || fila.length === 0) {
+          console.log(`\n${tabla}: sin filas.`);
+          continue;
+        }
+        const claves = Object.keys(fila[0]).filter((k) =>
+          /ART|PRECIO|UNIDAD|LOTE|PEND|RECIB|FECHAENTREGA|FECHA|CODCLI|NOMCLI|CAMBIO|PROVE|IDALB|IDPED|SERIE|NUMDOC/i.test(k),
+        );
+        console.log(`\n${tabla} · columnas relevantes con su primer valor:`);
+        console.log('  ' + claves.map((k) => `${k}=${JSON.stringify(fila[0][k])}`).join(' · '));
+      }
+
+      // 4. Muestras
       for (const tabla of ['CABEFACC', 'T_RESERVAS']) {
         const cols = await consulta(
           `SELECT COLUMN_NAME AS col FROM ${base}.INFORMATION_SCHEMA.COLUMNS
