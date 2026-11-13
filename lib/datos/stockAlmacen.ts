@@ -15,6 +15,17 @@ export type FilaStockAlmacen = {
   ubicacion: string | null;
 };
 
+/** Alerta de rotura o necesidad de compra para un artículo. */
+export type AlertaStock = {
+  codigo: string;
+  articulo: string;
+  stock: number;
+  punto: number;
+  mediaDiaria: number;
+  propuesta: number;
+  rotura: boolean;
+};
+
 /** Agrupación por artículo: una cabecera con sus modelos/almacenes/lotes dentro. */
 export type GrupoStock = {
   clave: string;
@@ -28,6 +39,7 @@ export type StockAlmacenResumen = {
   empresa: { codigo: string; nombre: string };
   filas: FilaStockAlmacen[];
   grupos: GrupoStock[];
+  alertas: AlertaStock[];
   totalFilas: number;
   referencias: number;
   refsConStock: number;
@@ -77,7 +89,8 @@ export async function getStockAlmacen(
     return query;
   };
 
-  const [filas, almacenesRaw] = await Promise.all([
+  const hace90 = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+  const [filas, almacenesRaw, artsRes, consumoRes] = await Promise.all([
     todasLasFilas<FilaStockAlmacen>(construir),
     todasLasFilas<{ almacen_codigo: string; almacen_nombre: string | null }>((desde) =>
       supabase
@@ -85,6 +98,21 @@ export async function getStockAlmacen(
         .select('almacen_codigo, almacen_nombre')
         .eq('empresa_id', empresa.id)
         .order('almacen_codigo')
+        .range(desde, desde + TAMANO_PAGINA - 1),
+    ),
+    todasLasFilas<{ id: string; codigo_erp: string; punto_pedido: number | null }>((desde) =>
+      supabase
+        .from('articulos')
+        .select('id, codigo_erp, punto_pedido')
+        .eq('empresa_id', empresa.id)
+        .range(desde, desde + TAMANO_PAGINA - 1),
+    ),
+    todasLasFilas<{ articulo_id: string; unidades: number }>((desde) =>
+      supabase
+        .from('v_consumo_diario')
+        .select('articulo_id, unidades')
+        .eq('empresa_id', empresa.id)
+        .gte('fecha', hace90)
         .range(desde, desde + TAMANO_PAGINA - 1),
     ),
   ]);
@@ -108,6 +136,40 @@ export async function getStockAlmacen(
     }
   }
 
+  // Alertas: rotura (sin stock con ventas) y bajo punto de pedido.
+  const codigoPorId = new Map(artsRes.map((a) => [a.id, a.codigo_erp]));
+  const puntoPorCodigo = new Map(artsRes.map((a) => [a.codigo_erp, Number(a.punto_pedido ?? 0)]));
+  const consumoPorCodigo = new Map<string, number>();
+  for (const c of consumoRes) {
+    const codigo = codigoPorId.get(c.articulo_id);
+    if (!codigo) continue;
+    consumoPorCodigo.set(codigo, (consumoPorCodigo.get(codigo) ?? 0) + Number(c.unidades ?? 0));
+  }
+  const stockPorCodigo = new Map<string, number>();
+  for (const f of filas) {
+    stockPorCodigo.set(f.articulo_codigo, (stockPorCodigo.get(f.articulo_codigo) ?? 0) + Number(f.unidades ?? 0));
+  }
+
+  const alertas: AlertaStock[] = [];
+  for (const [codigo, stock] of stockPorCodigo) {
+    const consumo = consumoPorCodigo.get(codigo) ?? 0;
+    const media = consumo / 90;
+    const punto = puntoPorCodigo.get(codigo) ?? 0;
+    const propuesta = media > 0 ? Math.max(0, Math.round(media * 45 - stock)) : 0;
+    const rotura = stock <= 0 && consumo > 0;
+    if (!rotura && !(punto > 0 && stock < punto) && propuesta <= 0) continue;
+    alertas.push({
+      codigo,
+      articulo: filas.find((f) => f.articulo_codigo === codigo)?.articulo_nombre ?? codigo,
+      stock,
+      punto,
+      mediaDiaria: media,
+      propuesta,
+      rotura,
+    });
+  }
+  alertas.sort((a, b) => Number(b.rotura) - Number(a.rotura) || b.propuesta - a.propuesta);
+
   const gruposMap = new Map<string, GrupoStock>();
   for (const f of filas) {
     const nombre = (f.articulo_nombre ?? '').trim() || f.articulo_codigo;
@@ -129,6 +191,7 @@ export async function getStockAlmacen(
     empresa: { codigo: empresa.codigo, nombre: empresa.nombre },
     filas,
     grupos,
+    alertas: alertas.slice(0, 25),
     totalFilas: filas.length,
     referencias: todasRefs.size,
     refsConStock: conStock.size,
