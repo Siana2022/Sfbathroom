@@ -129,9 +129,8 @@ export async function getAlertas(codigoEmpresa: string, anio: number): Promise<A
 
   const stockRoturas = stock.roturas;
   const vencido = cobros.vencido;
-  const umbralRetraso = umbralDe(configMap, 'proveedores.retraso');
-  // Solo cuentan los proveedores cuyo plazo REAL excede el pactado en más del umbral.
-  const proveedoresConRetraso = concentracion.riesgoProveedor.filter((p) => p.plazoReal !== null && p.plazoReal - p.plazo > umbralRetraso).length;
+  // El riesgo de proveedor se retiró de Concentración; la alerta queda a 0.
+  const proveedoresConRetraso = 0;
   const familiasDependientes = concentracion.riesgo.length;
   const umbralDso = umbralDe(configMap, 'cobros.dso');
   const clientesDsoAlAlza = cobros.porCliente.filter((c) => {

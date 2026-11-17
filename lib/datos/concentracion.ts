@@ -21,16 +21,7 @@ export type ConcentracionData = {
   refs80: number;
   porPais: { pais: string; neta: number; pct: number }[];
   riesgo: { familia: string; cliente: string; netaFamilia: number; pctCliente: number }[];
-  riesgoProveedor: {
-    proveedor: string;
-    pais: string;
-    plazo: number;
-    plazoReal: number | null;
-    volumen: number;
-    pctVolumen: number;
-    chino: boolean;
-    plazoAlto: boolean;
-  }[];
+
 };
 
 export const UMBRAL_FAMILIA_RELEVANTE = 0.08;
@@ -52,58 +43,6 @@ const NOMBRE_PAIS: Record<string, string> = {
 
 const DIA_MS = 86400000;
 
-async function getRiesgoProveedorList(supabase: ReturnType<typeof createClient>, empresaId: string): Promise<ConcentracionData['riesgoProveedor']> {
-  const [proveedores, gastos] = await Promise.all([
-    todasLasFilas<{ codigo_erp: string; nombre: string; pais: string | null; plazo_suministro: number | null }>((desde) =>
-      supabase
-        .from('proveedores')
-        .select('codigo_erp, nombre, pais, plazo_suministro')
-        .eq('empresa_id', empresaId)
-        .range(desde, desde + TAMANO_PAGINA - 1)
-    ),
-    todasLasFilas<{ proveedor_codigo: string; base_imponible: number | null }>((desde) =>
-      supabase
-        .from('gastos_logistica')
-        .select('proveedor_codigo, base_imponible')
-        .eq('empresa_id', empresaId)
-        .range(desde, desde + TAMANO_PAGINA - 1)
-    ),
-  ]);
-
-  const proveedorPorCodigo = new Map<string, { nombre: string; pais: string | null; plazo_suministro: number | null }>();
-  for (const p of proveedores) {
-    if (p.codigo_erp) proveedorPorCodigo.set(String(p.codigo_erp).trim(), p);
-  }
-
-  const volumen = new Map<string, number>();
-  for (const g of gastos) {
-    const codigo = String(g.proveedor_codigo ?? '').trim();
-    if (!codigo) continue;
-    volumen.set(codigo, (volumen.get(codigo) ?? 0) + Number(g.base_imponible ?? 0));
-  }
-  let volumenTotal = 0;
-  for (const v of volumen.values()) volumenTotal += v;
-
-  return [...volumen.entries()]
-    .filter(([, v]) => v > 0)
-    .map(([codigo, vol]) => {
-      const p = proveedorPorCodigo.get(codigo);
-      const plazo = Number(p?.plazo_suministro ?? 0);
-      const pais = p?.pais ?? '—';
-      return {
-        proveedor: p?.nombre ?? codigo,
-        pais,
-        plazo,
-        plazoReal: null,
-        volumen: vol,
-        pctVolumen: volumenTotal > 0 ? (vol / volumenTotal) * 100 : 0,
-        chino: pais.toLowerCase() === 'china',
-        plazoAlto: plazo > PLAZO_PROVEEDOR_ALTO_DIAS,
-      };
-    })
-    .sort((a, b) => b.volumen - a.volumen);
-}
-
 export async function getConcentracion(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<ConcentracionData> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
@@ -111,7 +50,7 @@ export async function getConcentracion(codigoEmpresa: string, anio: number, filt
   // Camino rápido sin filtros: facturas + líneas en una sola llamada (RPC ventas_anio).
   const sinFiltros = !filtros || !hayFiltros(filtros);
 
-  const [ventas, clisRes, articulosRes, riesgoProveedor] = await Promise.all([
+  const [ventas, clisRes, articulosRes] = await Promise.all([
     sinFiltros ? ventasAnioRpc(supabase, codigoEmpresa, anio) : Promise.resolve(null),
     todasLasFilas<FilaCliente>((desde) =>
       supabase
@@ -127,7 +66,6 @@ export async function getConcentracion(codigoEmpresa: string, anio: number, filt
         .eq('empresa_id', empresa.id)
         .range(desde, desde + TAMANO_PAGINA - 1)
     ),
-    getRiesgoProveedorList(supabase, empresa.id),
   ]);
 
   // Facturas y líneas: del RPC si está disponible; si no, camino antiguo (paginado + filtros).
@@ -299,6 +237,5 @@ export async function getConcentracion(codigoEmpresa: string, anio: number, filt
     refs80,
     porPais,
     riesgo,
-    riesgoProveedor,
   };
 }
