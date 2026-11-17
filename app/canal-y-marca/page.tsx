@@ -19,6 +19,8 @@ export default async function CanalMarcaPage({ searchParams }: { searchParams: S
   const opciones = await getOpcionesFiltros(empresa);
   const d = await getCanalMarca(empresa, ANIO, filtros);
 
+  const sbImporte = d.porMarca.find((m) => m.marca === 'Starbath Plus')?.importe ?? 0;
+
   const cabeceraExcel = ['Segmento', 'Importe', '% facturación', 'Unidades', 'Precio medio', 'Clientes', 'Ref. activas', 'Cto. vs año anterior', 'Peso 12M rodante', 'Margen %', 'Margen €'];
   const filasExcel = d.porMarca.map((m) => [
       m.marca,
@@ -45,13 +47,38 @@ export default async function CanalMarcaPage({ searchParams }: { searchParams: S
       <Filtros opciones={opciones} />
 
       <ul className="grid-kpis">
-        <Kpi etiqueta="% facturación Starbath Plus" valor={d.pctStarbath === null ? '—' : `${decimal(d.pctStarbath)} %`} nota="indicador estratégico" />
         <Kpi
-          etiqueta="Diferencial de margen SB − MB"
-          valor={d.diferencialMargen.diffPct === null ? '—' : `${decimal(d.diferencialMargen.diffPct)} %`}
-          nota={d.diferencialMargen.diffEuros === null ? '¿cuánto aporta un punto de traslado?' : `≈ ${eur(d.diferencialMargen.diffEuros)} por punto en % actual`}
+          etiqueta="Facturación Starbath Plus"
+          valor={eur(sbImporte)}
+          nota={d.pctStarbath === null ? 'sin facturación' : `${decimal(d.pctStarbath)} % sobre el total`}
+        />
+        <Kpi
+          etiqueta="Objetivo anual"
+          valor={d.objetivoAnual > 0 ? eur(d.objetivoAnual) : '—'}
+          nota={
+            d.objetivoAnual > 0
+              ? `${decimal((sbImporte / d.objetivoAnual) * 100)} % de avance`
+              : 'Configúralo en /configuracion (ventas · objetivo_starbath)'
+          }
         />
       </ul>
+
+      <div className="card">
+        <h2>Facturación Starbath Plus frente al objetivo</h2>
+        <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 0 }}>
+          Barras: facturación mensual Starbath Plus. Línea de referencia: objetivo anual repartido en 12 meses.
+        </p>
+        <GraficoBarras
+          series={d.pctStarbathMensual.map((m) => ({
+            etiqueta: m.mes,
+            valor: m.sb,
+            valor2: d.objetivoAnual > 0 ? d.objetivoAnual / 12 : null,
+            titulo: `${m.mes}: ${eur(m.sb)}${d.objetivoAnual > 0 ? ` · objetivo ${eur(d.objetivoAnual / 12)}` : ''}`,
+          }))}
+          formato={eur}
+          leyenda={{ a: 'Facturado Starbath Plus', b: 'Objetivo mensual' }}
+        />
+      </div>
 
       {(d.calidad.pctSinMarca > 0.5 || d.calidad.pctSinCanal > 0.5) && (
         <Aviso tipo="info">
@@ -139,55 +166,6 @@ export default async function CanalMarcaPage({ searchParams }: { searchParams: S
         />
       </div>
 
-      <div className="card">
-        <h2>Facturación por canal</h2>
-        <table className="tabla">
-          <thead>
-            <tr>
-              <th>Canal</th>
-              <th className="td-num">Importe</th>
-              <th className="td-num">%</th>
-            </tr>
-          </thead>
-          <tbody>
-            {d.porCanal.map((c) => (
-              <tr key={c.canal}>
-                <td>{c.canal}</td>
-                <td className="td-num">{eur(c.importe)}</td>
-                <td className="td-num">{decimal(c.pct)} %</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <Tarta datos={d.porCanal.map((c) => ({ etiqueta: c.canal, valor: c.importe }))} />
-      </div>
-
-      <div className="card">
-        <h2>Marca blanca por cliente-fabricante</h2>
-        <p style={{ color: 'var(--muted)' }}>Dependencia dentro del canal más sustituible.</p>
-        <table className="tabla">
-          <thead>
-            <tr>
-              <th>Cliente</th>
-              <th className="td-num">Importe</th>
-              <th className="td-num">% sobre total</th>
-              <th className="td-num">Margen</th>
-              <th className="td-num">Margen %</th>
-            </tr>
-          </thead>
-          <tbody>
-            {d.marcaBlancaPorCliente.map((c) => (
-              <tr key={c.cliente}>
-                <td>{c.cliente}</td>
-                <td className="td-num">{eur(c.importe)}</td>
-                <td className="td-num">{decimal(c.pct)} %</td>
-                <td className="td-num">{eur(c.margen)}</td>
-                <td className="td-num">{c.margenPct === null ? '—' : `${decimal(c.margenPct)} %`}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
     </div>
   );
 }
