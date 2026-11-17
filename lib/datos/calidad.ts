@@ -19,6 +19,7 @@ export type CalidadData = {
   porEstado: { estado: string; count: number }[];
   devolucionesArticulo: { articulo: string; unidades: number; importe: number }[];
   devolucionesFamilia: { familia: string; unidades: number; importe: number }[];
+  devolucionesCliente: { nombre: string; unidades: number; importe: number }[];
 };
 
 const TIPO_LABEL: Record<string, string> = {
@@ -30,7 +31,7 @@ const TIPO_LABEL: Record<string, string> = {
 };
 
 type Fila = { tipo: string; importe: number; estado: string; cliente_id: string | null };
-type FilaAbonoLinea = { articulo_id: string | null; cantidad: number; importe: number; coste_unitario: number | null };
+type FilaAbonoLinea = { factura_id: string; articulo_id: string | null; cantidad: number; importe: number; coste_unitario: number | null };
 
 export async function getCalidad(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<CalidadData> {
   const supabase = createClient();
@@ -43,8 +44,9 @@ export async function getCalidad(codigoEmpresa: string, anio: number, filtros?: 
   let neta = 0;
   let importeDevoluciones = 0;
   const idsAbonos: string[] = [];
+  const clienteDeFactura = new Map<string, string>();
   {
-    let facturas: { id: string; tipo_documento: string; base_imponible: number }[];
+    let facturas: { id: string; tipo_documento: string; base_imponible: number; cliente_id?: string | null }[];
     if (ventas) {
       facturas = ventas.facturas as unknown as { id: string; tipo_documento: string; base_imponible: number }[];
     } else {
@@ -52,7 +54,7 @@ export async function getCalidad(codigoEmpresa: string, anio: number, filtros?: 
       const filas = await todasLasFilas<{ id: string; tipo_documento: string; base_imponible: number }>((desde) =>
         supabase
           .from('facturas')
-          .select('id, tipo_documento, base_imponible')
+          .select('id, tipo_documento, base_imponible, cliente_id')
           .eq('empresa_id', empresa.id)
           .gte('fecha', `${anio}-01-01`)
           .lte('fecha', `${anio}-12-31`)
@@ -62,6 +64,7 @@ export async function getCalidad(codigoEmpresa: string, anio: number, filtros?: 
     }
     for (const f of facturas) {
       const base = Number(f.base_imponible ?? 0);
+      if (f.cliente_id) clienteDeFactura.set(f.id, f.cliente_id);
       if (f.tipo_documento === 'abono') {
         importeDevoluciones += Math.abs(base);
         idsAbonos.push(f.id);
@@ -80,6 +83,7 @@ export async function getCalidad(codigoEmpresa: string, anio: number, filtros?: 
   );
   const articuloPorId = new Map(articulos.map((a) => [a.id, a]));
 
+  const devCliente = new Map<string, { unidades: number; importe: number }>();
   const devArticulo = new Map<string, { unidades: number; importe: number }>();
   const devFamilia = new Map<string, { unidades: number; importe: number }>();
   let margenPerdidoDevoluciones = 0;
@@ -103,18 +107,26 @@ export async function getCalidad(codigoEmpresa: string, anio: number, filtros?: 
       dF.unidades += unidades;
       dF.importe += importeAbs;
       devFamilia.set(fam, dF);
+      const clienteId = clienteDeFactura.get(l.factura_id);
+      if (clienteId) {
+        const dC = devCliente.get(clienteId) ?? { unidades: 0, importe: 0 };
+        dC.unidades += unidades;
+        dC.importe += importeAbs;
+        devCliente.set(clienteId, dC);
+      }
       const coste = unidades * Number(l.coste_unitario ?? 0);
       margenPerdidoDevoluciones += Math.max(0, importeAbs - coste);
     }
   }
 
-  const incidencias = await todasLasFilas<Fila & { fecha: string; fecha_cierre: string | null }>((desde) =>
-    supabase
+  const incidencias = await todasLasFilas<Fila & { fecha: string; fecha_cierre: string | null }>((desde) => {
+    let q = supabase
       .from('incidencias')
       .select('tipo, importe, estado, cliente_id, fecha, fecha_cierre')
-      .eq('empresa_id', empresa.id)
-      .range(desde, desde + TAMANO_PAGINA - 1)
-  );
+      .eq('empresa_id', empresa.id);
+    if (filtros?.cliente) q = q.eq('cliente_id', filtros.cliente);
+    return q.range(desde, desde + TAMANO_PAGINA - 1);
+  });
 
   const tipoMap = new Map<string, { count: number; importe: number }>();
   const estadoMap = new Map<string, number>();
@@ -161,6 +173,15 @@ export async function getCalidad(codigoEmpresa: string, anio: number, filtros?: 
     .map(([id, v]) => ({ articulo: articuloPorId.get(id)?.nombre ?? '—', unidades: v.unidades, importe: v.importe }))
     .sort((a, b) => b.importe - a.importe)
     .slice(0, 10);
+  const devClienteIds = [...devCliente.keys()];
+  if (devClienteIds.length) {
+    const { data: clis } = await supabase.from('clientes').select('id, nombre').in('id', devClienteIds);
+    for (const c of clis ?? []) nombreCliente.set((c as { id: string }).id, (c as { nombre: string }).nombre);
+  }
+  const devolucionesCliente = [...devCliente.entries()]
+    .map(([id, v]) => ({ nombre: nombreCliente.get(id) ?? '—', unidades: v.unidades, importe: v.importe }))
+    .sort((a, b) => b.importe - a.importe);
+
   const devolucionesFamilia = [...devFamilia.entries()]
     .map(([familia, v]) => ({ familia, unidades: v.unidades, importe: v.importe }))
     .sort((a, b) => b.importe - a.importe);
@@ -179,5 +200,6 @@ export async function getCalidad(codigoEmpresa: string, anio: number, filtros?: 
     porEstado,
     devolucionesArticulo,
     devolucionesFamilia,
+    devolucionesCliente,
   };
 }
