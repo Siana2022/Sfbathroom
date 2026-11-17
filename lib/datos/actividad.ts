@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getConfiguracionUmbrales } from '@/lib/datos/configuracion';
 import { getRol, puedeVerMargenes } from '@/lib/datos/role';
+import { esComercialValido } from '@/lib/datos/filtros';
+import { contarSufijos, grupoComercial } from '@/lib/agrupacionComercial';
 import { filtrarPorIds, getFacturaIdsFiltradas, hayFiltros, type Filtros } from '@/lib/datos/filtros';
 import { netaDeDocumento } from '@/lib/datos/neta';
 import { lineasPorFacturas } from '@/lib/datos/lineas';
@@ -25,6 +27,7 @@ export type ComercialRow = {
   trimNeta: number;
   saturacionImporte: boolean;
   saturacionClientes: boolean;
+  secciones: ComercialRow[];
 };
 
 export type ActividadData = {
@@ -179,7 +182,9 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
   }
 
   const { data: comerciales } = await supabase.from('comerciales').select('id, nombre').eq('activo', true);
-  const filasComerciales = ((comerciales ?? []) as FilaComercial[]).filter((c) => !filtros?.comercial || c.id === filtros.comercial);
+  const filasComerciales = ((comerciales ?? []) as FilaComercial[]).filter(
+    (c) => esComercialValido(c.nombre) && (!filtros?.comercial || c.id === filtros.comercial),
+  );
 
   const rol = await getRol();
   const sinAccesoMargen = !puedeVerMargenes(rol);
@@ -212,8 +217,49 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
       trimNeta: v?.trimNeta ?? 0,
       saturacionImporte: (v?.trimNeta ?? 0) > satImporte,
       saturacionClientes: activosAnio.size > satClientes,
+      secciones: [],
     };
   }).sort((a, b) => b.neta - a.neta);
 
-  return { empresa, anio, sinAccesoMargen, comerciales: comercialesRes };
+  return { empresa, anio, sinAccesoMargen, comerciales: agrupar(comercialesRes) };
+}
+
+// ─── Agrupación por cabecera (STARBATH / BIGMAT o sufijo repetido) ───
+function agrupar(filas: ComercialRow[]): ComercialRow[] {
+  const sufijos = contarSufijos(filas.map((f) => f.nombre));
+  const mapa = new Map<string, { base: ComercialRow; secciones: ComercialRow[]; descuentoPonderado: number }>();
+
+  for (const f of filas) {
+    const { base, seccion } = grupoComercial(f.nombre, sufijos);
+    const g = mapa.get(base) ?? {
+      base: { ...f, nombre: base, secciones: [] },
+      secciones: [],
+      descuentoPonderado: 0,
+    };
+
+    g.base.neta += f.neta;
+    g.base.facturas += f.facturas;
+    g.base.clientes += f.clientes;
+    g.base.pedidos += f.pedidos;
+    g.base.presupuesto += f.presupuesto;
+    g.base.nuevos += f.nuevos;
+    g.base.perdidos += f.perdidos;
+    g.base.trimNeta += f.trimNeta;
+    g.base.margenAbs = (g.base.margenAbs ?? 0) + (f.margenAbs ?? 0);
+    g.descuentoPonderado += f.descuentoMedio * f.facturas;
+    if (seccion) g.secciones.push({ ...f, nombre: seccion, secciones: [] });
+
+    mapa.set(base, g);
+  }
+
+  const salida: ComercialRow[] = [];
+  for (const g of mapa.values()) {
+    const b = g.base;
+    b.descuentoMedio = b.facturas > 0 ? g.descuentoPonderado / b.facturas : 0;
+    b.margenPct = b.margenAbs !== null && b.neta > 0 ? (b.margenAbs / b.neta) * 100 : null;
+    b.cumplimientoPct = b.presupuesto > 0 ? (b.neta / b.presupuesto) * 100 : null;
+    b.secciones = g.secciones.sort((a, b2) => b2.neta - a.neta);
+    salida.push(b);
+  }
+  return salida.sort((a, b) => b.neta - a.neta);
 }
