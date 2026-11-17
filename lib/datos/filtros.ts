@@ -181,7 +181,7 @@ export async function getFacturaIdsFiltradas(
 ): Promise<Set<string> | null> {
   const { cliente, comercial, familia, marca, desde, hasta } = filtros;
   const porArticulo = Boolean(familia);
-  const sinRestriccion = !cliente && !comercial && !porArticulo && !desde && !hasta;
+  const sinRestriccion = !cliente && !comercial && !marca && !porArticulo && !desde && !hasta;
   if (sinRestriccion) return null;
 
   const gte = desde ?? baseDesde;
@@ -251,7 +251,7 @@ export async function getPedidoIdsFiltrados(
 ): Promise<Set<string> | null> {
   const { cliente, familia, marca, desde, hasta } = filtros;
   const porArticulo = Boolean(familia || marca);
-  const sinRestriccion = !cliente && !porArticulo && !desde && !hasta;
+  const sinRestriccion = !cliente && !marca && !porArticulo && !desde && !hasta;
   if (sinRestriccion) return null;
 
   const gte = desde ?? baseDesde;
