@@ -127,7 +127,8 @@ export async function getOpcionesFiltros(
         .eq('empresa_id', empresa.id)
         .range(desde, desde + TAMANO_PAGINA - 1)
     ),
-    supabase.from('marcas').select('id, nombre').eq('empresa_id', empresa.id).order('nombre'),
+    // `marcas` no tiene empresa_id (son globales); filtrar por él dejaba el desplegable vacío.
+    supabase.from('marcas').select('id, nombre').eq('activo', true).order('nombre'),
   ]);
 
   let opcionesClientes = clientes.map((c) => ({ id: c.id, nombre: c.nombre }));
