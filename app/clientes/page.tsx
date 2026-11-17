@@ -40,6 +40,42 @@ export default async function ClientesPage({ searchParams }: { searchParams: Sea
       />
 
       <div className="card">
+        <h2>Semáforo de fuga</h2>
+        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
+          Clientes activos con días sin pedir por encima de su frecuencia histórica. Rojo:
+          más de 2,5 veces su frecuencia habitual. Ámbar: entre su frecuencia y 2,5 veces.
+        </p>
+        {d.semaforo.length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>Ningún cliente activo está por encima de su frecuencia habitual.</p>
+        ) : (
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th className="td-num">Días sin pedir</th>
+                <th className="td-num">Frecuencia habitual</th>
+                <th>Semáforo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {d.semaforo.map((c) => (
+                <tr key={c.id}>
+                  <td>{c.nombre}</td>
+                  <td className="td-num">{numero(c.diasSin)}</td>
+                  <td className="td-num">{c.frecuencia === null ? '—' : `${decimal(c.frecuencia)} días`}</td>
+                  <td>
+                    <span className={c.nivel === 'aviso' ? 'badge pendiente' : 'badge construccion'}>
+                      {c.nivel === 'aviso' ? 'ámbar' : 'rojo'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="card">
         <h2>Clientes sin actividad en más de 12 meses</h2>
         <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
           Clientes sin facturar desde hace más de 12 meses, con su comercial asignado.
@@ -180,41 +216,6 @@ export default async function ClientesPage({ searchParams }: { searchParams: Sea
         </div>
       </div>
 
-      <div className="card">
-        <h2>Semáforo de fuga</h2>
-        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
-          Clientes activos con días sin pedir por encima de su frecuencia histórica. Rojo:
-          más de 2,5 veces su frecuencia habitual. Ámbar: entre su frecuencia y 2,5 veces.
-        </p>
-        {d.semaforo.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>Ningún cliente activo está por encima de su frecuencia habitual.</p>
-        ) : (
-          <table className="tabla">
-            <thead>
-              <tr>
-                <th>Cliente</th>
-                <th className="td-num">Días sin pedir</th>
-                <th className="td-num">Frecuencia habitual</th>
-                <th>Semáforo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.semaforo.map((c) => (
-                <tr key={c.id}>
-                  <td>{c.nombre}</td>
-                  <td className="td-num">{numero(c.diasSin)}</td>
-                  <td className="td-num">{c.frecuencia === null ? '—' : `${decimal(c.frecuencia)} días`}</td>
-                  <td>
-                    <span className={c.nivel === 'aviso' ? 'badge pendiente' : 'badge construccion'}>
-                      {c.nivel === 'aviso' ? 'ámbar' : 'rojo'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
     </div>
   );
 }
