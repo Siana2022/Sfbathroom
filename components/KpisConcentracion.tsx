@@ -46,7 +46,10 @@ export default function KpisConcentracion({ netaTotal, numClientes, top1, top3, 
           ? pareto.slice(0, 10)
           : pareto.slice(0, 500);
 
-  const tarjeta = (etiqueta: string, valor: string, nota: string, v?: Vista) => (
+  const lecturaHhi =
+    hhi < 1500 ? 'Cartera diversificada' : hhi <= 2500 ? 'Concentración moderada' : 'Muy concentrada';
+
+  const tarjeta = (etiqueta: string, valor: string, nota: string, v?: Vista, pequeno = false) => (
     <li
       className={`kpi${v ? ' kpi-clic' : ''}`}
       onClick={v ? () => setVista(v) : undefined}
@@ -55,7 +58,7 @@ export default function KpisConcentracion({ netaTotal, numClientes, top1, top3, 
       onKeyDown={v ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setVista(v); } } : undefined}
     >
       <span className="kpi-etiqueta">{etiqueta}</span>
-      <strong className="kpi-valor">{valor}</strong>
+      <strong className="kpi-valor" style={pequeno ? { fontSize: 19, lineHeight: 1.25 } : undefined}>{valor}</strong>
       <span className="kpi-nota">{nota}</span>
       {v ? <span className="kpi-ver">Ver clientes →</span> : null}
     </li>
@@ -68,7 +71,7 @@ export default function KpisConcentracion({ netaTotal, numClientes, top1, top3, 
         {tarjeta('% top 1', top1 === null ? '—' : `${decimal(top1)} %`, 'mayor cliente sobre el total', 'top1')}
         {tarjeta('% top 3', top3 === null ? '—' : `${decimal(top3)} %`, 'tres mayores clientes', 'top3')}
         {tarjeta('% top 10', top10 === null ? '—' : `${decimal(top10)} %`, 'diez mayores clientes', 'top10')}
-        {tarjeta('Índice de Herfindahl', decimal(hhi), '×10.000 (mayor = más concentrado)', 'hhi')}
+        {tarjeta('Concentración de clientes', lecturaHhi, `HHI ${decimal(hhi)} · ×10.000`, 'hhi', true)}
       </ul>
 
       {vista ? (
@@ -76,7 +79,9 @@ export default function KpisConcentracion({ netaTotal, numClientes, top1, top3, 
           <div className="modal-caja modal-ancho" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
               <div>
-                <h3 style={{ margin: 0 }}>{TITULO[vista]}</h3>
+                <h3 style={{ margin: 0 }}>
+                  {vista === 'hhi' ? `Concentración de clientes: ${lecturaHhi}` : TITULO[vista]}
+                </h3>
                 {vista === 'hhi' ? (
                   <p style={{ color: 'var(--muted)', margin: '6px 0 0', fontSize: 13, maxWidth: 720 }}>
                     El HHI suma los cuadrados de la cuota de cada cliente. Menos de 1.500 = cartera
