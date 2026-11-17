@@ -111,7 +111,16 @@ export async function getOpcionesFiltros(
 
   return {
     clientes: opcionesClientes,
-    comerciales: (comerciales.data ?? []).map((c) => ({ id: c.id, nombre: c.nombre })),
+    comerciales: (comerciales.data ?? [])
+      .filter((c) => {
+        const n = String(c.nombre ?? '').trim();
+        if (n === '' || n === '—' || n === '-') return false;
+        if (/^sin nombre$/i.test(n)) return false;
+        if (/utilizar pr[oó]ximo comercial/i.test(n)) return false;
+        if (/^(prueba|test|zz)/i.test(n)) return false;
+        return true;
+      })
+      .map((c) => ({ id: c.id, nombre: c.nombre })),
     familias: [...new Set(articulosFam.map((a) => a.familia).filter((f): f is string => Boolean(f)))]
       .sort((a, b) => a.localeCompare(b, 'es'))
       .map((f) => ({ id: f, nombre: f })),

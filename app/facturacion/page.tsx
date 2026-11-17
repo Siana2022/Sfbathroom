@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { getFacturacion, getVariacion, getRankingsFacturacion, getSeriesKpisMensual } from '@/lib/datos/facturacion';
@@ -196,18 +197,32 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
               </tr>
             </thead>
             <tbody>
-              {rk.comerciales.map((c, i) => {
+              {rk.comerciales.map((c) => {
                 const vp = c.importePrev > 0 ? ((c.importe - c.importePrev) / c.importePrev) * 100 : null;
                 return (
-                  <tr key={i}>
-                    <td>{c.comercial}</td>
-                    <td className="td-num">{c.anio}</td>
-                    <td className="td-num">{eur(c.importe)}</td>
-                    <td className="td-num">{numero(c.unidades)}</td>
-                    <td className={`td-num ${vp != null && vp >= 0 ? 'td-pos' : ''}`}>
-                      {vp === null ? '—' : `${vp > 0 ? '+' : ''}${decimal(vp)} %`}
-                    </td>
-                  </tr>
+                  <Fragment key={c.comercial}>
+                    <tr>
+                      <td>{c.secciones.length > 0 ? <strong>{c.comercial}</strong> : c.comercial}</td>
+                      <td className="td-num">{c.anio}</td>
+                      <td className="td-num">{eur(c.importe)}</td>
+                      <td className="td-num">{numero(c.unidades)}</td>
+                      <td className={`td-num ${vp != null && vp >= 0 ? 'td-pos' : ''}`}>
+                        {vp === null ? '—' : `${vp > 0 ? '+' : ''}${decimal(vp)} %`}
+                      </td>
+                    </tr>
+                    {c.secciones.map((s) => {
+                      const sp = s.importePrev > 0 ? ((s.importe - s.importePrev) / s.importePrev) * 100 : null;
+                      return (
+                        <tr key={`${c.comercial}-${s.nombre}`} style={{ color: 'var(--muted)' }}>
+                          <td style={{ paddingLeft: 24 }}>· {s.nombre}</td>
+                          <td className="td-num">{c.anio}</td>
+                          <td className="td-num">{eur(s.importe)}</td>
+                          <td className="td-num">{numero(s.unidades)}</td>
+                          <td className="td-num">{sp === null ? '—' : `${sp > 0 ? '+' : ''}${decimal(sp)} %`}</td>
+                        </tr>
+                      );
+                    })}
+                  </Fragment>
                 );
               })}
             </tbody>

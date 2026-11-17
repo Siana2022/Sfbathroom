@@ -3,6 +3,7 @@ import { filtrarPorIds, getFacturaIdsFiltradas, hayFiltros, type Filtros } from 
 import { lineasPorFacturas } from '@/lib/datos/lineas';
 import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 import { ventasFiltradoRpc } from '@/lib/datos/ventas';
+import { contarSufijos, grupoComercial } from '@/lib/agrupacionComercial';
 
 export type EmpresaSel = { id: string; codigo: string; nombre: string };
 
@@ -565,7 +566,15 @@ export async function getSeriesKpisMensual(
 // ─── Rankings de la pestaña Facturación (RPC perf_rankings_facturacion, 0043) ───
 export type RankingReferencia = { articulo: string; codigo: string | null; unidades: number; neta: number };
 export type RankingCliente = { cliente: string; neta: number; unidades: number; comercial: string; netaPrev: number };
-export type RankingComercial = { comercial: string; anio: number; importe: number; unidades: number; importePrev: number };
+export type RankingComercialSeccion = { nombre: string; importe: number; unidades: number; importePrev: number };
+export type RankingComercial = {
+  comercial: string;
+  anio: number;
+  importe: number;
+  unidades: number;
+  importePrev: number;
+  secciones: RankingComercialSeccion[];
+};
 export type RankingsFacturacion = {
   topReferencias: RankingReferencia[];
   topClientes: RankingCliente[];
@@ -610,12 +619,34 @@ export async function getRankingsFacturacion(
       comercial: c.comercial ?? '—',
       netaPrev: Number(c.neta_prev ?? 0),
     })),
-    comerciales: (d.comerciales ?? []).map((c) => ({
-      comercial: c.comercial ?? '—',
-      anio: Number(c.anio ?? anio),
-      importe: Number(c.importe ?? 0),
-      unidades: Number(c.unidades ?? 0),
-      importePrev: Number(c.importe_prev ?? 0),
-    })),
+    comerciales: agruparComerciales(
+      (d.comerciales ?? []).map((c) => ({
+        comercial: c.comercial ?? '—',
+        anio: Number(c.anio ?? anio),
+        importe: Number(c.importe ?? 0),
+        unidades: Number(c.unidades ?? 0),
+        importePrev: Number(c.importe_prev ?? 0),
+      })),
+    ),
   };
+}
+
+/** Agrupa los comerciales por cabecera (STARBATH/BIGMAT o sufijo repetido). */
+function agruparComerciales(filas: Omit<RankingComercial, 'secciones'>[]): RankingComercial[] {
+  const sufijos = contarSufijos(filas.map((f) => f.comercial));
+  const mapa = new Map<string, RankingComercial>();
+  for (const f of filas) {
+    const { base, seccion } = grupoComercial(f.comercial, sufijos);
+    const g = mapa.get(base) ?? { comercial: base, anio: f.anio, importe: 0, unidades: 0, importePrev: 0, secciones: [] };
+    g.importe += f.importe;
+    g.unidades += f.unidades;
+    g.importePrev += f.importePrev;
+    if (seccion) {
+      g.secciones.push({ nombre: seccion, importe: f.importe, unidades: f.unidades, importePrev: f.importePrev });
+    }
+    mapa.set(base, g);
+  }
+  const salida = [...mapa.values()].sort((a, b) => b.importe - a.importe);
+  for (const g of salida) g.secciones.sort((a, b) => b.importe - a.importe);
+  return salida;
 }
