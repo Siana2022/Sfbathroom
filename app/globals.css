@@ -1233,3 +1233,27 @@ table.tabla td[title] { cursor: help; }
   z-index: 5;
 }
 .split-columnas > .tarta { max-width: 760px; margin: 20px auto 4px; }
+
+/* ---------------- Esqueletos de carga ---------------- */
+.sk {
+  position: relative;
+  overflow: hidden;
+  background: var(--wash);
+  border-radius: 8px;
+}
+.sk::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
+  animation: sk-brillo 1.2s infinite;
+}
+@keyframes sk-brillo {
+  100% { transform: translateX(100%); }
+}
+.sk-titulo { width: 280px; height: 34px; margin: 6px 0 22px; }
+.sk-subtitulo { width: 200px; height: 20px; margin-bottom: 16px; }
+.sk-kpi { height: 104px; border: none; }
+.sk-linea { height: 14px; margin: 12px 0; width: 100%; }
+.sk-linea:nth-child(even) { width: 86%; }

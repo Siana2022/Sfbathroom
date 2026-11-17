@@ -3,6 +3,8 @@ import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import type { Filtros } from '@/lib/datos/filtros';
 import { diasEntre, hoyISO, sumarDias, sumarDiasHabiles } from '@/lib/fechas';
 import { TAMANO_PAGINA, todasLasFilas } from '@/lib/datos/query';
+import { getUsuario } from '@/lib/datos/role';
+import { memo } from '@/lib/perf/memo';
 
 /**
  * Pedidos y cartera.
@@ -130,6 +132,12 @@ function etiquetaPedido(p: FilaPedido): string {
 }
 
 export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<PedidosResumen> {
+  const usuario = await getUsuario();
+  const clave = `pedidos:${usuario?.id ?? 'anon'}:${codigoEmpresa}:${anio}:${JSON.stringify(filtros ?? {})}`;
+  return memo(clave, () => pedidosInterno(codigoEmpresa, anio, filtros));
+}
+
+async function pedidosInterno(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<PedidosResumen> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
 
