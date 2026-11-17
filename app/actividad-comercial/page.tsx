@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { getActividad, type ComercialRow } from '@/lib/datos/actividad';
 import { parseFiltros, getOpcionesFiltros, type SearchParams } from '@/lib/datos/filtros';
 import { eur2, numero, decimal } from '@/lib/formato';
-import Kpi from '@/components/Kpi';
+import KpisActividad from '@/components/KpisActividad';
 import DescargarExcel from '@/components/DescargarExcel';
 import Filtros from '@/components/Filtros';
 import Aviso from '@/components/Aviso';
@@ -106,16 +106,21 @@ export default async function ActividadComercialPage({ searchParams }: { searchP
         </Aviso>
       )}
 
-      <ul className="grid-kpis">
-        <Kpi etiqueta={`Facturación gestionada ${d.anio}`} valor={numero(totalNeta)} nota={`${d.comerciales.length} comerciales activos`} />
-        <Kpi
-          etiqueta="Cumplimiento presupuesto"
-          valor={totalPresupuesto > 0 ? `${decimal((totalNeta / totalPresupuesto) * 100)} %` : '—'}
-          nota={`presupuesto ${numero(totalPresupuesto)} €`}
-        />
-        <Kpi etiqueta="Clientes nuevos" valor={numero(totalNuevos)} nota="incorporados este ejercicio" />
-        <Kpi etiqueta="Clientes perdidos" valor={numero(totalPerdidos)} nota="respecto al ejercicio anterior" />
-      </ul>
+      <KpisActividad
+        anio={d.anio}
+        totalNeta={totalNeta}
+        numComerciales={d.comerciales.length}
+        totalPresupuesto={totalPresupuesto}
+        nuevos={totalNuevos}
+        perdidos={totalPerdidos}
+        comerciales={d.comerciales.map((c) => ({
+          nombre: c.nombre,
+          neta: c.neta,
+          presupuesto: c.presupuesto,
+          cumplimientoPct: c.cumplimientoPct,
+        }))}
+        listas={d.listas}
+      />
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
