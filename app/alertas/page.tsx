@@ -4,6 +4,8 @@ import { eur, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
 import GestionAlerta from '@/components/GestionAlerta';
+import EditorUmbrales from '@/components/EditorUmbrales';
+import { getConfiguracion } from '@/lib/datos/configuracion';
 import { ANIO_ACTUAL } from '@/lib/ejercicio';
 
 
@@ -24,9 +26,8 @@ async function getPerfiles() {
 
 export default async function AlertasPage() {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
-  const d = await getAlertas(empresa, ANIO);
+  const [d, perfiles, cfg] = await Promise.all([getAlertas(empresa, ANIO), getPerfiles(), getConfiguracion()]);
   const criticas = d.senales.filter((s) => s.severidad === 'critico').length;
-  const perfiles = await getPerfiles();
 
   return (
     <div>
@@ -35,7 +36,7 @@ export default async function AlertasPage() {
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
         Avisos por umbral sobre los datos de {d.empresa.nombre}: fuga y clientes no activos, rotura
         de stock, vencidos, DSO al alza, saturación comercial, retraso de proveedor, dependencia de
-        cliente y erosión de precio. Los umbrales se editan en Configuración.
+        cliente y erosión de precio. Cada regla se puede activar, desactivar y ajustar aquí abajo.
       </p>
 
       <ul className="grid-kpis">
@@ -122,6 +123,24 @@ export default async function AlertasPage() {
           </table>
         )}
       </div>
+
+      {cfg.puedesEditar ? (
+        <div className="card">
+          <h2>Configurar alertas</h2>
+          <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
+            Activa o desactiva cada regla y ajusta su umbral. Las reglas desactivadas dejan de
+            aparecer en la lista de señales.
+          </p>
+          <EditorUmbrales umbrales={cfg.umbrales} />
+        </div>
+      ) : (
+        <div className="card">
+          <p style={{ color: 'var(--muted)' }}>
+            La configuración de alertas está restringida a dirección y administradores. Tu rol actual es{' '}
+            <strong>{cfg.rol ?? 'sin sesión'}</strong>.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
