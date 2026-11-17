@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getRol, getUsuario, puedeVerMargenes } from '@/lib/datos/role';
 import { memo } from '@/lib/perf/memo';
+import { grupoComercial } from '@/lib/agrupacionComercial';
 import { filtrarPorIds, getFacturaIdsFiltradas, hayFiltros, type Filtros } from '@/lib/datos/filtros';
 import { lineasPorFacturas } from '@/lib/datos/lineas';
 import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
@@ -77,8 +78,6 @@ const TRAMOS_MARGEN = [
   { tramo: '> 70 %', min: 70, max: Infinity },
 ];
 
-const TOKENS_GRUPO_COMERCIAL = ['STARBATH', 'BIGMAT'];
-
 function margenPct(importe: number, coste: number): number {
   return importe > 0 ? ((importe - coste) / importe) * 100 : 0;
 }
@@ -92,26 +91,6 @@ function pushMap(m: Map<string, { importe: number; coste: number }>, clave: stri
 
 function aCliente(nombre: string, v: { importe: number; coste: number }): MargenCliente {
   return { nombre, importe: v.importe, coste: v.coste, margen: v.importe - v.coste, margenPct: margenPct(v.importe, v.coste) };
-}
-
-/** Agrupa STARBATH/BIGMAT bajo una cabecera y deja el resto del nombre como sección. */
-function agruparComercial(nombre: string, sufijos: Map<string, number>): { base: string; seccion: string | null } {
-  const up = nombre.toUpperCase();
-  for (const token of TOKENS_GRUPO_COMERCIAL) {
-    if (up.includes(token)) {
-      const resto = nombre
-        .replace(new RegExp(token, 'ig'), '')
-        .replace(/^[\s\-–—|/]+|[\s\-–—|/]+$/g, '')
-        .trim();
-      return { base: token, seccion: resto === '' ? null : resto };
-    }
-  }
-  const i = nombre.indexOf(' - ');
-  if (i > 0) {
-    const sufijo = nombre.slice(i + 3).trim();
-    if ((sufijos.get(sufijo) ?? 0) > 1) return { base: sufijo, seccion: nombre.slice(0, i).trim() };
-  }
-  return { base: nombre, seccion: null };
 }
 
 export async function getMargen(
@@ -343,7 +322,7 @@ async function margenInterno(
   }
   const comercialAgrupado = new Map<string, { importe: number; coste: number; secciones: Map<string, { importe: number; coste: number }> }>();
   for (const [nombre, v] of porComercialRaw.entries()) {
-    const { base, seccion } = agruparComercial(nombre, sufijos);
+    const { base, seccion } = grupoComercial(nombre, sufijos);
     const agg = comercialAgrupado.get(base) ?? { importe: 0, coste: 0, secciones: new Map() };
     agg.importe += v.importe;
     agg.coste += v.coste;
