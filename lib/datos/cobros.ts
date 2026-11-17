@@ -246,8 +246,7 @@ export async function getCobros(codigoEmpresa: string, anio: number, filtros?: F
         dsoDelta: dsoRep !== null && dsoCliente !== null ? dsoCliente - dsoRep : null,
       };
     })
-    .sort((a, b) => b.saldo - a.saldo)
-    .slice(0, 10);
+    .sort((a, b) => b.saldo - a.saldo);
 
   return {
     empresa,
