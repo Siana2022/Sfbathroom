@@ -315,12 +315,13 @@ export async function getArticuloIdsFiltrados(
   empresaId: string,
   filtros: Filtros,
 ): Promise<Set<string> | null> {
-  const { familia, marca } = filtros;
-  if (!familia && !marca) return null;
+  // La marca ya no es del artículo (se deduce del comercial), así que el filtro
+  // de producto solo aplica por familia.
+  const { familia } = filtros;
+  if (!familia) return null;
 
   let aq = supabase.from('articulos').select('id').eq('empresa_id', empresaId);
   if (familia) aq = aq.eq('familia', familia);
-  if (marca) aq = aq.eq('marca_id', marca);
   const filas = await todasLasFilas<{ id: string }>((desde) => aq.range(desde, desde + TAMANO_PAGINA - 1));
   return new Set(filas.map((f) => f.id));
 }
