@@ -73,7 +73,7 @@ export const bloques: Bloque[] = [
   {
     numero: '10',
     slug: '/actividad-comercial',
-    titulo: 'Actividad comercial',
+    titulo: 'Trabajo comercial',
     resumen: 'Carga por persona en SF + DOT, clientes gestionados, margen aportado, descuentos aplicados e indicador de saturación.',
     metricas: ['Facturación total gestionada SF + DOT', 'Clientes activos por comercial', 'Descuento medio aplicado', 'Saturación del equipo'],
   },
