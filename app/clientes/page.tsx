@@ -30,15 +30,16 @@ export default async function ClientesPage({ searchParams }: { searchParams: Sea
 
       <ul className="grid-kpis">
         <Kpi etiqueta={`Clientes activos ${d.anio}`} valor={numero(d.activos)} nota={`en ${ANIO - 1}: ${d.activosPrevio}`} />
-        <Kpi etiqueta="Clientes activos 12M" valor={numero(d.activos12m)} nota="con al menos un pedido en los últimos 12 meses" />
+        <Kpi etiqueta="Clientes activos 12M" valor={numero(d.activos12m)} nota="con facturación en los últimos 12 meses" />
         <Kpi etiqueta="Tasa de retención" valor={d.retencion === null ? '—' : `${decimal(d.retencion)} %`} nota="siguen facturando año a año" />
-        <Kpi etiqueta="Nuevos clientes" valor={numero(d.nuevos)} nota="no facturaron el año previo" />
-        <Kpi etiqueta="Recuperados" valor={numero(d.recuperados)} nota="facturaron previo, no el actual" />
-        <Kpi etiqueta="Clientes perdidos / inactivos" valor={numero(d.perdidos)} nota="estado marcado en el CRM" />
+        <Kpi etiqueta="Nuevos clientes" valor={numero(d.nuevos)} nota={`primera factura en ${d.anio}`} />
+        <Kpi etiqueta="Recuperados" valor={numero(d.recuperados)} nota="vuelven tras un año sin comprar" />
+        <Kpi etiqueta="Clientes inactivos" valor={numero(d.inactivos)} nota="entre 12 y 24 meses sin facturar" />
+        <Kpi etiqueta="Clientes perdidos" valor={numero(d.perdidos)} nota="más de 24 meses sin facturar" />
       </ul>
 
       <div className="card">
-        <h2>Clientes sin actividad en 12 meses</h2>
+        <h2>Clientes sin actividad en más de 12 meses</h2>
         <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
           Aviso Q2: clientes con estado activo pero sin facturar desde hace más de 365 días.
           Candidatos a reactivación (o a su clasificación como perdidos).
