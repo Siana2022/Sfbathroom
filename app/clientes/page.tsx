@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { getClientes } from '@/lib/datos/clientes';
 import { parseFiltros, getOpcionesFiltros, type SearchParams } from '@/lib/datos/filtros';
 import { decimal, eur, numero } from '@/lib/formato';
-import Kpi from '@/components/Kpi';
+import KpisClientes from '@/components/KpisClientes';
 import DescargarExcel from '@/components/DescargarExcel';
 import Filtros from '@/components/Filtros';
 import { ANIO_ACTUAL } from '@/lib/ejercicio';
@@ -28,15 +28,16 @@ export default async function ClientesPage({ searchParams }: { searchParams: Sea
 
       <Filtros opciones={opciones} />
 
-      <ul className="grid-kpis">
-        <Kpi etiqueta={`Clientes activos ${d.anio}`} valor={numero(d.activos)} nota={`en ${ANIO - 1}: ${d.activosPrevio}`} />
-        <Kpi etiqueta="Clientes activos 12M" valor={numero(d.activos12m)} nota="con facturación en los últimos 12 meses" />
-        <Kpi etiqueta="Tasa de retención" valor={d.retencion === null ? '—' : `${decimal(d.retencion)} %`} nota="siguen facturando año a año" />
-        <Kpi etiqueta="Nuevos clientes" valor={numero(d.nuevos)} nota={`primera factura en ${d.anio}`} />
-        <Kpi etiqueta="Recuperados" valor={numero(d.recuperados)} nota="vuelven tras un año sin comprar" />
-        <Kpi etiqueta="Clientes inactivos" valor={numero(d.inactivos)} nota="entre 12 y 24 meses sin facturar" />
-        <Kpi etiqueta="Clientes perdidos" valor={numero(d.perdidos)} nota="más de 24 meses sin facturar" />
-      </ul>
+      <KpisClientes
+        anio={d.anio}
+        activos12m={d.activos12m}
+        retencion={d.retencion}
+        nuevos={d.nuevos}
+        recuperados={d.recuperados}
+        inactivos={d.inactivos}
+        perdidos={d.perdidos}
+        listas={d.listas}
+      />
 
       <div className="card">
         <h2>Clientes sin actividad en más de 12 meses</h2>

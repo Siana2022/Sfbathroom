@@ -5,6 +5,26 @@ import { lineasPorFacturas } from '@/lib/datos/lineas';
 import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 import { ventasAnioRpc, ventasFacturasRangoRpc } from '@/lib/datos/ventas';
 
+export type ClienteActividad = {
+  id: string;
+  nombre: string;
+  netaAnio: number;
+  netaPrev: number;
+  neta12m: number;
+  facturasAnio: number;
+  primera: string | null;
+  ultima: string | null;
+  diasSin: number | null;
+};
+
+export type ListasClientes = {
+  activos12m: ClienteActividad[];
+  nuevos: ClienteActividad[];
+  recuperados: ClienteActividad[];
+  inactivos: ClienteActividad[];
+  perdidos: ClienteActividad[];
+};
+
 export type ClientesData = {
   empresa: { id: string; codigo: string; nombre: string };
   anio: number;
@@ -23,6 +43,7 @@ export type ClientesData = {
   noActivos: { nombre: string; diasSin: number; ultimaFactura: string }[];
   movimiento: { nombre: string; netaActual: number; netaPrevia: number; delta: number; deltaPct: number | null }[];
   cohortes: { mes: string; nuevos: number; activos12m: number; retencion: number | null }[];
+  listas: ListasClientes;
 };
 
 type FilaFactura = { id: string; cliente_id: string | null; fecha: string; base_imponible: number };
@@ -35,6 +56,7 @@ type FilaActividad = {
   cliente_id: string;
   primera: string | null;
   ultima: string | null;
+  facturasAnio: number;
   netaAnio: number;
   netaPrev: number;
   neta12m: number;
@@ -140,6 +162,7 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
   let recuperados = 0;
   let retencion: number | null = null;
   let noActivos: ClientesData['noActivos'] = [];
+  const listas: ListasClientes = { activos12m: [], nuevos: [], recuperados: [], inactivos: [], perdidos: [] };
 
   if (actividad) {
     const anioIni = `${anio}-01-01`;
@@ -162,6 +185,36 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
       if (diasSin > 730) perdidos += 1;
       else if (diasSin > 365) inactivos += 1;
     }
+
+    const conDias: ClienteActividad[] = actividad.map((a) => ({
+      id: a.cliente_id,
+      nombre: nombreCliente.get(a.cliente_id) ?? '—',
+      netaAnio: Number(a.netaAnio ?? 0),
+      netaPrev: Number(a.netaPrev ?? 0),
+      neta12m: Number(a.neta12m ?? 0),
+      facturasAnio: Number(a.facturasAnio ?? 0),
+      primera: a.primera,
+      ultima: a.ultima,
+      diasSin: a.ultima ? Math.floor((hoy * DIA - Date.parse(a.ultima)) / DIA) : null,
+    }));
+
+    listas.activos12m = conDias.filter((c) => c.neta12m > 0).sort((a, b) => b.neta12m - a.neta12m).slice(0, 500);
+    listas.nuevos = conDias
+      .filter((c) => c.netaAnio > 0 && c.primera !== null && c.primera >= anioIni)
+      .sort((a, b) => b.netaAnio - a.netaAnio)
+      .slice(0, 500);
+    listas.recuperados = conDias
+      .filter((c) => c.netaAnio > 0 && c.netaPrev <= 0 && c.primera !== null && c.primera < prevIni)
+      .sort((a, b) => b.netaAnio - a.netaAnio)
+      .slice(0, 500);
+    listas.inactivos = conDias
+      .filter((c) => c.diasSin !== null && c.diasSin > 365 && c.diasSin <= 730)
+      .sort((a, b) => (b.diasSin ?? 0) - (a.diasSin ?? 0))
+      .slice(0, 500);
+    listas.perdidos = conDias
+      .filter((c) => c.diasSin !== null && c.diasSin > 730)
+      .sort((a, b) => (b.diasSin ?? 0) - (a.diasSin ?? 0))
+      .slice(0, 500);
 
     noActivos = actividad
       .filter((a) => a.ultima !== null && Math.floor((hoy * DIA - Date.parse(a.ultima)) / DIA) > 365)
@@ -324,5 +377,6 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
     noActivos,
     movimiento,
     cohortes,
+    listas,
   };
 }
