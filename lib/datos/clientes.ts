@@ -15,6 +15,7 @@ export type ClienteActividad = {
   primera: string | null;
   ultima: string | null;
   diasSin: number | null;
+  comercial: string | null;
 };
 
 export type ListasClientes = {
@@ -47,7 +48,7 @@ export type ClientesData = {
 };
 
 type FilaFactura = { id: string; cliente_id: string | null; fecha: string; base_imponible: number };
-type FilaCliente = { id: string; nombre: string; estado: string; fecha_primer_pedido: string | null };
+type FilaCliente = { id: string; nombre: string; estado: string; fecha_primer_pedido: string | null; comercial_id: string | null };
 type FilaArticulo = { id: string; familia: string | null };
 type FilaLinea = { factura_id: string; articulo_id: string | null };
 type FilaPedido = { cliente_id: string | null; fecha_entrada: string };
@@ -142,12 +143,17 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
   const clientes = await todasLasFilas<FilaCliente>((desde) =>
     supabase
       .from('clientes')
-      .select('id, nombre, estado, fecha_primer_pedido')
+      .select('id, nombre, estado, fecha_primer_pedido, comercial_id')
       .eq('empresa_id', empresa.id)
       .range(desde, desde + TAMANO_PAGINA - 1)
   );
 
   const nombreCliente = new Map(clientes.map((c) => [c.id, c.nombre]));
+  const comercialDeCliente = new Map(clientes.map((c) => [c.id, c.comercial_id]));
+  const { data: comercialesRaw } = await supabase.from('comerciales').select('id, nombre');
+  const nombreComercial = new Map(
+    ((comercialesRaw ?? []) as { id: string; nombre: string }[]).map((c) => [c.id, c.nombre]),
+  );
 
   // Actividad agregada en SQL: primera/última factura y facturación por ejercicio.
   const { data: actividadRaw } = await supabase.rpc('clientes_actividad', {
@@ -196,6 +202,7 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
       primera: a.primera,
       ultima: a.ultima,
       diasSin: a.ultima ? Math.floor((hoy * DIA - Date.parse(a.ultima)) / DIA) : null,
+      comercial: nombreComercial.get(comercialDeCliente.get(a.cliente_id) ?? '') ?? null,
     }));
 
     listas.activos12m = conDias.filter((c) => c.neta12m > 0).sort((a, b) => b.neta12m - a.neta12m).slice(0, 500);

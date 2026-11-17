@@ -53,6 +53,7 @@ function Tarjeta({
 
 export default function KpisClientes({ anio, activos12m, retencion, nuevos, recuperados, inactivos, perdidos, listas }: Props) {
   const [sel, setSel] = useState<Clave | null>(null);
+  const [comercial, setComercial] = useState('');
 
   useEffect(() => {
     if (!sel) return;
@@ -63,7 +64,9 @@ export default function KpisClientes({ anio, activos12m, retencion, nuevos, recu
     return () => document.removeEventListener('keydown', onKey);
   }, [sel]);
 
-  const filas: ClienteActividad[] = sel ? listas[sel] : [];
+  const base: ClienteActividad[] = sel ? listas[sel] : [];
+  const comerciales = [...new Set(base.map((c) => c.comercial ?? 'Sin asignar'))].sort((a, b) => a.localeCompare(b, 'es'));
+  const filas = comercial === '' ? base : base.filter((c) => (c.comercial ?? 'Sin asignar') === comercial);
 
   return (
     <>
@@ -94,6 +97,21 @@ export default function KpisClientes({ anio, activos12m, retencion, nuevos, recu
                 <p style={{ color: 'var(--muted)', margin: '4px 0 0', fontSize: 13 }}>
                   {filas.length} {filas.length === 1 ? 'cliente' : 'clientes'} · datos de {anio}
                 </p>
+                {comerciales.length > 1 ? (
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 13 }}>
+                    Comercial
+                    <select
+                      value={comercial}
+                      onChange={(e) => setComercial(e.target.value)}
+                      style={{ padding: '6px 9px', border: '1px solid var(--border-2)', borderRadius: 8 }}
+                    >
+                      <option value="">Todos</option>
+                      {comerciales.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
               </div>
               <button type="button" className="modal-cerrar" onClick={() => setSel(null)} aria-label="Cerrar">✕</button>
             </div>
@@ -103,6 +121,7 @@ export default function KpisClientes({ anio, activos12m, retencion, nuevos, recu
                 <thead>
                   <tr>
                     <th>Cliente</th>
+                    <th>Comercial</th>
                     <th className="td-num">Facturación {anio}</th>
                     <th className="td-num">Facturación {anio - 1}</th>
                     <th className="td-num">Últimos 12M</th>
@@ -116,6 +135,7 @@ export default function KpisClientes({ anio, activos12m, retencion, nuevos, recu
                   {filas.map((c) => (
                     <tr key={c.id}>
                       <td>{c.nombre}</td>
+                      <td>{c.comercial ?? <span style={{ color: 'var(--rojo)' }}>Sin asignar</span>}</td>
                       <td className="td-num">{eur(c.netaAnio)}</td>
                       <td className="td-num">{eur(c.netaPrev)}</td>
                       <td className="td-num">{eur(c.neta12m)}</td>
