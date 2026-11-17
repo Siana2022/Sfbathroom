@@ -37,14 +37,14 @@ export type CanalMarcaData = {
   calidad: { importeSinMarca: number; pctSinMarca: number; importeSinCanal: number; pctSinCanal: number };
 };
 
-type FilaFactura = { id: string; cliente_id: string | null; fecha: string };
+type FilaFactura = { id: string; cliente_id: string | null; comercial_id: string | null; fecha: string };
 type FilaLinea = { factura_id: string; articulo_id: string | null; cantidad: number; importe: number; coste_unitario: number | null };
 type FilaArticulo = { id: string; marca_id: string | null; marca_blanca_cliente_id: string | null; coste_unitario: number | null };
 type FilaMarca = { id: string; nombre: string };
 type FilaCliente = { id: string; canal_id: string | null };
 type FilaCanal = { id: string; nombre: string };
 
-const NOMBRE_SB = 'Starbath Plus';
+const NOMBRE_SB = 'STARBATH';
 
 type SegmentoAgregado = Omit<Segmento, 'pct' | 'precioMedio' | 'crecimientoPct' | 'peso12m' | 'margenPct' | 'margenAbs'> & {
   coste: number;
@@ -60,6 +60,7 @@ async function getSegmentos(
   anioPrevio: number,
   clientesCanal: Map<string, string | null>,
   canalNombre: Map<string, string>,
+  empresaNombre: string,
   filtros?: Filtros,
 ) {
   // Camino rápido sin filtros: facturas + líneas de los dos ejercicios en dos llamadas
@@ -82,7 +83,7 @@ async function getSegmentos(
     const facturasRaw = await todasLasFilas<FilaFactura>((desde) =>
       supabase
         .from('facturas')
-        .select('id, cliente_id, fecha')
+        .select('id, cliente_id, comercial_id, fecha')
         .eq('empresa_id', empresaId)
         .in('tipo_documento', ['factura', 'abono', 'nota_cargo'])
         .gte('fecha', `${anioPrevio}-01-01`)
@@ -128,6 +129,14 @@ async function getSegmentos(
 
   const facturaAnio = new Map(facturas.map((f) => [f.id, Number(f.fecha.slice(0, 4))]));
   const facturaCliente = new Map(facturas.map((f) => [f.id, f.cliente_id]));
+  const facturaComercial = new Map(facturas.map((f) => [f.id, f.comercial_id]));
+  const comercialNombre = new Map<string, string>();
+  {
+    const { data: coms } = await supabase.from('comerciales').select('id, nombre');
+    for (const c of (coms ?? []) as { id: string; nombre: string }[]) comercialNombre.set(c.id, c.nombre);
+  }
+  const esStarbath = (id: string | null) =>
+    String(id ? (comercialNombre.get(id) ?? '') : '').toUpperCase().includes('STARBATH');
   const facturaMes = new Map(facturas.map((f) => [f.id, f.fecha.slice(0, 7)]));
 
   const seg = new Map<string, SegmentoAgregado>();
@@ -140,7 +149,7 @@ async function getSegmentos(
     const cantidad = Number(l.cantidad ?? 0);
     const fi = facturaAnio.get(l.factura_id);
     const a = l.articulo_id ? articuloMap.get(l.articulo_id) : null;
-    const nombreMarca = (a?.marca_id && marcaNombre.get(a.marca_id)) ?? 'Sin marca';
+    const nombreMarca = esStarbath(facturaComercial.get(l.factura_id) ?? null) ? NOMBRE_SB : empresaNombre;
     const costeUnit =
       Number(l.coste_unitario ?? 0) ||
       (l.articulo_id ? (costeMedioArticulo.get(l.articulo_id) ?? 0) : 0) ||
@@ -173,8 +182,8 @@ async function getSegmentos(
       segPrevio.set(nombreMarca, p);
     }
 
-    if (a?.marca_id && mes) {
-      const esSb = marcaNombre.get(a.marca_id) === NOMBRE_SB;
+    if (mes) {
+      const esSb = esStarbath(facturaComercial.get(l.factura_id) ?? null);
       const m = mensual.get(mes) ?? { sb: 0, mb: 0 };
       if (esSb) m.sb += importe;
       else m.mb += importe;
@@ -300,7 +309,7 @@ export async function getCanalMarca(codigoEmpresa: string, anio: number, filtros
     for (const c of (canales ?? []) as FilaCanal[]) canalNombre.set(c.id, c.nombre);
   }
 
-  const r = await getSegmentos(supabase, codigoEmpresa, empresa.id, anio, anioPrevio, clienteCanal, canalNombre, filtros);
+  const r = await getSegmentos(supabase, codigoEmpresa, empresa.id, anio, anioPrevio, clienteCanal, canalNombre, empresa.nombre, filtros);
 
   if (sinAccesoMargen) {
     for (const s of r.porMarca) {
