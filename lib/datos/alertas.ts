@@ -33,6 +33,8 @@ export type Senal = {
   etiqueta: string;
   valor: string;
   severidad: 'ok' | 'aviso' | 'critico';
+  /** Regla de alertas_config que la controla (para poder activarla/desactivarla). */
+  clave?: string;
 };
 
 export type AlertasData = {
@@ -182,56 +184,68 @@ export async function getAlertas(codigoEmpresa: string, anio: number): Promise<A
   const senales: Senal[] = [
     {
       etiqueta: 'Roturas de stock',
+      clave: 'stock.rotura',
       valor: String(stockRoturas),
       severidad: severidad(stockRoturas, umbralDe(configMap, 'stock.rotura'), avisoDe(configMap, 'stock.rotura')),
     },
     {
       etiqueta: 'Referencias bajo punto de pedido',
+      clave: 'stock.bajo_punto_pedido',
       valor: String(stock.bajoPuntoPedido),
       severidad: severidad(stock.bajoPuntoPedido, umbralDe(configMap, 'stock.bajo_punto_pedido'), avisoDe(configMap, 'stock.bajo_punto_pedido')),
     },
     {
       etiqueta: 'Vencido total',
+      clave: 'cobros.vencido_total',
       valor: `${Math.round(vencido)} €`,
       severidad: severidad(vencido, umbralDe(configMap, 'cobros.vencido_total'), avisoDe(configMap, 'cobros.vencido_total')),
     },
     {
       etiqueta: 'Clientes activos sin ventas este año (fuga)',
+      clave: 'clientes.fuga',
       valor: String(fuga),
       severidad: severidad(fuga, umbralDe(configMap, 'clientes.fuga'), avisoDe(configMap, 'clientes.fuga')),
     },
     {
       etiqueta: 'Clientes activos sin pedidos en 12 meses (Q2)',
+      clave: 'clientes.no_activos',
       valor: String(noActivos),
       severidad: severidad(noActivos, umbralDe(configMap, 'clientes.no_activos'), avisoDe(configMap, 'clientes.no_activos')),
     },
     {
       etiqueta: 'Saturación comercial (Q6)',
+      clave: 'comerciales.saturacion_importe',
       valor: `${Math.round(trimNeta / 1000)} k€ trim. · ${activos12m.size} clientes activos`,
       severidad: saturacion ? 'critico' : 'ok',
     },
     {
       etiqueta: 'Proveedores con retraso real',
+      clave: 'proveedores.retraso',
       valor: String(proveedoresConRetraso),
       severidad: conAlerta(proveedoresConRetraso),
     },
     {
       etiqueta: 'Familias dependientes de un cliente',
+      clave: 'concentracion.familia_cliente',
       valor: String(familiasDependientes),
       severidad: conAlerta(familiasDependientes),
     },
     {
       etiqueta: 'Clientes alargando pagos (DSO al alza)',
+      clave: 'cobros.dso',
       valor: String(clientesDsoAlAlza),
       severidad: conAlerta(clientesDsoAlAlza),
     },
     {
       etiqueta: 'Erosión de precio sobre tarifa',
+      clave: 'ventas.erosion_precio',
       valor: erosionPrecio === null ? '—' : String(erosionPrecio),
       severidad: erosionPrecio === null ? 'ok' : conAlerta(erosionPrecio),
     },
-    { etiqueta: 'Cumplimiento de presupuesto', valor: cumplimiento === null ? '—' : `${cumplimiento.toFixed(1)} %`, severidad: 'ok' },
+    { etiqueta: 'Cumplimiento de presupuesto',
+      clave: 'presupuesto.desviacion_mes', valor: cumplimiento === null ? '—' : `${cumplimiento.toFixed(1)} %`, severidad: 'ok' },
   ];
 
-  return { empresa, config: config.filter((c) => c.activo), generadas, senales };
+  const activas = senales.filter((s) => !s.clave || configMap.get(s.clave)?.activo !== false);
+  return { empresa, config: config.filter((c) => c.activo), generadas, senales: activas };
 }
