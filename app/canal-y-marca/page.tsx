@@ -5,6 +5,9 @@ import { decimal, eur } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
 import Filtros from '@/components/Filtros';
+import Aviso from '@/components/Aviso';
+import Tarta from '@/components/Tarta';
+import GraficoBarras from '@/components/GraficoBarras';
 import { ANIO_ACTUAL } from '@/lib/ejercicio';
 
 
@@ -50,6 +53,15 @@ export default async function CanalMarcaPage({ searchParams }: { searchParams: S
         />
       </ul>
 
+      {(d.calidad.pctSinMarca > 0.5 || d.calidad.pctSinCanal > 0.5) && (
+        <Aviso tipo="info">
+          Calidad del dato: <strong>{decimal(d.calidad.pctSinMarca)} %</strong> de la facturación no tiene
+          marca asignada ({eur(d.calidad.importeSinMarca)}) y <strong>{decimal(d.calidad.pctSinCanal)} %</strong>{' '}
+          no tiene canal ({eur(d.calidad.importeSinCanal)}). El reparto por segmento puede no ser fiable
+          hasta completar esos campos en A3ERP.
+        </Aviso>
+      )}
+
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2>Métricas por segmento</h2>
@@ -87,6 +99,7 @@ export default async function CanalMarcaPage({ searchParams }: { searchParams: S
             ))}
           </tbody>
         </table>
+        <Tarta datos={d.porMarca.map((m) => ({ etiqueta: m.marca, valor: m.importe }))} />
       </div>
 
       <div className="card">
@@ -114,6 +127,16 @@ export default async function CanalMarcaPage({ searchParams }: { searchParams: S
             })}
           </tbody>
         </table>
+        <GraficoBarras
+          series={d.pctStarbathMensual.map((m) => ({
+            etiqueta: m.mes,
+            valor: m.sb,
+            valor2: m.mb,
+            titulo: `${m.mes}: Starbath ${eur(m.sb)} · Marca blanca ${eur(m.mb)}`,
+          }))}
+          formato={eur}
+          leyenda={{ a: 'Starbath Plus', b: 'Marca blanca' }}
+        />
       </div>
 
       <div className="card">
@@ -136,6 +159,7 @@ export default async function CanalMarcaPage({ searchParams }: { searchParams: S
             ))}
           </tbody>
         </table>
+        <Tarta datos={d.porCanal.map((c) => ({ etiqueta: c.canal, valor: c.importe }))} />
       </div>
 
       <div className="card">
@@ -147,6 +171,8 @@ export default async function CanalMarcaPage({ searchParams }: { searchParams: S
               <th>Cliente</th>
               <th className="td-num">Importe</th>
               <th className="td-num">% sobre total</th>
+              <th className="td-num">Margen</th>
+              <th className="td-num">Margen %</th>
             </tr>
           </thead>
           <tbody>
@@ -155,6 +181,8 @@ export default async function CanalMarcaPage({ searchParams }: { searchParams: S
                 <td>{c.cliente}</td>
                 <td className="td-num">{eur(c.importe)}</td>
                 <td className="td-num">{decimal(c.pct)} %</td>
+                <td className="td-num">{eur(c.margen)}</td>
+                <td className="td-num">{c.margenPct === null ? '—' : `${decimal(c.margenPct)} %`}</td>
               </tr>
             ))}
           </tbody>

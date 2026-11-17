@@ -21,7 +21,7 @@ export type Segmento = {
   margenAbs: number | null;
 };
 
-export type MarcaBlancaCliente = { cliente: string; importe: number; pct: number };
+export type MarcaBlancaCliente = { cliente: string; importe: number; pct: number; margen: number; margenPct: number | null };
 
 export type CanalMarcaData = {
   empresa: { id: string; codigo: string; nombre: string };
@@ -33,6 +33,7 @@ export type CanalMarcaData = {
   pctStarbathMensual: { mes: string; sb: number; mb: number }[];
   diferencialMargen: { sb: number | null; mb: number | null; diffPct: number | null; diffEuros: number | null };
   marcaBlancaPorCliente: MarcaBlancaCliente[];
+  calidad: { importeSinMarca: number; pctSinMarca: number; importeSinCanal: number; pctSinCanal: number };
 };
 
 type FilaFactura = { id: string; cliente_id: string | null; fecha: string };
@@ -91,6 +92,23 @@ async function getSegmentos(
     lineas = await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, articulo_id, cantidad, importe, coste_unitario', facturas.map((f) => f.id));
   }
 
+  const costeLoteFilas = await todasLasFilas<{ articulo_id: string; coste_completo_unitario: number | null; cantidad: number | null }>((desde) =>
+    supabase
+      .from('v_coste_completo_por_lote')
+      .select('articulo_id, coste_completo_unitario, cantidad')
+      .eq('empresa_id', empresaId)
+      .range(desde, desde + TAMANO_PAGINA - 1),
+  );
+  const costeLoteSum = new Map<string, { suma: number; qty: number }>();
+  for (const l of costeLoteFilas) {
+    const v = costeLoteSum.get(l.articulo_id) ?? { suma: 0, qty: 0 };
+    v.suma += Number(l.coste_completo_unitario ?? 0) * Number(l.cantidad ?? 0);
+    v.qty += Number(l.cantidad ?? 0);
+    costeLoteSum.set(l.articulo_id, v);
+  }
+  const costeMedioArticulo = new Map<string, number>();
+  for (const [id, v] of costeLoteSum) if (v.qty > 0) costeMedioArticulo.set(id, v.suma / v.qty);
+
   const { data: articulosRaw } = await supabase.from('articulos').select('id, marca_id, marca_blanca_cliente_id, coste_unitario').eq('empresa_id', empresaId);
   const articulos = (articulosRaw ?? []) as FilaArticulo[];
   const articuloMap = new Map(articulos.map((a) => [a.id, a]));
@@ -114,7 +132,7 @@ async function getSegmentos(
   const seg = new Map<string, SegmentoAgregado>();
   const segPrevio = new Map<string, { importe: number }>();
   const mensual = new Map<string, { sb: number; mb: number }>();
-  const mbCliente = new Map<string, number>();
+  const mbCliente = new Map<string, { importe: number; coste: number }>();
 
   for (const l of lineas) {
     const importe = Number(l.importe ?? 0);
@@ -122,7 +140,11 @@ async function getSegmentos(
     const fi = facturaAnio.get(l.factura_id);
     const a = l.articulo_id ? articuloMap.get(l.articulo_id) : null;
     const nombreMarca = (a?.marca_id && marcaNombre.get(a.marca_id)) ?? 'Sin marca';
-    const coste = cantidad * Number(l.coste_unitario ?? a?.coste_unitario ?? 0);
+    const costeUnit =
+      Number(l.coste_unitario ?? 0) ||
+      (l.articulo_id ? (costeMedioArticulo.get(l.articulo_id) ?? 0) : 0) ||
+      Number(a?.coste_unitario ?? 0);
+    const coste = cantidad * costeUnit;
     const mes = facturaMes.get(l.factura_id);
 
     if (fi === anio) {
@@ -159,7 +181,10 @@ async function getSegmentos(
     }
 
     if (a?.marca_blanca_cliente_id && facturaCliente.get(l.factura_id) === a.marca_blanca_cliente_id) {
-      mbCliente.set(a.marca_blanca_cliente_id, (mbCliente.get(a.marca_blanca_cliente_id) ?? 0) + importe);
+      const mbv = mbCliente.get(a.marca_blanca_cliente_id) ?? { importe: 0, coste: 0 };
+      mbv.importe += importe;
+      mbv.coste += coste;
+      mbCliente.set(a.marca_blanca_cliente_id, mbv);
     }
   }
 
@@ -224,8 +249,20 @@ async function getSegmentos(
     pctStarbath: sb?.pct ?? null,
     pctStarbathMensual: ventana.map((mes) => ({ mes, sb: mensual.get(mes)!.sb, mb: mensual.get(mes)!.mb })),
     marcaBlancaPorCliente: [...mbCliente.entries()]
-      .map(([id, importe]) => ({ cliente: clienteNombre.get(id) ?? '—', importe, pct: total > 0 ? (importe / total) * 100 : 0 }))
+      .map(([id, v]) => ({
+        cliente: clienteNombre.get(id) ?? '—',
+        importe: v.importe,
+        pct: total > 0 ? (v.importe / total) * 100 : 0,
+        margen: v.importe - v.coste,
+        margenPct: v.importe > 0 ? ((v.importe - v.coste) / v.importe) * 100 : null,
+      }))
       .sort((a, b) => b.importe - a.importe),
+    calidad: {
+      importeSinMarca: porMarca.find((s) => s.marca === 'Sin marca')?.importe ?? 0,
+      pctSinMarca: total > 0 ? ((porMarca.find((s) => s.marca === 'Sin marca')?.importe ?? 0) / total) * 100 : 0,
+      importeSinCanal: porCanal.find((c) => c.canal === 'Sin canal')?.importe ?? 0,
+      pctSinCanal: total > 0 ? ((porCanal.find((c) => c.canal === 'Sin canal')?.importe ?? 0) / total) * 100 : 0,
+    },
     diferencialMargen: {
       sb: sb?.margenPct ?? null,
       mb: mb?.margenPct ?? null,
