@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { OpcionesFiltros } from '@/lib/datos/filtros';
 import SelectorBuscable from '@/components/SelectorBuscable';
+import { contarSufijos, grupoComercial } from '@/lib/agrupacionComercial';
 
 export type CampoFiltro = 'cliente' | 'comercial' | 'familia' | 'marca' | 'desde' | 'hasta';
 
@@ -35,6 +36,17 @@ function FiltrosInner({ opciones, campos }: Props) {
   }
 
   const valor = (clave: string) => sp.get(clave) ?? '';
+
+  // Comerciales agrupados por cabecera (STARBATH / BIGMAT) en el desplegable.
+  const sufijosComercial = contarSufijos(opciones.comerciales.map((o) => o.nombre));
+  const gruposComercial = new Map<string, typeof opciones.comerciales>();
+  for (const o of opciones.comerciales) {
+    const { base } = grupoComercial(o.nombre, sufijosComercial);
+    const lista = gruposComercial.get(base) ?? [];
+    lista.push(o);
+    gruposComercial.set(base, lista);
+  }
+  const comercialesOrdenados = [...gruposComercial.entries()].sort((a, b) => a[0].localeCompare(b[0], 'es'));
   const hayFiltros = [...sp.keys()].some((k) => TODOS.includes(k as CampoFiltro));
 
   return (
@@ -56,10 +68,14 @@ function FiltrosInner({ opciones, campos }: Props) {
           Comercial
           <select value={valor('comercial')} onChange={(e) => setUrl({ comercial: e.target.value || undefined })}>
             <option value="">Todos</option>
-            {opciones.comerciales.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.nombre}
-              </option>
+            {comercialesOrdenados.map(([base, lista]) => (
+              <optgroup key={base} label={base}>
+                {lista.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.nombre}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </label>
