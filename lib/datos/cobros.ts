@@ -22,6 +22,7 @@ export type CobrosData = {
   empresa: { id: string; codigo: string; nombre: string };
   saldoTotal: number;
   vencido: number;
+  vencido90: number;
   enCarteraFuturo: number;
   dso: number | null;
   dsoDesvioDias: number;
@@ -56,31 +57,19 @@ export async function getCobros(codigoEmpresa: string, anio: number, filtros?: F
   if (clienteId) carteraQuery = carteraQuery.eq('cliente_id', clienteId);
   const { data: cartera, error: carteraError } = await carteraQuery;
 
-  const hoyMs = Math.floor(Date.now() / DIA_MS);
-  let filas: FilaAging[] = [];
-  const fuenteCartera = !carteraError && Array.isArray(cartera) && cartera.length > 0;
-  if (fuenteCartera) {
-    filas = (cartera as { cliente_id: string | null; pendiente: number | null; fecha_vencimiento: string | null }[])
-      .filter((c) => Number(c.pendiente ?? 0) !== 0)
-      .map((c) => ({
-        cliente_id: c.cliente_id,
-        pendiente: Number(c.pendiente ?? 0),
-        dias_mora: c.fecha_vencimiento
-          ? Math.floor((hoyMs * DIA_MS - Date.parse(c.fecha_vencimiento)) / DIA_MS)
-          : 0,
-      }));
-  } else {
-    let agingQuery = supabase
-      .from('v_aging')
-      .select('cliente_id, pendiente, dias_mora')
-      .eq('empresa_id', empresa.id);
-    if (clienteId) agingQuery = agingQuery.eq('cliente_id', clienteId);
-    const { data: aging } = await agingQuery;
-    filas = (aging ?? []) as FilaAging[];
-  }
-
   let saldoTotal = 0;
   let vencidoTotal = 0;
+  let vencido90 = 0;
+  let enCarteraFuturo = 0;
+  const vencidoPorCliente = new Map<string, number>();
+  const saldoPorCliente = new Map<string, number>();
+  const buckets: AgingBucket[] = [
+    { label: 'Al corriente', min: -Infinity, max: -0.000001, importe: 0 },
+    { label: 'Mora 1-30', min: 0, max: 30, importe: 0 },
+    { label: 'Mora 31-60', min: 31, max: 60, importe: 0 },
+    { label: 'Mora 61-90', min: 61, max: 90, importe: 0 },
+    { label: 'Mora +90', min: 91, max: null, importe: 0 },
+  ];
 
   // DSO: saldo abierto actual ÷ ventas de los últimos 365 días (neta12m)
   let neta12m = 0;
@@ -99,28 +88,62 @@ export async function getCobros(codigoEmpresa: string, anio: number, filtros?: F
     }
   }
 
-  const buckets: AgingBucket[] = [
-    { label: 'Al corriente', min: -Infinity, max: -0.000001, importe: 0 },
-    { label: 'Mora 1-30', min: 0, max: 30, importe: 0 },
-    { label: 'Mora 31-60', min: 31, max: 60, importe: 0 },
-    { label: 'Mora 61-90', min: 61, max: 90, importe: 0 },
-    { label: 'Mora +90', min: 91, max: null, importe: 0 },
-  ];
+  // Fuente preferente: resumen agregado en SQL de los vencimientos reales.
+  const { data: resumenRaw, error: resumenError } = await supabase.rpc('cobros_resumen', {
+    p_codigo_empresa: codigoEmpresa,
+    p_cliente: clienteId ?? null,
+  });
+  const resumen = !resumenError && resumenRaw
+    ? (resumenRaw as {
+        saldo: number;
+        vencido: number;
+        vencido90: number;
+        futuro: number;
+        buckets: { corriente: number; d1_30: number; d31_60: number; d61_90: number; d90: number };
+        por_cliente: { cliente_id: string; saldo: number; vencido: number }[];
+      })
+    : null;
+  const fuenteCartera = Boolean(resumen);
 
-  const vencidoPorCliente = new Map<string, number>();
-  for (const f of filas) {
-    const pend = Number(f.pendiente ?? 0);
-    saldoTotal += pend;
-    if (pend <= 0) continue;
-    const dias = Number(f.dias_mora ?? 0);
-    if (dias >= 0) vencidoTotal += pend;
-    for (const b of buckets) {
-      const enRango = dias >= b.min && (b.max === null || dias <= b.max);
-      if (enRango) b.importe += pend;
+  if (resumen) {
+    saldoTotal = Number(resumen.saldo ?? 0);
+    vencidoTotal = Number(resumen.vencido ?? 0);
+    vencido90 = Number(resumen.vencido90 ?? 0);
+    enCarteraFuturo = Number(resumen.futuro ?? 0);
+    buckets[0].importe = Number(resumen.buckets?.corriente ?? 0);
+    buckets[1].importe = Number(resumen.buckets?.d1_30 ?? 0);
+    buckets[2].importe = Number(resumen.buckets?.d31_60 ?? 0);
+    buckets[3].importe = Number(resumen.buckets?.d61_90 ?? 0);
+    buckets[4].importe = Number(resumen.buckets?.d90 ?? 0);
+    for (const c of resumen.por_cliente ?? []) {
+      saldoPorCliente.set(c.cliente_id, Number(c.saldo ?? 0));
+      vencidoPorCliente.set(c.cliente_id, Number(c.vencido ?? 0));
     }
-    if (f.cliente_id && dias >= 0) {
-      vencidoPorCliente.set(f.cliente_id, (vencidoPorCliente.get(f.cliente_id) ?? 0) + pend);
+  } else {
+    let agingQuery = supabase
+      .from('v_aging')
+      .select('cliente_id, pendiente, dias_mora')
+      .eq('empresa_id', empresa.id);
+    if (clienteId) agingQuery = agingQuery.eq('cliente_id', clienteId);
+    const { data: aging } = await agingQuery;
+    const filas = (aging ?? []) as FilaAging[];
+    for (const f of filas) {
+      const pend = Number(f.pendiente ?? 0);
+      saldoTotal += pend;
+      if (f.cliente_id) saldoPorCliente.set(f.cliente_id, (saldoPorCliente.get(f.cliente_id) ?? 0) + pend);
+      if (pend <= 0) continue;
+      const dias = Number(f.dias_mora ?? 0);
+      if (dias >= 0) vencidoTotal += pend;
+      if (dias > 90) vencido90 += pend;
+      for (const b of buckets) {
+        const enRango = dias >= b.min && (b.max === null || dias <= b.max);
+        if (enRango) b.importe += pend;
+      }
+      if (f.cliente_id && dias >= 0) {
+        vencidoPorCliente.set(f.cliente_id, (vencidoPorCliente.get(f.cliente_id) ?? 0) + pend);
+      }
     }
+    enCarteraFuturo = saldoTotal - vencidoTotal;
   }
 
   const dso = neta12m > 0 ? saldoTotal / (neta12m / 365) : null;
@@ -230,7 +253,8 @@ export async function getCobros(codigoEmpresa: string, anio: number, filtros?: F
     empresa,
     saldoTotal,
     vencido: vencidoTotal,
-    enCarteraFuturo: saldoTotal - vencidoTotal,
+    vencido90,
+    enCarteraFuturo,
     dso,
     dsoDesvioDias,
     dsoDesvioEuros,
