@@ -108,38 +108,6 @@ export default async function ClientesPage({ searchParams }: { searchParams: Sea
       </div>
 
       <div className="card">
-        <h2>Cohortes mensuales de nuevos clientes</h2>
-        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
-          Clientes que empezaron a facturar en cada mes de {ANIO - 1} y cuántos siguen comprando
-          a día de hoy.
-        </p>
-        {d.cohortes.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>Sin cohortes del ejercicio previo.</p>
-        ) : (
-          <table className="tabla">
-            <thead>
-              <tr>
-                <th>Mes de inicio</th>
-                <th className="td-num">Nuevos</th>
-                <th className="td-num">Activos hoy</th>
-                <th className="td-num">Retención</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.cohortes.map((c) => (
-                <tr key={c.mes}>
-                  <td>{c.mes}</td>
-                  <td className="td-num">{numero(c.nuevos)}</td>
-                  <td className="td-num">{numero(c.activos12m)}</td>
-                  <td className="td-num">{c.retencion === null ? '—' : `${decimal(c.retencion)} %`}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      <div className="card">
         <h2>Clientes por facturación {d.anio}</h2>
         {d.tabla.length === 0 ? (
           <p style={{ color: 'var(--muted)' }}>Sin facturación en el ejercicio.</p>

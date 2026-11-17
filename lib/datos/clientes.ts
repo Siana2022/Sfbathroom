@@ -45,7 +45,6 @@ export type ClientesData = {
   semaforo: { id: string; nombre: string; estado: string; diasSin: number; frecuencia: number | null; nivel: 'ok' | 'aviso' | 'critico' }[];
   noActivos: { id: string; nombre: string; diasSin: number; ultimaFactura: string; comercial: string | null }[];
   movimiento: { id: string; nombre: string; netaActual: number; netaPrevia: number; delta: number; deltaPct: number | null }[];
-  cohortes: { mes: string; nuevos: number; activos12m: number; retencion: number | null }[];
   listas: ListasClientes;
 };
 
@@ -305,26 +304,6 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
     .sort((a, b) => b.delta - a.delta)
     .slice(0, 12);
 
-  const primeraFecha = new Map<string, string>();
-  for (const [id, fechas] of fechasCliente.entries()) {
-    primeraFecha.set(id, [...fechas].sort()[0]);
-  }
-  const cohortes: ClientesData['cohortes'] = [];
-  for (let mes = 1; mes <= 12; mes++) {
-    const mesS = String(mes).padStart(2, '0');
-    const clavePrevio = `${anioPrevio}-${mesS}`;
-    const miembros = [...primeraFecha.entries()].filter(([, fecha]) => fecha.slice(0, 7) === clavePrevio).map(([id]) => id);
-    if (miembros.length === 0) continue;
-    const activosRet = miembros.filter((id) => activos12m.has(id)).length;
-    cohortes.push({
-      mes: clavePrevio,
-      nuevos: miembros.length,
-      activos12m: activosRet,
-      retencion: miembros.length > 0 ? (activosRet / miembros.length) * 100 : null,
-    });
-  }
-  cohortes.sort((a, b) => (a.mes < b.mes ? -1 : 1));
-
   const tabla = [...porCliente.entries()]
     .map(([id, v]) => ({
       id,
@@ -419,7 +398,6 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
     semaforo,
     noActivos,
     movimiento,
-    cohortes,
     listas,
   };
 }
