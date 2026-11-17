@@ -28,6 +28,7 @@ export type CobrosData = {
   dsoDesvioEuros: number;
   riesgoVivoTotal: number;
   buckets: AgingBucket[];
+  fuenteCartera: boolean;
   porCliente: ClienteCredito[];
 };
 
@@ -57,7 +58,8 @@ export async function getCobros(codigoEmpresa: string, anio: number, filtros?: F
 
   const hoyMs = Math.floor(Date.now() / DIA_MS);
   let filas: FilaAging[] = [];
-  if (!carteraError && Array.isArray(cartera) && cartera.length > 0) {
+  const fuenteCartera = !carteraError && Array.isArray(cartera) && cartera.length > 0;
+  if (fuenteCartera) {
     filas = (cartera as { cliente_id: string | null; pendiente: number | null; fecha_vencimiento: string | null }[])
       .filter((c) => Number(c.pendiente ?? 0) !== 0)
       .map((c) => ({
@@ -234,6 +236,7 @@ export async function getCobros(codigoEmpresa: string, anio: number, filtros?: F
     dsoDesvioEuros,
     riesgoVivoTotal,
     buckets,
+    fuenteCartera,
     porCliente,
   };
 }
