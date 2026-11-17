@@ -39,6 +39,8 @@ const COMERCIALES_INVALIDOS = new Set([
   'ANA VIDAL',
   'LUCIA FERRER',
   'MARCO ROSSI',
+  'ORIENTE MEDIO',
+  'PROVEEDORES',
 ]);
 
 /** Mayúsculas sin tildes, para comparar nombres pese a acentos. */
