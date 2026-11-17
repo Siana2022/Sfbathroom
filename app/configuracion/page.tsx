@@ -1,10 +1,17 @@
-import { getConfiguracion } from '@/lib/datos/configuracion';
+import { cookies } from 'next/headers';
+import { getConfiguracion, getObjetivosComercial } from '@/lib/datos/configuracion';
+import { ANIO_ACTUAL } from '@/lib/ejercicio';
+import EditorObjetivosComercial from '@/components/EditorObjetivosComercial';
 import EditorUmbrales from '@/components/EditorUmbrales';
 import PushSuscripcion from '@/components/PushSuscripcion';
 
 
 export default async function ConfiguracionPage() {
-  const d = await getConfiguracion();
+  const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
+  const [d, objetivos] = await Promise.all([
+    getConfiguracion(),
+    getObjetivosComercial(empresa, ANIO_ACTUAL),
+  ]);
 
   return (
     <div>
@@ -19,6 +26,12 @@ export default async function ConfiguracionPage() {
         </p>
         <PushSuscripcion />
       </div>
+
+      {d.puedesEditar ? (
+        <div className="card">
+          <EditorObjetivosComercial empresaId={objetivos.empresaId} anio={objetivos.anio} filas={objetivos.filas} />
+        </div>
+      ) : null}
 
       {!d.puedesEditar ? (
         <div className="card">

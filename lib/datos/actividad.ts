@@ -180,9 +180,21 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
   }
 
   const presupuestoPorComercial = new Map<string, number>();
-  for (const p of (presupuestoRes.data ?? []) as FilaPresupuesto[]) {
-    if (filtros?.comercial && p.comercial_id !== filtros.comercial) continue;
-    if (p.comercial_id) presupuestoPorComercial.set(p.comercial_id, (presupuestoPorComercial.get(p.comercial_id) ?? 0) + Number(p.importe ?? 0));
+  const { data: objetivos } = await supabase
+    .from('objetivos_comercial')
+    .select('comercial_id, importe')
+    .eq('empresa_id', empresa.id)
+    .eq('anio', anio);
+  if (Array.isArray(objetivos) && objetivos.length > 0) {
+    for (const o of objetivos as { comercial_id: string; importe: number }[]) {
+      if (filtros?.comercial && o.comercial_id !== filtros.comercial) continue;
+      presupuestoPorComercial.set(o.comercial_id, Number(o.importe ?? 0));
+    }
+  } else {
+    for (const p of (presupuestoRes.data ?? []) as FilaPresupuesto[]) {
+      if (filtros?.comercial && p.comercial_id !== filtros.comercial) continue;
+      if (p.comercial_id) presupuestoPorComercial.set(p.comercial_id, (presupuestoPorComercial.get(p.comercial_id) ?? 0) + Number(p.importe ?? 0));
+    }
   }
 
   const { data: comerciales } = await supabase.from('comerciales').select('id, nombre').eq('activo', true);
