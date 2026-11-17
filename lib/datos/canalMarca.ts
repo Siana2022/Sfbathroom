@@ -33,6 +33,7 @@ export type CanalMarcaData = {
   pctStarbathMensual: { mes: string; sb: number; mb: number }[];
   diferencialMargen: { sb: number | null; mb: number | null; diffPct: number | null; diffEuros: number | null };
   marcaBlancaPorCliente: MarcaBlancaCliente[];
+  objetivoAnual: number;
   calidad: { importeSinMarca: number; pctSinMarca: number; importeSinCanal: number; pctSinCanal: number };
 };
 
@@ -240,6 +241,14 @@ async function getSegmentos(
     .map(([canal, importe]) => ({ canal, importe, pct: total > 0 ? (importe / total) * 100 : 0 }))
     .sort((a, b) => b.importe - a.importe);
 
+  const { data: objetivoRaw } = await supabase
+    .from('alertas_config')
+    .select('umbral')
+    .eq('modulo', 'ventas')
+    .eq('nombre', 'objetivo_starbath')
+    .maybeSingle();
+  const objetivoAnual = Number((objetivoRaw as { umbral: number | null } | null)?.umbral ?? 0);
+
   const sb = porMarca.find((s) => s.marca === NOMBRE_SB);
   const mb = porMarca.find((s) => s.marca !== NOMBRE_SB && s.marca !== 'Sin marca');
 
@@ -248,6 +257,7 @@ async function getSegmentos(
     porCanal,
     pctStarbath: sb?.pct ?? null,
     pctStarbathMensual: ventana.map((mes) => ({ mes, sb: mensual.get(mes)!.sb, mb: mensual.get(mes)!.mb })),
+    objetivoAnual,
     marcaBlancaPorCliente: [...mbCliente.entries()]
       .map(([id, v]) => ({
         cliente: clienteNombre.get(id) ?? '—',
