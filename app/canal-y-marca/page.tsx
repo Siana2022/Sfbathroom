@@ -19,7 +19,7 @@ export default async function CanalMarcaPage({ searchParams }: { searchParams: S
   const opciones = await getOpcionesFiltros(empresa);
   const d = await getCanalMarca(empresa, ANIO, filtros);
 
-  const sbImporte = d.porMarca.find((m) => m.marca === 'Starbath Plus')?.importe ?? 0;
+  const sbImporte = d.porMarca.find((m) => m.marca === 'STARBATH')?.importe ?? 0;
 
   const cabeceraExcel = ['Segmento', 'Importe', '% facturación', 'Unidades', 'Precio medio', 'Clientes', 'Ref. activas', 'Cto. vs año anterior', 'Peso 12M rodante', 'Margen %', 'Margen €'];
   const filasExcel = d.porMarca.map((m) => [
@@ -48,7 +48,7 @@ export default async function CanalMarcaPage({ searchParams }: { searchParams: S
 
       <ul className="grid-kpis">
         <Kpi
-          etiqueta="Facturación Starbath Plus"
+          etiqueta="Facturación STARBATH"
           valor={eur(sbImporte)}
           nota={d.pctStarbath === null ? 'sin facturación' : `${decimal(d.pctStarbath)} % sobre el total`}
         />
@@ -66,7 +66,7 @@ export default async function CanalMarcaPage({ searchParams }: { searchParams: S
       <div className="card">
         <h2>Facturación Starbath Plus frente al objetivo</h2>
         <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 0 }}>
-          Barras: facturación mensual Starbath Plus. Línea de referencia: objetivo anual repartido en 12 meses.
+          Barras: facturación mensual STARBATH. Línea de referencia: objetivo anual repartido en 12 meses.
         </p>
         <GraficoBarras
           series={d.pctStarbathMensual.map((m) => ({
@@ -76,7 +76,7 @@ export default async function CanalMarcaPage({ searchParams }: { searchParams: S
             titulo: `${m.mes}: ${eur(m.sb)}${d.objetivoAnual > 0 ? ` · objetivo ${eur(d.objetivoAnual / 12)}` : ''}`,
           }))}
           formato={eur}
-          leyenda={{ a: 'Facturado Starbath Plus', b: 'Objetivo mensual' }}
+          leyenda={{ a: 'Facturado STARBATH', b: 'Objetivo mensual' }}
         />
       </div>
 

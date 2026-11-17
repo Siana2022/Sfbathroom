@@ -110,7 +110,16 @@ export async function getOpcionesFiltros(
   });
   const comercialesActivos = Array.isArray(activosRaw) ? new Set(activosRaw as string[]) : null;
 
-  const [clientes, comerciales, articulosFam, marcas] = await Promise.all([
+  const [{ data: empresaFila }, { data: marcasTodas }] = await Promise.all([
+    supabase.from('empresas').select('nombre').eq('codigo', codigoEmpresa).maybeSingle(),
+    supabase.from('marcas').select('id, nombre'),
+  ]);
+  const nombreEmpresa = String((empresaFila as { nombre?: string } | null)?.nombre ?? codigoEmpresa);
+  const marcasFiltradas = ((marcasTodas ?? []) as { id: string; nombre: string }[])
+    .filter((m) => m.nombre === 'STARBATH' || m.nombre === nombreEmpresa)
+    .map((m) => ({ id: m.id, nombre: m.nombre === 'STARBATH' ? 'STARBATH' : nombreEmpresa }));
+
+  const [clientes, comerciales, articulosFam] = await Promise.all([
     todasLasFilas<{ id: string; nombre: string }>((desde) =>
       supabase
         .from('clientes')
@@ -127,8 +136,7 @@ export async function getOpcionesFiltros(
         .eq('empresa_id', empresa.id)
         .range(desde, desde + TAMANO_PAGINA - 1)
     ),
-    // `marcas` no tiene empresa_id (son globales); filtrar por él dejaba el desplegable vacío.
-    supabase.from('marcas').select('id, nombre').eq('activo', true).order('nombre'),
+    supabase.from('empresas').select('nombre').eq('codigo', codigoEmpresa).maybeSingle(),
   ]);
 
   let opcionesClientes = clientes.map((c) => ({ id: c.id, nombre: c.nombre }));
@@ -154,7 +162,7 @@ export async function getOpcionesFiltros(
     familias: [...new Set(articulosFam.map((a) => a.familia).filter((f): f is string => Boolean(f)))]
       .sort((a, b) => a.localeCompare(b, 'es'))
       .map((f) => ({ id: f, nombre: f })),
-    marcas: (marcas.data ?? []).map((m) => ({ id: m.id, nombre: m.nombre })),
+    marcas: marcasFiltradas,
   };
 }
 
@@ -172,7 +180,7 @@ export async function getFacturaIdsFiltradas(
   baseHasta: string,
 ): Promise<Set<string> | null> {
   const { cliente, comercial, familia, marca, desde, hasta } = filtros;
-  const porArticulo = Boolean(familia || marca);
+  const porArticulo = Boolean(familia);
   const sinRestriccion = !cliente && !comercial && !porArticulo && !desde && !hasta;
   if (sinRestriccion) return null;
 
@@ -181,20 +189,32 @@ export async function getFacturaIdsFiltradas(
 
   let query = supabase
     .from('facturas')
-    .select('id')
+    .select('id, comercial_id')
     .eq('empresa_id', empresaId)
     .gte('fecha', gte)
     .lte('fecha', lte);
   if (cliente) query = query.eq('cliente_id', cliente);
   if (comercial) query = query.eq('comercial_id', comercial);
 
-  const filas = await todasLasFilas<{ id: string }>((desde) => query.range(desde, desde + TAMANO_PAGINA - 1));
+  let filas = await todasLasFilas<{ id: string; comercial_id: string | null }>((desde) =>
+    query.range(desde, desde + TAMANO_PAGINA - 1),
+  );
+
+  if (marca) {
+    const { data: marcaFila } = await supabase.from('marcas').select('nombre').eq('id', marca).maybeSingle();
+    const esStarbath = String((marcaFila as { nombre?: string } | null)?.nombre ?? '').toUpperCase().includes('STARBATH');
+    const coms = await todasLasFilas<{ id: string; nombre: string }>((desde) =>
+      supabase.from('comerciales').select('id, nombre').range(desde, desde + TAMANO_PAGINA - 1),
+    );
+    const sb = new Set(coms.filter((c) => String(c.nombre).toUpperCase().includes('STARBATH')).map((c) => c.id));
+    filas = filas.filter((f) => (esStarbath ? sb.has(f.comercial_id ?? '') : !sb.has(f.comercial_id ?? '')));
+  }
+
   let ids = new Set(filas.map((f) => f.id));
 
   if (porArticulo) {
     let aq = supabase.from('articulos').select('id').eq('empresa_id', empresaId);
     if (familia) aq = aq.eq('familia', familia);
-    if (marca) aq = aq.eq('marca_id', marca);
     const artIds = (
       await todasLasFilas<{ id: string }>((desde) => aq.range(desde, desde + TAMANO_PAGINA - 1))
     ).map((a) => a.id);
@@ -239,18 +259,30 @@ export async function getPedidoIdsFiltrados(
 
   let query = supabase
     .from('pedidos')
-    .select('id')
+    .select('id, comercial_id')
     .eq('empresa_id', empresaId)
     .gte('fecha_entrada', gte)
     .lte('fecha_entrada', lte);
   if (cliente) query = query.eq('cliente_id', cliente);
-  const filas = await todasLasFilas<{ id: string }>((desde) => query.range(desde, desde + TAMANO_PAGINA - 1));
+  let filas = await todasLasFilas<{ id: string; comercial_id: string | null }>((desde) =>
+    query.range(desde, desde + TAMANO_PAGINA - 1),
+  );
+
+  if (marca) {
+    const { data: marcaFila } = await supabase.from('marcas').select('nombre').eq('id', marca).maybeSingle();
+    const esStarbath = String((marcaFila as { nombre?: string } | null)?.nombre ?? '').toUpperCase().includes('STARBATH');
+    const coms = await todasLasFilas<{ id: string; nombre: string }>((desde) =>
+      supabase.from('comerciales').select('id, nombre').range(desde, desde + TAMANO_PAGINA - 1),
+    );
+    const sb = new Set(coms.filter((c) => String(c.nombre).toUpperCase().includes('STARBATH')).map((c) => c.id));
+    filas = filas.filter((f) => (esStarbath ? sb.has(f.comercial_id ?? '') : !sb.has(f.comercial_id ?? '')));
+  }
+
   let ids = new Set(filas.map((f) => f.id));
 
   if (porArticulo) {
     let aq = supabase.from('articulos').select('id').eq('empresa_id', empresaId);
     if (familia) aq = aq.eq('familia', familia);
-    if (marca) aq = aq.eq('marca_id', marca);
     const artIds = (
       await todasLasFilas<{ id: string }>((desde) => aq.range(desde, desde + TAMANO_PAGINA - 1))
     ).map((a) => a.id);
