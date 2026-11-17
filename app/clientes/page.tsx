@@ -150,6 +150,8 @@ export default async function ClientesPage({ searchParams }: { searchParams: Sea
                 <th>Cliente</th>
                 <th>Comercial</th>
                 <th className="td-num">Facturación neta</th>
+                <th className="td-num" title="Facturación neta menos coste de venta (mismo criterio que /margen).">Margen</th>
+                <th className="td-num" title="Margen sobre la facturación neta del cliente.">Margen %</th>
                 <th className="td-num">Facturas</th>
                 <th className="td-num">Ticket medio</th>
               </tr>
@@ -160,6 +162,10 @@ export default async function ClientesPage({ searchParams }: { searchParams: Sea
                   <td><Link href={`/clientes/${c.id}`} className="enlace">{c.nombre}</Link></td>
                   <td>{c.comercial ?? '—'}</td>
                   <td className="td-num">{eur(c.neta)}</td>
+                  <td className="td-num">{eur(c.margen)}</td>
+                  <td className={`td-num ${c.margenPct !== null && c.margenPct >= 0 ? 'td-pos' : ''}`}>
+                    {c.margenPct === null ? '—' : `${decimal(c.margenPct)} %`}
+                  </td>
                   <td className="td-num">{numero(c.facturas)}</td>
                   <td className="td-num">{eur(c.ticket)}</td>
                 </tr>

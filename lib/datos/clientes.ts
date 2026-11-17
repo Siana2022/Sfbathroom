@@ -16,6 +16,8 @@ export type ClienteActividad = {
   ultima: string | null;
   diasSin: number | null;
   comercial: string | null;
+  margen: number;
+  margenPct: number | null;
 };
 
 export type ListasClientes = {
@@ -37,7 +39,7 @@ export type ClientesData = {
   perdidos: number;
   inactivos: number;
   retencion: number | null;
-  tabla: { id: string; nombre: string; neta: number; facturas: number; ticket: number; comercial: string | null }[];
+  tabla: { id: string; nombre: string; neta: number; coste: number; margen: number; margenPct: number | null; facturas: number; ticket: number; comercial: string | null }[];
   familias: string[];
   matriz: { id: string; nombre: string; neta: number; compradas: boolean[] }[];
   semaforo: { id: string; nombre: string; estado: string; diasSin: number; frecuencia: number | null; nivel: 'ok' | 'aviso' | 'critico' }[];
@@ -162,6 +164,17 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
   });
   const actividad = Array.isArray(actividadRaw) ? (actividadRaw as FilaActividad[]) : null;
 
+  const { data: margenRaw } = await supabase.rpc('clientes_margen', {
+    p_codigo_empresa: codigoEmpresa,
+    p_anio: anio,
+  });
+  const costePorCliente = new Map<string, number>();
+  if (Array.isArray(margenRaw)) {
+    for (const m of margenRaw as { cliente_id: string; coste: number }[]) {
+      costePorCliente.set(m.cliente_id, Number(m.coste ?? 0));
+    }
+  }
+
   let perdidos = 0;
   let inactivos = 0;
   let nuevos = 0;
@@ -203,6 +216,15 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
       ultima: a.ultima,
       diasSin: a.ultima ? Math.floor((hoy * DIA - Date.parse(a.ultima)) / DIA) : null,
       comercial: nombreComercial.get(comercialDeCliente.get(a.cliente_id) ?? '') ?? null,
+      margen: (() => {
+        const neta = Number(a.netaAnio ?? 0);
+        return neta - (costePorCliente.get(a.cliente_id) ?? 0);
+      })(),
+      margenPct: (() => {
+        const neta = Number(a.netaAnio ?? 0);
+        if (neta === 0) return null;
+        return ((neta - (costePorCliente.get(a.cliente_id) ?? 0)) / neta) * 100;
+      })(),
     }));
 
     listas.activos12m = conDias.filter((c) => c.neta12m > 0).sort((a, b) => b.neta12m - a.neta12m).slice(0, 500);
@@ -306,6 +328,9 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
       id,
       nombre: nombreCliente.get(id) ?? '—',
       neta: v.neta,
+      coste: costePorCliente.get(id) ?? 0,
+      margen: v.neta - (costePorCliente.get(id) ?? 0),
+      margenPct: v.neta !== 0 ? ((v.neta - (costePorCliente.get(id) ?? 0)) / v.neta) * 100 : null,
       facturas: v.facturas,
       ticket: v.facturas > 0 ? v.neta / v.facturas : 0,
       comercial: nombreComercial.get(comercialDeCliente.get(id) ?? '') ?? null,

@@ -123,6 +123,8 @@ export default function KpisClientes({ anio, activos12m, retencion, nuevos, recu
                     <th>Cliente</th>
                     <th>Comercial</th>
                     <th className="td-num">Facturación {anio}</th>
+                    <th className="td-num">Margen {anio}</th>
+                    <th className="td-num">Margen %</th>
                     <th className="td-num">Facturación {anio - 1}</th>
                     <th className="td-num">Últimos 12M</th>
                     <th className="td-num">Facturas</th>
@@ -137,6 +139,10 @@ export default function KpisClientes({ anio, activos12m, retencion, nuevos, recu
                       <td>{c.nombre}</td>
                       <td>{c.comercial ?? <span style={{ color: 'var(--rojo)' }}>Sin asignar</span>}</td>
                       <td className="td-num">{eur(c.netaAnio)}</td>
+                      <td className="td-num">{eur(c.margen)}</td>
+                      <td className={`td-num ${c.margenPct !== null && c.margenPct >= 0 ? 'td-pos' : ''}`}>
+                        {c.margenPct === null ? '—' : `${decimal(c.margenPct)} %`}
+                      </td>
                       <td className="td-num">{eur(c.netaPrev)}</td>
                       <td className="td-num">{eur(c.neta12m)}</td>
                       <td className="td-num">{numero(c.facturasAnio)}</td>
