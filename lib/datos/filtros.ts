@@ -43,6 +43,11 @@ const COMERCIALES_INVALIDOS = new Set([
   'PROVEEDORES',
 ]);
 
+/** ¿Es un comercial real (no demo ni valor regional de A3ERP)? */
+export function esComercialValido(nombre: string): boolean {
+  return !COMERCIALES_INVALIDOS.has(normalizarNombre(nombre));
+}
+
 /** Mayúsculas sin tildes, para comparar nombres pese a acentos. */
 function normalizarNombre(nombre: string): string {
   return nombre
