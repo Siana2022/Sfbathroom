@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
+import { getUsuario } from '@/lib/datos/role';
+import { memo } from '@/lib/perf/memo';
 
 export type FiltroStock = 'todos' | 'con' | 'sin';
 
@@ -62,6 +64,15 @@ function sanear(texto: string): string {
 }
 
 export async function getStockAlmacen(
+  codigoEmpresa: string,
+  opciones: { q?: string; estado?: string; almacen?: string } = {},
+): Promise<StockAlmacenResumen> {
+  const usuario = await getUsuario();
+  const clave = `stock:${usuario?.id ?? 'anon'}:${codigoEmpresa}:${JSON.stringify(opciones)}`;
+  return memo(clave, () => stockInterno(codigoEmpresa, opciones));
+}
+
+async function stockInterno(
   codigoEmpresa: string,
   opciones: { q?: string; estado?: string; almacen?: string } = {},
 ): Promise<StockAlmacenResumen> {

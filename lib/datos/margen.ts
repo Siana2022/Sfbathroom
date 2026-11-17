@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
-import { getRol, puedeVerMargenes } from '@/lib/datos/role';
+import { getRol, getUsuario, puedeVerMargenes } from '@/lib/datos/role';
+import { memo } from '@/lib/perf/memo';
 import { filtrarPorIds, getFacturaIdsFiltradas, hayFiltros, type Filtros } from '@/lib/datos/filtros';
 import { lineasPorFacturas } from '@/lib/datos/lineas';
 import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
@@ -114,6 +115,17 @@ function agruparComercial(nombre: string, sufijos: Map<string, number>): { base:
 }
 
 export async function getMargen(
+  codigoEmpresa: string,
+  anio: number,
+  filtros?: Filtros,
+  erosionMin = 15,
+): Promise<MargenData> {
+  const usuario = await getUsuario();
+  const clave = `margen:${usuario?.id ?? 'anon'}:${codigoEmpresa}:${anio}:${JSON.stringify(filtros ?? {})}:${erosionMin}`;
+  return memo(clave, () => margenInterno(codigoEmpresa, anio, filtros, erosionMin));
+}
+
+async function margenInterno(
   codigoEmpresa: string,
   anio: number,
   filtros?: Filtros,
