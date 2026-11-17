@@ -34,7 +34,6 @@ export type LineaDocumento = {
   codigo: string;
   articulo: string;
   familia: string;
-  marca: string;
   cantidad: number;
   precio: number;
   descuento: number;
@@ -196,7 +195,6 @@ export async function getDocumento(id: string): Promise<DocumentoDetalle | null>
       codigo: art?.codigo_erp ?? '—',
       articulo: art?.nombre ?? '—',
       familia: art?.familia?.trim() || '—',
-      marca: art?.marca_id ? marcaNombre.get(art.marca_id) ?? '—' : '—',
       cantidad: Number(l.cantidad ?? 0),
       precio: Number(l.precio_unitario ?? 0),
       descuento: Number(l.descuento_pct ?? 0),
