@@ -2,8 +2,8 @@
  * Diagnóstico: nombres de los proveedores que tienen artículos.
  * Solo lectura.
  *
- * - Localiza la tabla de proveedores y sus columnas.
- * - Para cada código de ARTICULO.CODPRO muestra su nombre y cuántos artículos tiene.
+ * Busca de forma amplia (cualquier tabla con CODPRO y una columna de nombre),
+ * porque en este A3ERP la tabla de proveedores no se llama PROVEEDOR.
  *
  * Uso (en el PC de la ingesta, con su .env):
  *   node --env-file=.env diag-proveedores.mjs
@@ -43,23 +43,37 @@ async function main() {
       const base = `[${e.base}]`;
       console.log(`\n================ ${e.codigo} · ${e.base} ================`);
 
-      const tablas = await q(`SELECT name FROM ${base}.sys.tables WHERE name LIKE 'PROVEED%' ORDER BY name`);
-      console.log('Tablas: ' + ((tablas ?? []).map((t) => t.name).join(', ') || '(ninguna)'));
-      const tabla = (tablas ?? [])[0];
-      if (!tabla) continue;
+      // Tablas con columna CODPRO (candidatas a maestro de proveedores).
+      const tablas = await q(`SELECT DISTINCT t.name AS tabla
+                              FROM ${base}.sys.tables t
+                              JOIN ${base}.sys.columns c ON c.object_id = t.object_id
+                              WHERE c.name = 'CODPRO'
+                                 OR t.name LIKE '%PROVEED%' OR t.name LIKE '%ACREED%' OR t.name LIKE '%TERCER%'
+                              ORDER BY t.name`);
+      console.log('Tablas con CODPRO: ' + ((tablas ?? []).map((t) => t.tabla).join(', ') || '(ninguna)'));
 
-      const cols = await q(`SELECT name AS columna, system_type_id FROM ${base}.sys.columns
-                            WHERE object_id = OBJECT_ID('${base}.dbo.${tabla.name}') ORDER BY column_id`);
-      console.log(`\nColumnas de ${tabla.name}: ` + cols.map((c) => c.columna).join(', '));
+      // Para cada candidata, ver si tiene nombre y sacar los proveedores usados.
+      for (const t of tablas ?? []) {
+        const cols = await q(`SELECT c.name AS columna FROM ${base}.sys.columns c
+                              WHERE c.object_id = OBJECT_ID('${base}.dbo.${t.tabla}')`);
+        const lista = (cols ?? []).map((c) => c.columna);
+        const colNom = lista.find((c) => /^(NOMBRE|NOM|NOMBRECOMERCIAL|RAZONSOCIAL|DESCRIPCION)$/i.test(c))
+          ?? lista.find((c) => /NOM|RAZON|DESCRIP/i.test(c));
 
-      const filas = await q(`SELECT a.CODPRO AS codigo, COUNT(*) AS articulos,
-                                    MAX(p.NOMBRE) AS nombre
-                             FROM ${base}.dbo.ARTICULO a
-                             LEFT JOIN ${base}.dbo.[${tabla.name}] p ON LTRIM(RTRIM(p.CODPRO)) = LTRIM(RTRIM(a.CODPRO))
-                             GROUP BY a.CODPRO
-                             ORDER BY COUNT(*) DESC`);
-      console.log('\nProveedores de artículos:');
-      console.table(filas);
+        const total = await q(`SELECT COUNT(*) AS n FROM ${base}.dbo.[${t.tabla}]`);
+        if (!colNom) {
+          console.log(`\n${t.tabla}: ${total?.[0]?.n ?? '?'} filas · sin columna de nombre (${lista.slice(0, 8).join(', ')}…)`);
+          continue;
+        }
+
+        const filas = await q(`SELECT TOP 40 p.CODPRO AS codigo, p.[${colNom}] AS nombre, COUNT(a.CODART) AS articulos
+                               FROM ${base}.dbo.[${t.tabla}] p
+                               LEFT JOIN ${base}.dbo.ARTICULO a ON LTRIM(RTRIM(a.CODPRO)) = LTRIM(RTRIM(p.CODPRO))
+                               GROUP BY p.CODPRO, p.[${colNom}]
+                               ORDER BY COUNT(a.CODART) DESC`);
+        console.log(`\n${t.tabla} · nombre en ${colNom} · ${total?.[0]?.n ?? '?'} filas`);
+        console.table(filas);
+      }
     }
   } finally {
     await pool.close();
