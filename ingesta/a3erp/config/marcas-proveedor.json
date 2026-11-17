@@ -1,0 +1,11 @@
+{
+  "_comentario": "Equivalencia proveedor de A3ERP (CODPRO) -> marca. Rellenar tras diag-proveedores.mjs. Los códigos van como texto y se comparan sin espacios.",
+  "SF": {
+    "714": "Starbath Plus",
+    "753": "Marca blanca"
+  },
+  "FUX": {
+    "714": "Starbath Plus"
+  },
+  "DOT": {}
+}
