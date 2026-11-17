@@ -60,7 +60,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: Sea
             <tbody>
               {d.noActivos.map((c) => (
                 <tr key={c.nombre}>
-                  <td>{c.nombre}</td>
+                  <td><Link href={`/clientes/${c.id}`} className="enlace">{c.nombre}</Link></td>
                   <td>{c.comercial ?? '—'}</td>
                   <td className={`td-num ${c.diasSin > 365 ? 'td-pos' : ''}`}>{numero(c.diasSin)}</td>
                   <td>{c.ultimaFactura}</td>
@@ -88,8 +88,8 @@ export default async function ClientesPage({ searchParams }: { searchParams: Sea
           </thead>
           <tbody>
             {d.movimiento.map((c) => (
-              <tr key={c.nombre}>
-                <td>{c.nombre}</td>
+              <tr key={c.id}>
+                <td><Link href={`/clientes/${c.id}`} className="enlace">{c.nombre}</Link></td>
                 <td className="td-num">{eur(c.netaActual)}</td>
                 <td className="td-num">{eur(c.netaPrevia)}</td>
                 <td className={`td-num ${c.delta < 0 ? 'td-pos' : ''}`}>{c.delta > 0 ? '+' : ''}{eur(c.delta)}</td>
