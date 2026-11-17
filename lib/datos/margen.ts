@@ -251,12 +251,13 @@ async function margenInterno(
     aRaw.coste += coste;
     porArticuloRaw.set(key, aRaw);
 
-    if (a) {
-      const marca = (a.marca_id && marcasMap.get(a.marca_id)) ?? 'Sin marca';
-      const mRaw = porMarcaRaw.get(marca) ?? { marcaBlanca: false, importe: 0, coste: 0 };
+    {
+      const comNombre = f?.comercial_id ? (comercialesMap.get(f.comercial_id) ?? '') : '';
+      const esSb = comNombre.toUpperCase().includes('STARBATH');
+      const marca = esSb ? 'STARBATH' : empresa.nombre;
+      const mRaw = porMarcaRaw.get(marca) ?? { marcaBlanca: !esSb, importe: 0, coste: 0 };
       mRaw.importe += importe;
       mRaw.coste += coste;
-      mRaw.marcaBlanca = mRaw.marcaBlanca || Boolean(a.marca_blanca_cliente_id);
       porMarcaRaw.set(marca, mRaw);
     }
 
