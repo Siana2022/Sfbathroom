@@ -22,6 +22,7 @@ export type CobrosData = {
   empresa: { id: string; codigo: string; nombre: string };
   saldoTotal: number;
   vencido: number;
+  vencido90: number;
   enCarteraFuturo: number;
   dso: number | null;
   dsoDesvioDias: number;
@@ -84,12 +85,16 @@ export async function getCobros(codigoEmpresa: string, anio: number, filtros?: F
   ];
 
   const vencidoPorCliente = new Map<string, number>();
+  const saldoPorCliente = new Map<string, number>();
+  let vencido90 = 0;
   for (const f of filas) {
     const pend = Number(f.pendiente ?? 0);
     saldoTotal += pend;
+    if (f.cliente_id) saldoPorCliente.set(f.cliente_id, (saldoPorCliente.get(f.cliente_id) ?? 0) + pend);
     if (pend <= 0) continue;
     const dias = Number(f.dias_mora ?? 0);
     if (dias >= 0) vencidoTotal += pend;
+    if (dias > 90) vencido90 += pend;
     for (const b of buckets) {
       const enRango = dias >= b.min && (b.max === null || dias <= b.max);
       if (enRango) b.importe += pend;
@@ -175,11 +180,11 @@ export async function getCobros(codigoEmpresa: string, anio: number, filtros?: F
 
   const nombreCliente = new Map(clientes.map((c) => [c.id, c.nombre]));
   const limiteCliente = new Map(clientes.map((c) => [c.id, c.limite_credito]));
-  const claves = new Set([...saldoHoy.keys(), ...carteraPedido.keys()]);
+  const claves = new Set([...saldoPorCliente.keys(), ...saldoHoy.keys(), ...carteraPedido.keys()]);
 
   const porCliente: ClienteCredito[] = [...claves]
     .map((id) => {
-      const saldo = saldoHoy.get(id) ?? 0;
+      const saldo = saldoPorCliente.get(id) ?? saldoHoy.get(id) ?? 0;
       const netaClient = neta12mCliente.get(id) ?? 0;
       const dsoCliente = netaClient > 0 ? saldo / (netaClient / 365) : null;
       const saldoRep = saldoRepaso.get(id) ?? 0;
@@ -200,12 +205,13 @@ export async function getCobros(codigoEmpresa: string, anio: number, filtros?: F
       };
     })
     .sort((a, b) => b.saldo - a.saldo)
-    .slice(0, 10);
+    .slice(0, 25);
 
   return {
     empresa,
     saldoTotal,
     vencido: vencidoTotal,
+    vencido90,
     enCarteraFuturo: saldoTotal - vencidoTotal,
     dso,
     dsoDesvioDias,

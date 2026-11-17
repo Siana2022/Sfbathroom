@@ -36,6 +36,7 @@ export default async function CreditoCobroPage({ searchParams }: { searchParams:
       <ul className="grid-kpis">
         <Kpi etiqueta="Saldo total de clientes" valor={eur(d.saldoTotal)} nota={`de los que ${eur(d.vencido)} vencido`} />
         <Kpi etiqueta="Vencido total" valor={eur(d.vencido)} nota={`${numero(d.enCarteraFuturo)} en cartera, aún no vencido`} />
+        <Kpi etiqueta="Vencido > 90 días" valor={eur(d.vencido90)} nota="la parte más difícil de cobrar" />
         <Kpi etiqueta="DSO real" valor={d.dso === null ? '—' : `${decimal(d.dso)} días`} nota="días de venta a cobrar" />
         <Kpi
           etiqueta="Desvío DSO vs 30 días pactados"
