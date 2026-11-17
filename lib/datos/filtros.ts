@@ -30,6 +30,11 @@ export function hayFiltros(f: Filtros): boolean {
 
 export type OpcionFiltro = { id: string; nombre: string };
 
+/** Nombres que no son comerciales reales (demo o valores regionales de A3ERP). */
+const COMERCIALES_INVALIDOS = new Set(
+  ['77', 'AFRICA', 'AMERICA', 'ASIA', 'ANA VIDAL', 'LUCIA FERRER', 'MARCO ROSSI'].map((n) => n.toUpperCase()),
+);
+
 export type OpcionesFiltros = {
   clientes: OpcionFiltro[];
   comerciales: OpcionFiltro[];
@@ -83,6 +88,11 @@ export async function getOpcionesFiltros(
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
 
+  const { data: activosRaw } = await supabase.rpc('comerciales_con_actividad', {
+    p_codigo_empresa: codigoEmpresa,
+  });
+  const comercialesActivos = Array.isArray(activosRaw) ? new Set(activosRaw as string[]) : null;
+
   const [clientes, comerciales, articulosFam, marcas] = await Promise.all([
     todasLasFilas<{ id: string; nombre: string }>((desde) =>
       supabase
@@ -112,6 +122,8 @@ export async function getOpcionesFiltros(
   return {
     clientes: opcionesClientes,
     comerciales: (comerciales.data ?? [])
+      .filter((c) => !comercialesActivos || comercialesActivos.has(c.id))
+      .filter((c) => !COMERCIALES_INVALIDOS.has(String(c.nombre ?? '').trim().toUpperCase()))
       .filter((c) => {
         const n = String(c.nombre ?? '').trim();
         if (n === '' || n === '—' || n === '-') return false;
