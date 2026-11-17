@@ -16,12 +16,10 @@ function FilaComercial({
   c,
   esSeccion,
   sinAccesoMargen,
-  conSaturacion,
 }: {
   c: ComercialRow;
   esSeccion: boolean;
   sinAccesoMargen: boolean;
-  conSaturacion: boolean;
 }) {
   return (
     <tr style={esSeccion ? { color: 'var(--muted)' } : undefined}>
@@ -29,27 +27,17 @@ function FilaComercial({
         {esSeccion ? `· ${c.nombre}` : c.secciones.length > 0 ? <strong>{c.nombre}</strong> : c.nombre}
       </td>
       <td className="td-num">{numero(c.neta)} €</td>
-      <td className="td-num">{numero(c.facturas)}</td>
       <td className="td-num">{numero(c.clientes)}</td>
-      <td className="td-num">{eur2(c.descuentoMedio)}</td>
-      <td className="td-num">{numero(c.pedidos)}</td>
+      <td className="td-num">{c.perdidos > 0 ? `−${c.perdidos}` : c.perdidos}</td>
+      <td className="td-num">{c.nuevos > 0 ? `+${c.nuevos}` : c.nuevos}</td>
       {!sinAccesoMargen && (
         <>
           <td className="td-num">{c.margenPct === null ? '—' : `${decimal(c.margenPct)} %`}</td>
           <td className="td-num">{c.margenAbs === null ? '—' : `${numero(c.margenAbs)} €`}</td>
         </>
       )}
+      <td className="td-num">{numero(c.pedidos)}</td>
       <td className="td-num">{numero(c.presupuesto)} €</td>
-      <td className="td-num">{c.cumplimientoPct === null ? '—' : `${decimal(c.cumplimientoPct)} %`}</td>
-      <td className="td-num">{c.nuevos > 0 ? `+${c.nuevos}` : c.nuevos}</td>
-      <td className="td-num">{c.perdidos > 0 ? `−${c.perdidos}` : c.perdidos}</td>
-      {conSaturacion && (
-        <td className="td-num">
-          {c.saturacionImporte || c.saturacionClientes
-            ? `${c.saturacionImporte ? 'importe' : ''}${c.saturacionImporte && c.saturacionClientes ? ' y ' : ''}${c.saturacionClientes ? 'clientes' : ''}`
-            : '—'}
-        </td>
-      )}
     </tr>
   );
 }
@@ -68,30 +56,25 @@ export default async function ActividadComercialPage({ searchParams }: { searchP
   const saturados = d.comerciales.filter((c) => c.saturacionImporte || c.saturacionClientes).length;
 
   const columnas: string[] = [
-    'Comercial', 'Facturación', 'Facturas', 'Clientes activos', 'Descuento medio', 'Pedidos',
-    'Margen %', 'Margen €', 'Presupuesto', 'Cumplimiento %', 'Nuevos', 'Perdidos', 'Neta trim. actual', 'Saturación',
+    'Comercial', 'Facturación', 'Clientes activos', 'Clientes perdidos', 'Clientes nuevos',
+    'Margen %', 'Margen €', 'Nº pedidos', 'Objetivos',
   ];
   const registros = d.comerciales.flatMap((c) => [c, ...c.secciones]).map((c) => [
     c.nombre,
     c.neta.toFixed(2),
-    c.facturas,
     c.clientes,
-    c.descuentoMedio.toFixed(2),
-    c.pedidos,
+    c.perdidos,
+    c.nuevos,
     c.margenPct === null ? '' : c.margenPct.toFixed(2),
     c.margenAbs === null ? '' : c.margenAbs.toFixed(2),
+    c.pedidos,
     c.presupuesto.toFixed(2),
-    c.cumplimientoPct === null ? '' : c.cumplimientoPct.toFixed(2),
-    c.nuevos,
-    c.perdidos,
-    c.trimNeta.toFixed(2),
-    c.saturacionImporte || c.saturacionClientes ? 'Sí' : 'No',
   ]);
 
   return (
     <div>
       <p className="breadcrumb">Cuadro mando comercial · Bloque 10</p>
-      <h1>Actividad comercial</h1>
+      <h1>Trabajo comercial</h1>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
         Carga por persona de {d.empresa.nombre} en {d.anio}: facturación gestionada, clientes
         activos, descuentos, pedidos, margen aportado, cumplimiento de presupuesto, clientes
@@ -133,34 +116,29 @@ export default async function ActividadComercialPage({ searchParams }: { searchP
             <tr>
               <th>Comercial</th>
               <th className="td-num">Facturación</th>
-              <th className="td-num">Facturas</th>
               <th className="td-num">Clientes activos</th>
-              <th className="td-num">Descuento medio</th>
-              <th className="td-num">Pedidos</th>
+              <th className="td-num">Clientes perdidos</th>
+              <th className="td-num">Clientes nuevos</th>
               {!d.sinAccesoMargen && (
                 <>
-                  <th className="td-num">Margen</th>
+                  <th className="td-num">Margen %</th>
                   <th className="td-num">Margen €</th>
                 </>
               )}
-              <th className="td-num">Presupuesto</th>
-              <th className="td-num">Cumplimiento</th>
-              <th className="td-num">Nuevos</th>
-              <th className="td-num">Perdidos</th>
-              {saturados > 0 && <th className="td-num">Saturación</th>}
+              <th className="td-num">Nº pedidos</th>
+              <th className="td-num">Objetivos</th>
             </tr>
           </thead>
           <tbody>
             {d.comerciales.map((c) => (
               <Fragment key={c.id}>
-                <FilaComercial c={c} esSeccion={false} sinAccesoMargen={d.sinAccesoMargen} conSaturacion={saturados > 0} />
+                <FilaComercial c={c} esSeccion={false} sinAccesoMargen={d.sinAccesoMargen} />
                 {c.secciones.map((s) => (
                   <FilaComercial
                     key={`${c.id}-${s.id}`}
                     c={s}
                     esSeccion
                     sinAccesoMargen={d.sinAccesoMargen}
-                    conSaturacion={saturados > 0}
                   />
                 ))}
               </Fragment>

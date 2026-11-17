@@ -64,7 +64,7 @@ export default function KpisActividad({
       <ul className="grid-kpis">
         {tarjeta(`Facturación gestionada ${anio}`, numero(totalNeta), `${numComerciales} comerciales activos`, 'facturacion')}
         {tarjeta(
-          'Cumplimiento presupuesto',
+          'Cumplimiento objetivos',
           totalPresupuesto > 0 ? `${decimal((totalNeta / totalPresupuesto) * 100)} %` : '—',
           `presupuesto ${numero(totalPresupuesto)} €`,
           'cumplimiento',
