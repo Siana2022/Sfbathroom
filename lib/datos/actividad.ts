@@ -198,18 +198,39 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
   );
   const nombreCliente = new Map(clientesRes.map((c) => [c.id, c.nombre]));
 
-  const listaNuevos: { cliente: string; comercial: string }[] = [];
-  const listaPerdidos: { cliente: string; comercial: string }[] = [];
+  // Nuevos y perdidos ÚNICOS por empresa (un cliente cuenta una vez).
+  const nombreComercial = new Map(filasComerciales.map((c) => [c.id, c.nombre]));
+  const activosGlobal = new Set<string>();
+  const previoGlobal = new Set<string>();
   for (const c of filasComerciales) {
-    const activos = porComercial.get(c.id)?.clientes ?? new Set<string>();
-    const previo = clientesPrevio.get(c.id);
-    for (const id of activos) {
-      if (!previo?.has(id)) listaNuevos.push({ cliente: nombreCliente.get(id) ?? '—', comercial: c.nombre });
-    }
-    for (const id of previo ?? []) {
-      if (!activos.has(id)) listaPerdidos.push({ cliente: nombreCliente.get(id) ?? '—', comercial: c.nombre });
-    }
+    for (const id of porComercial.get(c.id)?.clientes ?? []) activosGlobal.add(id);
+    for (const id of clientesPrevio.get(c.id) ?? []) previoGlobal.add(id);
   }
+
+  // Comercial con más facturación de cada cliente este año (para asignarlo en el listado).
+  const netaPorCliente = new Map<string, Map<string, number>>();
+  for (const f of filas) {
+    if (!f.cliente_id || !f.comercial_id) continue;
+    const m = netaPorCliente.get(f.cliente_id) ?? new Map<string, number>();
+    m.set(f.comercial_id, (m.get(f.comercial_id) ?? 0) + netaDeDocumento(f.tipo_documento, f.base_imponible));
+    netaPorCliente.set(f.cliente_id, m);
+  }
+  const comercialPrincipal = (clienteId: string): string => {
+    const m = netaPorCliente.get(clienteId);
+    if (!m || m.size === 0) return '—';
+    const [id] = [...m.entries()].sort((a, b) => b[1] - a[1])[0];
+    return nombreComercial.get(id) ?? '—';
+  };
+
+  const listaNuevos: { cliente: string; comercial: string }[] = [...activosGlobal]
+    .filter((id) => !previoGlobal.has(id))
+    .map((id) => ({ cliente: nombreCliente.get(id) ?? '—', comercial: comercialPrincipal(id) }))
+    .sort((a, b) => a.cliente.localeCompare(b.cliente, 'es'));
+
+  const listaPerdidos: { cliente: string; comercial: string }[] = [...previoGlobal]
+    .filter((id) => !activosGlobal.has(id))
+    .map((id) => ({ cliente: nombreCliente.get(id) ?? '—', comercial: comercialPrincipal(id) }))
+    .sort((a, b) => a.cliente.localeCompare(b.cliente, 'es'));
 
   const comercialesRes: ComercialRow[] = filasComerciales.map((c) => {
     const v = porComercial.get(c.id);
