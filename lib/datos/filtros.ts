@@ -31,9 +31,24 @@ export function hayFiltros(f: Filtros): boolean {
 export type OpcionFiltro = { id: string; nombre: string };
 
 /** Nombres que no son comerciales reales (demo o valores regionales de A3ERP). */
-const COMERCIALES_INVALIDOS = new Set(
-  ['77', 'AFRICA', 'AMERICA', 'ASIA', 'ANA VIDAL', 'LUCIA FERRER', 'MARCO ROSSI'].map((n) => n.toUpperCase()),
-);
+const COMERCIALES_INVALIDOS = new Set([
+  '77',
+  'AFRICA',
+  'AMERICA',
+  'ASIA',
+  'ANA VIDAL',
+  'LUCIA FERRER',
+  'MARCO ROSSI',
+]);
+
+/** Mayúsculas sin tildes, para comparar nombres pese a acentos. */
+function normalizarNombre(nombre: string): string {
+  return nombre
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase();
+}
 
 export type OpcionesFiltros = {
   clientes: OpcionFiltro[];
@@ -123,7 +138,7 @@ export async function getOpcionesFiltros(
     clientes: opcionesClientes,
     comerciales: (comerciales.data ?? [])
       .filter((c) => !comercialesActivos || comercialesActivos.has(c.id))
-      .filter((c) => !COMERCIALES_INVALIDOS.has(String(c.nombre ?? '').trim().toUpperCase()))
+      .filter((c) => !COMERCIALES_INVALIDOS.has(normalizarNombre(String(c.nombre ?? ''))))
       .filter((c) => {
         const n = String(c.nombre ?? '').trim();
         if (n === '' || n === '—' || n === '-') return false;
