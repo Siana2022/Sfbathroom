@@ -14,6 +14,7 @@ export type ClientesData = {
   nuevos: number;
   recuperados: number;
   perdidos: number;
+  inactivos: number;
   retencion: number | null;
   tabla: { id: string; nombre: string; neta: number; facturas: number; ticket: number }[];
   familias: string[];
@@ -29,6 +30,15 @@ type FilaCliente = { id: string; nombre: string; estado: string; fecha_primer_pe
 type FilaArticulo = { id: string; familia: string | null };
 type FilaLinea = { factura_id: string; articulo_id: string | null };
 type FilaPedido = { cliente_id: string | null; fecha_entrada: string };
+
+type FilaActividad = {
+  cliente_id: string;
+  primera: string | null;
+  ultima: string | null;
+  netaAnio: number;
+  netaPrev: number;
+  neta12m: number;
+};
 
 const DIA = 86400000;
 
@@ -115,30 +125,74 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
       .range(desde, desde + TAMANO_PAGINA - 1)
   );
 
-  const perdidos = clientes.filter((c) => c.estado === 'perdido' || c.estado === 'inactivo').length;
-  // nuevos = compran este año y no compraron el año previo en la ventana
-  const nuevosRaw = [...activos].filter((id) => !activosPrevio.has(id));
-  const nuevos = nuevosRaw.filter((id) => {
-    const cli = clientes.find((c) => c.id === id);
-    return !cli?.fecha_primer_pedido || cli.fecha_primer_pedido.slice(0, 4) === at;
-  }).length;
-  // recuperados = compran este año, no compraron el previo, pero sí tenían histórico → vuelven tras parón
-  const recuperados = nuevosRaw.length - nuevos;
-  const retencion = activosPrevio.size > 0 ? [...activos].filter((id) => activosPrevio.has(id)).length / activosPrevio.size * 100 : null;
+  const nombreCliente = new Map(clientes.map((c) => [c.id, c.nombre]));
 
-  const noActivos: ClientesData['noActivos'] = [];
-  for (const c of clientes) {
-    if (c.estado !== 'activo') continue;
-    const fechas = fechasCliente.get(c.id);
-    if (!fechas || fechas.size === 0) continue;
-    const ultima = [...fechas].sort().reverse()[0];
-    const diasSin = Math.round((hoy * DIA - Date.parse(ultima)) / DIA);
-    if (diasSin > 365) {
-      noActivos.push({ nombre: c.nombre, diasSin, ultimaFactura: ultima });
+  // Actividad agregada en SQL: primera/última factura y facturación por ejercicio.
+  const { data: actividadRaw } = await supabase.rpc('clientes_actividad', {
+    p_codigo_empresa: codigoEmpresa,
+    p_anio: anio,
+  });
+  const actividad = Array.isArray(actividadRaw) ? (actividadRaw as FilaActividad[]) : null;
+
+  let perdidos = 0;
+  let inactivos = 0;
+  let nuevos = 0;
+  let recuperados = 0;
+  let retencion: number | null = null;
+  let noActivos: ClientesData['noActivos'] = [];
+
+  if (actividad) {
+    const anioIni = `${anio}-01-01`;
+    const prevIni = `${anio - 1}-01-01`;
+    const conNetaAnio = actividad.filter((a) => Number(a.netaAnio) > 0);
+    const conNetaPrev = actividad.filter((a) => Number(a.netaPrev) > 0);
+
+    nuevos = conNetaAnio.filter((a) => a.primera !== null && a.primera >= anioIni).length;
+    recuperados = conNetaAnio.filter(
+      (a) => Number(a.netaPrev) <= 0 && a.primera !== null && a.primera < prevIni,
+    ).length;
+    retencion =
+      conNetaPrev.length > 0
+        ? (conNetaPrev.filter((a) => Number(a.netaAnio) > 0).length / conNetaPrev.length) * 100
+        : null;
+
+    for (const a of actividad) {
+      if (!a.ultima) continue;
+      const diasSin = Math.floor((hoy * DIA - Date.parse(a.ultima)) / DIA);
+      if (diasSin > 730) perdidos += 1;
+      else if (diasSin > 365) inactivos += 1;
     }
+
+    noActivos = actividad
+      .filter((a) => a.ultima !== null && Math.floor((hoy * DIA - Date.parse(a.ultima)) / DIA) > 365)
+      .map((a) => ({
+        nombre: nombreCliente.get(a.cliente_id) ?? '—',
+        diasSin: Math.floor((hoy * DIA - Date.parse(a.ultima as string)) / DIA),
+        ultimaFactura: a.ultima as string,
+      }))
+      .sort((a, b) => b.diasSin - a.diasSin)
+      .slice(0, 10);
+  } else {
+    perdidos = clientes.filter((c) => c.estado === 'perdido' || c.estado === 'inactivo').length;
+    const nuevosRaw = [...activos].filter((id) => !activosPrevio.has(id));
+    nuevos = nuevosRaw.filter((id) => {
+      const cli = clientes.find((c) => c.id === id);
+      return !cli?.fecha_primer_pedido || cli.fecha_primer_pedido.slice(0, 4) === at;
+    }).length;
+    recuperados = nuevosRaw.length - nuevos;
+    retencion = activosPrevio.size > 0 ? ([...activos].filter((id) => activosPrevio.has(id)).length / activosPrevio.size) * 100 : null;
+
+    for (const c of clientes) {
+      if (c.estado !== 'activo') continue;
+      const fechas = fechasCliente.get(c.id);
+      if (!fechas || fechas.size === 0) continue;
+      const ultima = [...fechas].sort().reverse()[0];
+      const diasSin = Math.round((hoy * DIA - Date.parse(ultima)) / DIA);
+      if (diasSin > 365) noActivos.push({ nombre: c.nombre, diasSin, ultimaFactura: ultima });
+    }
+    noActivos.sort((a, b) => b.diasSin - a.diasSin);
+    if (noActivos.length > 10) noActivos.length = 10;
   }
-  noActivos.sort((a, b) => b.diasSin - a.diasSin);
-  if (noActivos.length > 10) noActivos.length = 10;
 
   const netaW1 = new Map<string, number>();
   const netaW2 = new Map<string, number>();
@@ -150,7 +204,6 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
     if (dia > hoy - 365) netaW1.set(f.cliente_id, (netaW1.get(f.cliente_id) ?? 0) + base);
     else if (dia > hoy - 730) netaW2.set(f.cliente_id, (netaW2.get(f.cliente_id) ?? 0) + base);
   }
-  const nombreCliente = new Map(clientes.map((c) => [c.id, c.nombre]));
   const movimiento = [...new Set([...netaW1.keys(), ...netaW2.keys()])]
     .map((id) => {
       const actual = netaW1.get(id) ?? 0;
@@ -262,6 +315,7 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
     nuevos,
     recuperados,
     perdidos,
+    inactivos,
     retencion,
     tabla,
     familias: familiasOrden,
