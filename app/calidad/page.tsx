@@ -49,7 +49,7 @@ export default async function CalidadPage({ searchParams }: { searchParams: Sear
       </ul>
 
       <div className="card">
-        <h2>Devoluciones por referencia</h2>
+        <h2>Devoluciones por referencia (top 10)</h2>
         {d.devolucionesArticulo.length === 0 ? (
           <p style={{ color: 'var(--muted)' }}>Sin abonos en el ejercicio.</p>
         ) : (
@@ -161,7 +161,7 @@ export default async function CalidadPage({ searchParams }: { searchParams: Sear
       </div>
 
       <div className="card">
-        <h2>Clientes con más incidencias</h2>
+        <h2>Clientes con más incidencias (top 5)</h2>
         {d.porCliente.length === 0 ? (
           <p style={{ color: 'var(--muted)' }}>Sin incidencias asociadas a cliente.</p>
         ) : (
