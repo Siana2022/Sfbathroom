@@ -35,6 +35,10 @@ export type ActividadData = {
   anio: number;
   sinAccesoMargen: boolean;
   comerciales: ComercialRow[];
+  listas: {
+    nuevos: { cliente: string; comercial: string }[];
+    perdidos: { cliente: string; comercial: string }[];
+  };
 };
 
 type Fila = { id: string; comercial_id: string | null; cliente_id: string | null; base_imponible: number; tipo_documento: string; descuento_pie: number; fecha: string };
@@ -189,6 +193,24 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
   const rol = await getRol();
   const sinAccesoMargen = !puedeVerMargenes(rol);
 
+  const clientesRes = await todasLasFilas<{ id: string; nombre: string }>((desde) =>
+    supabase.from('clientes').select('id, nombre').eq('empresa_id', empresa.id).range(desde, desde + TAMANO_PAGINA - 1),
+  );
+  const nombreCliente = new Map(clientesRes.map((c) => [c.id, c.nombre]));
+
+  const listaNuevos: { cliente: string; comercial: string }[] = [];
+  const listaPerdidos: { cliente: string; comercial: string }[] = [];
+  for (const c of filasComerciales) {
+    const activos = porComercial.get(c.id)?.clientes ?? new Set<string>();
+    const previo = clientesPrevio.get(c.id);
+    for (const id of activos) {
+      if (!previo?.has(id)) listaNuevos.push({ cliente: nombreCliente.get(id) ?? '—', comercial: c.nombre });
+    }
+    for (const id of previo ?? []) {
+      if (!activos.has(id)) listaPerdidos.push({ cliente: nombreCliente.get(id) ?? '—', comercial: c.nombre });
+    }
+  }
+
   const comercialesRes: ComercialRow[] = filasComerciales.map((c) => {
     const v = porComercial.get(c.id);
     const previo = clientesPrevio.get(c.id);
@@ -221,7 +243,13 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
     };
   }).sort((a, b) => b.neta - a.neta);
 
-  return { empresa, anio, sinAccesoMargen, comerciales: agrupar(comercialesRes) };
+  return {
+    empresa,
+    anio,
+    sinAccesoMargen,
+    comerciales: agrupar(comercialesRes),
+    listas: { nuevos: listaNuevos, perdidos: listaPerdidos },
+  };
 }
 
 // ─── Agrupación por cabecera (STARBATH / BIGMAT o sufijo repetido) ───
