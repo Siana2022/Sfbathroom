@@ -37,11 +37,11 @@ export type ClientesData = {
   perdidos: number;
   inactivos: number;
   retencion: number | null;
-  tabla: { id: string; nombre: string; neta: number; facturas: number; ticket: number }[];
+  tabla: { id: string; nombre: string; neta: number; facturas: number; ticket: number; comercial: string | null }[];
   familias: string[];
   matriz: { id: string; nombre: string; neta: number; compradas: boolean[] }[];
   semaforo: { id: string; nombre: string; estado: string; diasSin: number; frecuencia: number | null; nivel: 'ok' | 'aviso' | 'critico' }[];
-  noActivos: { nombre: string; diasSin: number; ultimaFactura: string }[];
+  noActivos: { nombre: string; diasSin: number; ultimaFactura: string; comercial: string | null }[];
   movimiento: { nombre: string; netaActual: number; netaPrevia: number; delta: number; deltaPct: number | null }[];
   cohortes: { mes: string; nuevos: number; activos12m: number; retencion: number | null }[];
   listas: ListasClientes;
@@ -229,6 +229,7 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
         nombre: nombreCliente.get(a.cliente_id) ?? '—',
         diasSin: Math.floor((hoy * DIA - Date.parse(a.ultima as string)) / DIA),
         ultimaFactura: a.ultima as string,
+        comercial: nombreComercial.get(comercialDeCliente.get(a.cliente_id) ?? '') ?? null,
       }))
       .sort((a, b) => b.diasSin - a.diasSin)
       .slice(0, 10);
@@ -248,7 +249,14 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
       if (!fechas || fechas.size === 0) continue;
       const ultima = [...fechas].sort().reverse()[0];
       const diasSin = Math.round((hoy * DIA - Date.parse(ultima)) / DIA);
-      if (diasSin > 365) noActivos.push({ nombre: c.nombre, diasSin, ultimaFactura: ultima });
+      if (diasSin > 365) {
+        noActivos.push({
+          nombre: c.nombre,
+          diasSin,
+          ultimaFactura: ultima,
+          comercial: nombreComercial.get(c.comercial_id ?? '') ?? null,
+        });
+      }
     }
     noActivos.sort((a, b) => b.diasSin - a.diasSin);
     if (noActivos.length > 10) noActivos.length = 10;
@@ -300,6 +308,7 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
       neta: v.neta,
       facturas: v.facturas,
       ticket: v.facturas > 0 ? v.neta / v.facturas : 0,
+      comercial: nombreComercial.get(comercialDeCliente.get(id) ?? '') ?? null,
     }))
     .sort((a, b) => b.neta - a.neta)
     .slice(0, 15);

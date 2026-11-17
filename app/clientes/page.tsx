@@ -42,7 +42,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: Sea
       <div className="card">
         <h2>Clientes sin actividad en más de 12 meses</h2>
         <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
-          Aviso Q2: clientes con estado activo pero sin facturar desde hace más de 365 días.
+          Clientes sin facturar desde hace más de 12 meses, con su comercial asignado.
           Candidatos a reactivación (o a su clasificación como perdidos).
         </p>
         {d.noActivos.length === 0 ? (
@@ -52,6 +52,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: Sea
             <thead>
               <tr>
                 <th>Cliente</th>
+                <th>Comercial</th>
                 <th className="td-num">Días sin facturar</th>
                 <th>Última factura</th>
               </tr>
@@ -60,6 +61,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: Sea
               {d.noActivos.map((c) => (
                 <tr key={c.nombre}>
                   <td>{c.nombre}</td>
+                  <td>{c.comercial ?? '—'}</td>
                   <td className={`td-num ${c.diasSin > 365 ? 'td-pos' : ''}`}>{numero(c.diasSin)}</td>
                   <td>{c.ultimaFactura}</td>
                 </tr>
@@ -146,6 +148,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: Sea
             <thead>
               <tr>
                 <th>Cliente</th>
+                <th>Comercial</th>
                 <th className="td-num">Facturación neta</th>
                 <th className="td-num">Facturas</th>
                 <th className="td-num">Ticket medio</th>
@@ -155,6 +158,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: Sea
               {d.tabla.map((c) => (
                 <tr key={c.id}>
                   <td><Link href={`/clientes/${c.id}`} className="enlace">{c.nombre}</Link></td>
+                  <td>{c.comercial ?? '—'}</td>
                   <td className="td-num">{eur(c.neta)}</td>
                   <td className="td-num">{numero(c.facturas)}</td>
                   <td className="td-num">{eur(c.ticket)}</td>
