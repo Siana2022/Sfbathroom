@@ -43,8 +43,8 @@ export type ClientesData = {
   familias: string[];
   matriz: { id: string; nombre: string; neta: number; compradas: boolean[] }[];
   semaforo: { id: string; nombre: string; estado: string; diasSin: number; frecuencia: number | null; nivel: 'ok' | 'aviso' | 'critico' }[];
-  noActivos: { nombre: string; diasSin: number; ultimaFactura: string; comercial: string | null }[];
-  movimiento: { nombre: string; netaActual: number; netaPrevia: number; delta: number; deltaPct: number | null }[];
+  noActivos: { id: string; nombre: string; diasSin: number; ultimaFactura: string; comercial: string | null }[];
+  movimiento: { id: string; nombre: string; netaActual: number; netaPrevia: number; delta: number; deltaPct: number | null }[];
   cohortes: { mes: string; nuevos: number; activos12m: number; retencion: number | null }[];
   listas: ListasClientes;
 };
@@ -248,6 +248,7 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
     noActivos = actividad
       .filter((a) => a.ultima !== null && Math.floor((hoy * DIA - Date.parse(a.ultima)) / DIA) > 365)
       .map((a) => ({
+        id: a.cliente_id,
         nombre: nombreCliente.get(a.cliente_id) ?? '—',
         diasSin: Math.floor((hoy * DIA - Date.parse(a.ultima as string)) / DIA),
         ultimaFactura: a.ultima as string,
@@ -273,6 +274,7 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
       const diasSin = Math.round((hoy * DIA - Date.parse(ultima)) / DIA);
       if (diasSin > 365) {
         noActivos.push({
+          id: c.id,
           nombre: c.nombre,
           diasSin,
           ultimaFactura: ultima,
@@ -298,7 +300,7 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
     .map((id) => {
       const actual = netaW1.get(id) ?? 0;
       const previa = netaW2.get(id) ?? 0;
-      return { nombre: nombreCliente.get(id) ?? '—', netaActual: actual, netaPrevia: previa, delta: actual - previa, deltaPct: previa > 0 ? ((actual - previa) / previa) * 100 : null };
+      return { id, nombre: nombreCliente.get(id) ?? '—', netaActual: actual, netaPrevia: previa, delta: actual - previa, deltaPct: previa > 0 ? ((actual - previa) / previa) * 100 : null };
     })
     .sort((a, b) => b.delta - a.delta)
     .slice(0, 12);
