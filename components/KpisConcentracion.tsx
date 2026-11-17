@@ -48,8 +48,9 @@ export default function KpisConcentracion({ netaTotal, numClientes, top1, top3, 
 
   const lecturaHhi =
     hhi < 1500 ? 'Cartera diversificada' : hhi <= 2500 ? 'Concentración moderada' : 'Muy concentrada';
+  const colorHhi = hhi < 1500 ? 'var(--verde)' : hhi <= 2500 ? 'var(--ambar)' : 'var(--rojo)';
 
-  const tarjeta = (etiqueta: string, valor: string, nota: string, v?: Vista, pequeno = false) => (
+  const tarjeta = (etiqueta: string, valor: string, nota: string, v?: Vista, pequeno = false, color?: string) => (
     <li
       className={`kpi${v ? ' kpi-clic' : ''}`}
       onClick={v ? () => setVista(v) : undefined}
@@ -58,7 +59,12 @@ export default function KpisConcentracion({ netaTotal, numClientes, top1, top3, 
       onKeyDown={v ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setVista(v); } } : undefined}
     >
       <span className="kpi-etiqueta">{etiqueta}</span>
-      <strong className="kpi-valor" style={pequeno ? { fontSize: 19, lineHeight: 1.25 } : undefined}>{valor}</strong>
+      <strong
+        className="kpi-valor"
+        style={{ ...(pequeno ? { fontSize: 19, lineHeight: 1.25 } : {}), ...(color ? { color } : {}) }}
+      >
+        {valor}
+      </strong>
       <span className="kpi-nota">{nota}</span>
       {v ? <span className="kpi-ver">Ver clientes →</span> : null}
     </li>
@@ -71,7 +77,7 @@ export default function KpisConcentracion({ netaTotal, numClientes, top1, top3, 
         {tarjeta('% top 1', top1 === null ? '—' : `${decimal(top1)} %`, 'mayor cliente sobre el total', 'top1')}
         {tarjeta('% top 3', top3 === null ? '—' : `${decimal(top3)} %`, 'tres mayores clientes', 'top3')}
         {tarjeta('% top 10', top10 === null ? '—' : `${decimal(top10)} %`, 'diez mayores clientes', 'top10')}
-        {tarjeta('Concentración de clientes', lecturaHhi, `HHI ${decimal(hhi)} · ×10.000`, 'hhi', true)}
+        {tarjeta('Concentración de clientes', lecturaHhi, `HHI ${decimal(hhi)} · ×10.000`, 'hhi', true, colorHhi)}
       </ul>
 
       {vista ? (
