@@ -2,7 +2,8 @@ import { cookies } from 'next/headers';
 import { getConcentracion, UMBRAL_CLIENTE_DE_FAMILIA, UMBRAL_FAMILIA_RELEVANTE } from '@/lib/datos/concentracion';
 import { parseFiltros, getOpcionesFiltros, type SearchParams } from '@/lib/datos/filtros';
 import { decimal, eur, numero } from '@/lib/formato';
-import Kpi from '@/components/Kpi';
+import KpisConcentracion from '@/components/KpisConcentracion';
+import Tarta from '@/components/Tarta';
 import DescargarExcel from '@/components/DescargarExcel';
 import Filtros from '@/components/Filtros';
 import { ANIO_ACTUAL } from '@/lib/ejercicio';
@@ -27,13 +28,15 @@ export default async function ConcentracionPage({ searchParams }: { searchParams
 
       <Filtros opciones={opciones} />
 
-      <ul className="grid-kpis">
-        <Kpi etiqueta="Facturación total" valor={eur(d.netaTotal)} nota={`${d.numClientes} clientes con venta`} />
-        <Kpi etiqueta="% top 1" valor={d.top1 === null ? '—' : `${decimal(d.top1)} %`} nota="mayor cliente sobre el total" />
-        <Kpi etiqueta="% top 3" valor={d.top3 === null ? '—' : `${decimal(d.top3)} %`} nota="tres mayores clientes" />
-        <Kpi etiqueta="% top 10" valor={d.top10 === null ? '—' : `${decimal(d.top10)} %`} nota="diez mayores clientes" />
-        <Kpi etiqueta="Índice de Herfindahl" valor={decimal(d.hhi)} nota="×10.000 (mayor = más concentrado)" />
-      </ul>
+      <KpisConcentracion
+        netaTotal={d.netaTotal}
+        numClientes={d.numClientes}
+        top1={d.top1}
+        top3={d.top3}
+        top10={d.top10}
+        hhi={d.hhi}
+        pareto={d.pareto}
+      />
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -67,6 +70,10 @@ export default async function ConcentracionPage({ searchParams }: { searchParams
             ))}
           </tbody>
         </table>
+        <div className="split-columnas">
+          <Tarta datos={d.porPais.map((p) => ({ etiqueta: p.pais, valor: p.neta }))} />
+          <Tarta datos={d.familias.map((f) => ({ etiqueta: f.familia, valor: f.neta }))} />
+        </div>
       </div>
 
       <div className="card">
@@ -102,49 +109,6 @@ export default async function ConcentracionPage({ searchParams }: { searchParams
         )}
       </div>
 
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2>Riesgo de proveedor</h2>
-          <DescargarExcel
-            nombre={`concentracion-riesgo-proveedor-${d.anio}`}
-            columnas={['Proveedor', 'País', 'Plazo pactado', 'Volumen logístico', '% compra']}
-            registros={d.riesgoProveedor.map((p) => [p.proveedor, p.pais, p.plazo, p.volumen, p.pctVolumen])}
-          />
-        </div>
-        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
-          Proveedores reales de A3ERP con su país y plazo pactado, ordenados por el volumen
-          comprado que ya tenemos cargado (gastos de logística y transporte). El aviso de plazo
-          se dispara por encima de 75 días.
-        </p>
-        <table className="tabla">
-          <thead>
-            <tr>
-              <th>Proveedor</th>
-              <th>País</th>
-              <th className="td-num">Plazo pactado</th>
-              <th className="td-num">Volumen logístico</th>
-              <th className="td-num">% compra</th>
-              <th>Riesgo</th>
-            </tr>
-          </thead>
-          <tbody>
-            {d.riesgoProveedor.map((p) => (
-              <tr key={p.proveedor}>
-                <td>{p.proveedor}</td>
-                <td>{p.pais}</td>
-                <td className={`td-num ${p.plazoAlto ? 'td-pos' : ''}`}>{p.plazo > 0 ? `${numero(p.plazo)} días` : '—'}</td>
-                <td className="td-num">{eur(p.volumen)}</td>
-                <td className="td-num">{decimal(p.pctVolumen)} %</td>
-                <td>
-                  <span className={`td-num ${p.chino || p.plazoAlto ? 'td-pos' : ''}`}>
-                    {[p.chino && 'origen China', p.plazoAlto && 'plazo alto'].filter(Boolean).join(' · ') || '—'}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
     </div>
   );
 }
