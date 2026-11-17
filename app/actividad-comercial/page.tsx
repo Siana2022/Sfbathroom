@@ -62,8 +62,9 @@ export default async function ActividadComercialPage({ searchParams }: { searchP
 
   const totalNeta = d.comerciales.reduce((a, c) => a + c.neta, 0);
   const totalPresupuesto = d.comerciales.reduce((a, c) => a + c.presupuesto, 0);
-  const totalNuevos = d.comerciales.reduce((a, c) => a + c.nuevos, 0);
-  const totalPerdidos = d.comerciales.reduce((a, c) => a + c.perdidos, 0);
+  // Nuevos y perdidos únicos por empresa (no sumados por comercial).
+  const totalNuevos = d.listas.nuevos.length;
+  const totalPerdidos = d.listas.perdidos.length;
   const saturados = d.comerciales.filter((c) => c.saturacionImporte || c.saturacionClientes).length;
 
   const columnas: string[] = [
