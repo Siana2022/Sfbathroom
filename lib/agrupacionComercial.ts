@@ -9,10 +9,27 @@
 
 export const TOKENS_GRUPO_COMERCIAL = ['STARBATH', 'BIGMAT'];
 
+/** Comerciales que se agrupan bajo una cabecera aunque no la lleven en el nombre. */
+const ALIAS_GRUPO: Record<string, string> = {
+  'JUAN ORTEGA': 'STARBATH',
+};
+
+const sinTildes = (s: string) =>
+  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase();
+
+/** ¿Este comercial pertenece a la marca STARBATH? */
+export function esMarcaStarbath(nombre: string): boolean {
+  const n = sinTildes(nombre);
+  return n.includes('STARBATH') || ALIAS_GRUPO[n] === 'STARBATH';
+}
+
 export function grupoComercial(
   nombre: string,
   sufijos: Map<string, number>,
 ): { base: string; seccion: string | null } {
+  const alias = ALIAS_GRUPO[sinTildes(nombre)];
+  if (alias) return { base: alias, seccion: nombre };
+
   const up = nombre.toUpperCase();
   for (const token of TOKENS_GRUPO_COMERCIAL) {
     if (up.includes(token)) {

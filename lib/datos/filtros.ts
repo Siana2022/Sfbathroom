@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { esMarcaStarbath } from '@/lib/agrupacionComercial';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { todasLasFilas, TAMANO_LOTE, TAMANO_PAGINA } from '@/lib/datos/query';
 
@@ -41,6 +42,8 @@ const COMERCIALES_INVALIDOS = new Set([
   'MARCO ROSSI',
   'ORIENTE MEDIO',
   'PROVEEDORES',
+  'CONTRACT',
+  'ESTUDIO ARQUITECTURA',
 ]);
 
 /** ¿Es un comercial real (no demo ni valor regional de A3ERP)? */
@@ -211,7 +214,7 @@ export async function getFacturaIdsFiltradas(
     const coms = await todasLasFilas<{ id: string; nombre: string }>((desde) =>
       supabase.from('comerciales').select('id, nombre').range(desde, desde + TAMANO_PAGINA - 1),
     );
-    const sb = new Set(coms.filter((c) => String(c.nombre).toUpperCase().includes('STARBATH')).map((c) => c.id));
+    const sb = new Set(coms.filter((c) => esMarcaStarbath(String(c.nombre))).map((c) => c.id));
     filas = filas.filter((f) => (esStarbath ? sb.has(f.comercial_id ?? '') : !sb.has(f.comercial_id ?? '')));
   }
 
@@ -279,7 +282,7 @@ export async function getPedidoIdsFiltrados(
     const coms = await todasLasFilas<{ id: string; nombre: string }>((desde) =>
       supabase.from('comerciales').select('id, nombre').range(desde, desde + TAMANO_PAGINA - 1),
     );
-    const sb = new Set(coms.filter((c) => String(c.nombre).toUpperCase().includes('STARBATH')).map((c) => c.id));
+    const sb = new Set(coms.filter((c) => esMarcaStarbath(String(c.nombre))).map((c) => c.id));
     filas = filas.filter((f) => (esStarbath ? sb.has(f.comercial_id ?? '') : !sb.has(f.comercial_id ?? '')));
   }
 

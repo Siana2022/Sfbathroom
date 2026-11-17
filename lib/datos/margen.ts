@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getRol, getUsuario, puedeVerMargenes } from '@/lib/datos/role';
 import { memo } from '@/lib/perf/memo';
-import { grupoComercial } from '@/lib/agrupacionComercial';
+import { esMarcaStarbath, grupoComercial } from '@/lib/agrupacionComercial';
 import { filtrarPorIds, getFacturaIdsFiltradas, hayFiltros, type Filtros } from '@/lib/datos/filtros';
 import { lineasPorFacturas } from '@/lib/datos/lineas';
 import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
@@ -253,7 +253,7 @@ async function margenInterno(
 
     {
       const comNombre = f?.comercial_id ? (comercialesMap.get(f.comercial_id) ?? '') : '';
-      const esSb = comNombre.toUpperCase().includes('STARBATH');
+      const esSb = esMarcaStarbath(comNombre);
       const marca = esSb ? 'STARBATH' : empresa.nombre;
       const mRaw = porMarcaRaw.get(marca) ?? { marcaBlanca: !esSb, importe: 0, coste: 0 };
       mRaw.importe += importe;

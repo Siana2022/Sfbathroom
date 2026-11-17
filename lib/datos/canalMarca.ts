@@ -5,6 +5,7 @@ import { filtrarPorIds, getFacturaIdsFiltradas, hayFiltros, type Filtros } from 
 import { lineasPorFacturas } from '@/lib/datos/lineas';
 import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 import { ventasAnioRpc } from '@/lib/datos/ventas';
+import { esMarcaStarbath } from '@/lib/agrupacionComercial';
 
 export type Segmento = {
   marca: string;
@@ -135,8 +136,7 @@ async function getSegmentos(
     const { data: coms } = await supabase.from('comerciales').select('id, nombre');
     for (const c of (coms ?? []) as { id: string; nombre: string }[]) comercialNombre.set(c.id, c.nombre);
   }
-  const esStarbath = (id: string | null) =>
-    String(id ? (comercialNombre.get(id) ?? '') : '').toUpperCase().includes('STARBATH');
+  const esStarbath = (id: string | null) => esMarcaStarbath(String(id ? (comercialNombre.get(id) ?? '') : ''));
   const facturaMes = new Map(facturas.map((f) => [f.id, f.fecha.slice(0, 7)]));
 
   const seg = new Map<string, SegmentoAgregado>();
