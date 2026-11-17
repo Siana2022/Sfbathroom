@@ -47,13 +47,35 @@ export async function getCobros(codigoEmpresa: string, anio: number, filtros?: F
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
   const clienteId = filtros?.cliente;
 
-  let agingQuery = supabase
-    .from('v_aging')
-    .select('cliente_id, pendiente, dias_mora')
+  // Fuente preferente: vencimientos reales de A3ERP (cobros_cartera).
+  let carteraQuery = supabase
+    .from('cobros_cartera')
+    .select('cliente_id, pendiente, fecha_vencimiento')
     .eq('empresa_id', empresa.id);
-  if (clienteId) agingQuery = agingQuery.eq('cliente_id', clienteId);
-  const { data: aging } = await agingQuery;
-  const filas = (aging ?? []) as FilaAging[];
+  if (clienteId) carteraQuery = carteraQuery.eq('cliente_id', clienteId);
+  const { data: cartera, error: carteraError } = await carteraQuery;
+
+  const hoyMs = Math.floor(Date.now() / DIA_MS);
+  let filas: FilaAging[] = [];
+  if (!carteraError && Array.isArray(cartera) && cartera.length > 0) {
+    filas = (cartera as { cliente_id: string | null; pendiente: number | null; fecha_vencimiento: string | null }[])
+      .filter((c) => Number(c.pendiente ?? 0) !== 0)
+      .map((c) => ({
+        cliente_id: c.cliente_id,
+        pendiente: Number(c.pendiente ?? 0),
+        dias_mora: c.fecha_vencimiento
+          ? Math.floor((hoyMs * DIA_MS - Date.parse(c.fecha_vencimiento)) / DIA_MS)
+          : 0,
+      }));
+  } else {
+    let agingQuery = supabase
+      .from('v_aging')
+      .select('cliente_id, pendiente, dias_mora')
+      .eq('empresa_id', empresa.id);
+    if (clienteId) agingQuery = agingQuery.eq('cliente_id', clienteId);
+    const { data: aging } = await agingQuery;
+    filas = (aging ?? []) as FilaAging[];
+  }
 
   let saldoTotal = 0;
   let vencidoTotal = 0;
