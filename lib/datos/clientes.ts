@@ -125,14 +125,16 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
     fechasCliente.set(f.cliente_id, s);
   }
 
-  const pedidos = await todasLasFilas<FilaPedido>((desde) =>
-    supabase
+  const pedidos = await todasLasFilas<FilaPedido>((desde) => {
+    let q = supabase
       .from('pedidos')
       .select('cliente_id, fecha_entrada')
       .eq('empresa_id', empresa.id)
-      .gte('fecha_entrada', iso(365))
-      .range(desde, desde + TAMANO_PAGINA - 1)
-  );
+      .gte('fecha_entrada', iso(365));
+    if (filtros?.cliente) q = q.eq('cliente_id', filtros.cliente);
+    if (filtros?.comercial) q = q.eq('comercial_id', filtros.comercial);
+    return q.range(desde, desde + TAMANO_PAGINA - 1);
+  });
   const activos12m = new Set(pedidos.map((p) => p.cliente_id).filter(Boolean));
   const ultimoPedido = new Map<string, string>();
   for (const p of pedidos) {
@@ -160,12 +162,20 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
   const { data: actividadRaw } = await supabase.rpc('clientes_actividad', {
     p_codigo_empresa: codigoEmpresa,
     p_anio: anio,
+    p_cliente: filtros?.cliente ?? null,
+    p_comercial: filtros?.comercial ?? null,
+    p_familia: filtros?.familia ?? null,
+    p_marca: filtros?.marca ?? null,
   });
   const actividad = Array.isArray(actividadRaw) ? (actividadRaw as FilaActividad[]) : null;
 
   const { data: margenRaw } = await supabase.rpc('clientes_margen', {
     p_codigo_empresa: codigoEmpresa,
     p_anio: anio,
+    p_cliente: filtros?.cliente ?? null,
+    p_comercial: filtros?.comercial ?? null,
+    p_familia: filtros?.familia ?? null,
+    p_marca: filtros?.marca ?? null,
   });
   const costePorCliente = new Map<string, number>();
   if (Array.isArray(margenRaw)) {
