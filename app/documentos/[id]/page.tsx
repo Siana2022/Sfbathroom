@@ -77,7 +77,6 @@ export default async function DocumentoPage({ params }: { params: { id: string }
                 <th>Código</th>
                 <th>Artículo</th>
                 <th>Familia</th>
-                <th>Marca</th>
                 <th className="td-num">Cantidad</th>
                 <th className="td-num">Precio</th>
                 <th className="td-num">Dto %</th>
@@ -90,7 +89,6 @@ export default async function DocumentoPage({ params }: { params: { id: string }
                   <td>{l.codigo}</td>
                   <td>{l.articulo}</td>
                   <td>{l.familia}</td>
-                  <td>{l.marca}</td>
                   <td className="td-num">{decimal(l.cantidad)}</td>
                   <td className="td-num">{eur2(l.precio)}</td>
                   <td className="td-num">{decimal(l.descuento)}</td>
