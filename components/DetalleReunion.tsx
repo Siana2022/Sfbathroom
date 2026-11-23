@@ -4,6 +4,12 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { EventoAgenda } from '@/lib/datos/agenda';
 
+const TIPOS_SEGUIMIENTO: { valor: string; etiqueta: string }[] = [
+  { valor: 'pedido_solicitado', etiqueta: 'Pedido solicitado' },
+  { valor: 'reunion_seguimiento', etiqueta: 'Reunión de seguimiento' },
+  { valor: 'otros', etiqueta: 'Otros' },
+];
+
 const TIPOS: Record<string, string> = {
   presencial: 'Presencial',
   online: 'Online',
@@ -24,6 +30,8 @@ export default function DetalleReunion({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [nota, setNota] = useState('');
+  const [tipoSeguimiento, setTipoSeguimiento] = useState('reunion_seguimiento');
+  const [motivo, setMotivo] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [fechaNueva, setFechaNueva] = useState(evento.fecha);
   const [horaNueva, setHoraNueva] = useState(evento.hora ? evento.hora.slice(0, 5) : '');
@@ -38,10 +46,14 @@ export default function DetalleReunion({
         empresa_id: empresaId,
         comercial_id: comercialId,
         texto: nota.trim(),
+        tipo: tipoSeguimiento,
+        motivo: tipoSeguimiento === 'otros' ? motivo.trim() || null : null,
       });
       if (e) setError(e.message);
       else {
         setNota('');
+        setMotivo('');
+        setTipoSeguimiento('reunion_seguimiento');
         router.refresh();
       }
     });
@@ -155,13 +167,32 @@ export default function DetalleReunion({
             {evento.seguimiento.map((n) => (
               <li key={n.id} style={{ marginBottom: 12 }}>
                 <span style={{ color: 'var(--muted)', fontSize: 12 }}>
-                  {n.fecha.slice(0, 16).replace('T', ' ')}
+                  {n.fecha.slice(0, 16).replace('T', ' ')} ·{' '}
+                  {TIPOS_SEGUIMIENTO.find((tp) => tp.valor === n.tipo)?.etiqueta ?? n.tipo}
+                  {n.tipo === 'otros' && n.motivo ? `: ${n.motivo}` : ''}
                 </span>
                 <div style={{ whiteSpace: 'pre-wrap' }}>{n.texto}</div>
               </li>
             ))}
           </ul>
         )}
+
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
+          <label className="campo-filtro">
+            Tipo de seguimiento
+            <select value={tipoSeguimiento} onChange={(e) => setTipoSeguimiento(e.target.value)}>
+              {TIPOS_SEGUIMIENTO.map((tp) => (
+                <option key={tp.valor} value={tp.valor}>{tp.etiqueta}</option>
+              ))}
+            </select>
+          </label>
+          {tipoSeguimiento === 'otros' ? (
+            <label className="campo-filtro" style={{ flex: 1, minWidth: 220 }}>
+              Motivo
+              <input type="text" value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Motivo de la reunión" />
+            </label>
+          ) : null}
+        </div>
 
         <textarea
           value={nota}
