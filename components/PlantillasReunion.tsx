@@ -7,9 +7,11 @@ type Plantilla = { id: string; nombre: string; puntos: string[] };
 
 export default function PlantillasReunion({
   empresaId,
+  comercialId,
   plantillasIniciales,
 }: {
   empresaId: string;
+  comercialId: string | null;
   plantillasIniciales: Plantilla[];
 }) {
   const supabase = createClient();
@@ -28,7 +30,7 @@ export default function PlantillasReunion({
       const filas = { nombre: nombre.trim(), puntos: lista(puntos) };
       const { error: e } = editando
         ? await supabase.from('reunion_plantillas').update(filas).eq('id', editando.id)
-        : await supabase.from('reunion_plantillas').insert({ empresa_id: empresaId, ...filas });
+        : await supabase.from('reunion_plantillas').insert({ empresa_id: empresaId, comercial_id: comercialId, ...filas });
       if (e) setError(e.message);
       else {
         setNombre('');
