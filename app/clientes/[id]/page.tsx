@@ -9,6 +9,8 @@ import EditorContactosCliente from '@/components/EditorContactosCliente';
 import { getContactosCliente } from '@/lib/datos/contactos';
 import { getPedidosCliente, getPreciosCliente, getReunionesCliente } from '@/lib/datos/ficha360';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
+import { getSeguimientoCliente } from '@/lib/datos/seguimiento';
+import PanelSeguimiento from '@/components/PanelSeguimiento';
 import GraficoBarras from '@/components/GraficoBarras';
 import { ANIO_ACTUAL } from '@/lib/ejercicio';
 
@@ -19,13 +21,14 @@ export default async function FichaClientePage({ params }: { params: { id: strin
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
   const d = await getFichaCliente(empresa, params.id, ANIO);
   if (!d) notFound();
-  const [crossSell, contactos, empresaData, pedidos, precios, reuniones] = await Promise.all([
+  const [crossSell, contactos, empresaData, pedidos, precios, reuniones, seguimiento] = await Promise.all([
     getCrossSell(empresa, params.id, ANIO),
     getContactosCliente(params.id),
     getEmpresaPorCodigo(empresa),
     getPedidosCliente(params.id),
     getPreciosCliente(d.cliente.codigoErp),
     getReunionesCliente(params.id),
+    getSeguimientoCliente(params.id),
   ]);
 
   const barras = d.historico.map((m) => ({ etiqueta: m.mes, valor: Math.max(0, m.neta), titulo: `${m.mes}: ${eur(m.neta)}` }));
@@ -39,6 +42,7 @@ export default async function FichaClientePage({ params }: { params: { id: strin
         <a href="#resumen" className="enlace">Resumen</a>
         <a href="#pedidos" className="enlace">Pedidos ({pedidos.length})</a>
         <a href="#tarifas" className="enlace">Tarifas y precios</a>
+        <a href="#seguimiento" className="enlace">Seguimiento ({seguimiento.eventos.length})</a>
         <a href="#reuniones" className="enlace">Reuniones ({reuniones.length})</a>
         <a href="#contactos" className="enlace">Contactos ({contactos.length})</a>
       </nav>
@@ -191,6 +195,13 @@ export default async function FichaClientePage({ params }: { params: { id: strin
           </table>
         )}
       </div>
+
+      <PanelSeguimiento
+        clienteId={d.cliente.id}
+        empresaId={empresaData.id}
+        eventos={seguimiento.eventos}
+        alertas={seguimiento.alertas}
+      />
 
       <div id="contactos">
         <EditorContactosCliente clienteId={d.cliente.id} empresaId={empresaData.id} contactos={contactos} />
