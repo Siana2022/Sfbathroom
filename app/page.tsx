@@ -7,6 +7,7 @@ import { getKpisPersonalizadosVistos } from '@/lib/datos/kpisVisibles';
 import { getMiDia } from '@/lib/datos/miDia';
 import { getAgendaResumen } from '@/lib/datos/agenda';
 import { getAlertasComercial } from '@/lib/datos/alertasComercial';
+import AlertasPanel from '@/components/AlertasPanel';
 import { memo, memoDiario } from '@/lib/perf/memo';
 import { decimal, eur, numero, pct } from '@/lib/formato';
 import { FORMATOS } from '@/lib/datos/kpisCatalogo';
@@ -70,64 +71,39 @@ export default async function Home() {
 
         <div className="card">
           <h2>Mis alertas</h2>
-          {alertas.alertas.length === 0 ? (
-            <p style={{ color: 'var(--muted)' }}>Sin alertas. Todo al día.</p>
+          <AlertasPanel alertas={alertas.alertas} empresaId={alertas.empresaId} comercialId={alertas.comercialId} />
+        </div>
+
+        <div className="card">
+          <h2>Próximas reuniones</h2>
+          {agenda.proximas.length === 0 ? (
+            <p style={{ color: 'var(--muted)' }}>Sin reuniones próximas.</p>
           ) : (
-            <p style={{ margin: 0 }}>
-              Tienes <strong style={{ color: 'var(--rojo)' }}>{alertas.criticas} críticas</strong> y{' '}
-              <strong>{alertas.avisos} avisos</strong>.{' '}
-              <Link href="/alertas-comercial" className="enlace">Ver todas →</Link>
-            </p>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {agenda.proximas.map((e) => (
+                <li key={e.id} style={{ marginBottom: 5 }}>
+                  {e.fecha} {e.hora ? `· ${e.hora.slice(0, 5)}` : ''} ·{' '}
+                  <Link href={`/agenda/${e.id}`} className="enlace">{e.asunto}</Link>
+                  {e.clienteNombre ? ` · ${e.clienteNombre}` : ''}
+                </li>
+              ))}
+            </ul>
           )}
         </div>
 
         <div className="card">
-          <h2>Mi agenda de hoy</h2>
-          {agenda.hoy.length === 0 && agenda.atrasadas.length === 0 ? (
-            <p style={{ color: 'var(--muted)' }}>Sin reuniones para hoy.</p>
+          <h2>Reuniones vencidas</h2>
+          {agenda.atrasadas.length === 0 ? (
+            <p style={{ color: 'var(--muted)' }}>Ninguna reunión atrasada.</p>
           ) : (
-            <>
-              {agenda.hoy.length > 0 ? (
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
-                  {agenda.hoy.map((e) => (
-                    <li key={e.id} style={{ marginBottom: 6 }}>
-                      {e.hora ? `${e.hora.slice(0, 5)} · ` : ''}
-                      <Link href={`/agenda/${e.id}`} className="enlace">{e.asunto}</Link>
-                      {e.clienteNombre ? ` · ${e.clienteNombre}` : ''}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p style={{ color: 'var(--muted)' }}>Sin reuniones para hoy.</p>
-              )}
-              {agenda.manana.length > 0 ? (
-                <div style={{ marginTop: 12 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>Mañana</div>
-                  <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
-                    {agenda.manana.map((e) => (
-                      <li key={e.id} style={{ marginBottom: 4 }}>
-                        {e.hora ? `${e.hora.slice(0, 5)} · ` : ''}
-                        <Link href={`/agenda/${e.id}`} className="enlace">{e.asunto}</Link>
-                        {e.clienteNombre ? ` · ${e.clienteNombre}` : ''}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-              {agenda.atrasadas.length > 0 ? (
-                <div style={{ marginTop: 12 }}>
-                  <div style={{ color: 'var(--rojo)', fontSize: 13, fontWeight: 700 }}>Atrasadas ({agenda.atrasadas.length})</div>
-                  <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
-                    {agenda.atrasadas.map((e) => (
-                      <li key={e.id} style={{ marginBottom: 4, color: 'var(--rojo)' }}>
-                        {e.fecha} · <Link href={`/agenda/${e.id}`} className="enlace">{e.asunto}</Link>
-                        {e.clienteNombre ? ` · ${e.clienteNombre}` : ''}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-            </>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {agenda.atrasadas.map((e) => (
+                <li key={e.id} style={{ marginBottom: 5, color: 'var(--rojo)' }}>
+                  {e.fecha} · <Link href={`/agenda/${e.id}`} className="enlace">{e.asunto}</Link>
+                  {e.clienteNombre ? ` · ${e.clienteNombre}` : ''}
+                </li>
+              ))}
+            </ul>
           )}
         </div>
 
