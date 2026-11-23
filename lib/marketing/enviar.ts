@@ -1,3 +1,4 @@
+import nodemailer from 'nodemailer';
 import { createServiceClient } from '@/lib/supabase/serviceRole';
 import { renderizarEmail, type BloqueEmail } from '@/lib/marketing/bloques';
 import { enlaceBaja } from '@/lib/marketing/firma';
@@ -5,6 +6,30 @@ import { enlaceBaja } from '@/lib/marketing/firma';
 const RESEND_BATCH = 'https://api.resend.com/emails/batch';
 const RESEND_UNO = 'https://api.resend.com/emails';
 const LOTE = 100;
+
+type Proveedor = 'resend' | 'ses';
+
+function proveedorActivo(): Proveedor {
+  const elegido = (process.env.EMAIL_MARKETING_PROVIDER ?? '').toLowerCase();
+  if (elegido === 'ses' || elegido === 'resend') return elegido;
+  return process.env.SES_SMTP_HOST ? 'ses' : 'resend';
+}
+
+function transporteSes() {
+  const host = process.env.SES_SMTP_HOST;
+  const user = process.env.SES_SMTP_USER;
+  const pass = process.env.SES_SMTP_PASS;
+  if (!host || !user || !pass) return null;
+  return nodemailer.createTransport({
+    host,
+    port: Number(process.env.SES_SMTP_PORT ?? '465'),
+    secure: (process.env.SES_SMTP_PORT ?? '465') === '465',
+    auth: { user, pass },
+    pool: true,
+    maxConnections: 4,
+    maxMessages: 100,
+  });
+}
 
 export type Segmento = {
   comerciales?: string[];
@@ -25,8 +50,13 @@ export async function enviarCampana(opciones: {
   prueba?: string | null;
   base: string;
 }): Promise<ResultadoEnvio> {
-  if (!process.env.RESEND_API_KEY) {
+  const proveedor = proveedorActivo();
+  if (proveedor === 'resend' && !process.env.RESEND_API_KEY) {
     return { ok: false, enviados: 0, fallidos: 0, error: 'Falta RESEND_API_KEY.' };
+  }
+  const ses = proveedor === 'ses' ? transporteSes() : null;
+  if (proveedor === 'ses' && !ses) {
+    return { ok: false, enviados: 0, fallidos: 0, error: 'Faltan credenciales SMTP de Amazon SES.' };
   }
 
   const admin = createServiceClient();
@@ -57,6 +87,14 @@ export async function enviarCampana(opciones: {
 
   if (opciones.prueba) {
     const html = renderizarEmail(c.bloques, enlaceBaja(opciones.prueba, base));
+    if (ses) {
+      try {
+        await ses.sendMail({ from, to: opciones.prueba, subject: `[PRUEBA] ${c.asunto}`, html });
+        return { ok: true, enviados: 1, fallidos: 0 };
+      } catch (err) {
+        return { ok: false, enviados: 0, fallidos: 0, error: (err as Error).message };
+      }
+    }
     const res = await fetch(RESEND_UNO, {
       method: 'POST',
       headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
@@ -109,6 +147,45 @@ export async function enviarCampana(opciones: {
 
   for (let i = 0; i < emails.length; i += LOTE) {
     const trozo = emails.slice(i, i + LOTE);
+
+    if (ses) {
+      for (let j = 0; j < trozo.length; j += 10) {
+        const grupo = trozo.slice(j, j + 10);
+        const resultados = await Promise.allSettled(
+          grupo.map((email) =>
+            ses.sendMail({
+              from,
+              to: email,
+              subject: c.asunto,
+              html: renderizarEmail(c.bloques, enlaceBaja(email, base)),
+            }),
+          ),
+        );
+        const okEmails: string[] = [];
+        for (let k = 0; k < grupo.length; k += 1) {
+          if (resultados[k].status === 'fulfilled') okEmails.push(grupo[k]);
+          else {
+            const motivo = (resultados[k] as PromiseRejectedResult).reason;
+            await admin.from('campana_envios').insert({
+              campana_id: c.id,
+              email: grupo[k],
+              cliente_id: destinatarios.get(grupo[k]) ?? null,
+              estado: 'error',
+              error: String((motivo as Error)?.message ?? motivo).slice(0, 500),
+            });
+            fallidos += 1;
+          }
+        }
+        if (okEmails.length > 0) {
+          enviados += okEmails.length;
+          await admin.from('campana_envios').insert(
+            okEmails.map((email) => ({ campana_id: c.id, email, cliente_id: destinatarios.get(email) ?? null, estado: 'enviado' })),
+          );
+        }
+      }
+      continue;
+    }
+
     const cuerpo = trozo.map((email) => ({
       from,
       to: [email],
