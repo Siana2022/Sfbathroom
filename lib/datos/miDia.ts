@@ -12,6 +12,9 @@ export type MiDia = {
   enRiesgo: { id: string; nombre: string; diasSin: number; ultimaFactura: string }[];
   ultimas: { id: string; nombre: string; fecha: string; importe: number }[];
   pendencias: { id: string; numero: string | null; fecha: string; importe: number; cliente: string }[];
+  objetivo: number;
+  cumplimiento: number | null;
+  ranking: { posicion: number; total: number } | null;
 };
 
 const DIA = 86400000;
@@ -108,7 +111,28 @@ export async function getMiDia(codigoEmpresa: string, anio: number): Promise<MiD
     cliente: nombreCliente.get(p.cliente_id ?? '') ?? '—',
   }));
 
+  const { data: objetivoFila } = await supabase
+    .from('objetivos_comercial')
+    .select('importe')
+    .eq('empresa_id', empresa.id)
+    .eq('anio', anio)
+    .eq('comercial_id', comercialId)
+    .maybeSingle();
+  const objetivo = Number((objetivoFila as { importe: number } | null)?.importe ?? 0);
+
+  const { data: rankingRaw } = await supabase.rpc('mi_ranking_comercial', {
+    p_codigo_empresa: codigoEmpresa,
+    p_anio: anio,
+  });
+  const rankingData = rankingRaw as { posicion: number | null; total: number | null } | null;
+
   return {
+    objetivo,
+    cumplimiento: objetivo > 0 ? (neta / objetivo) * 100 : null,
+    ranking:
+      rankingData && rankingData.posicion && rankingData.total
+        ? { posicion: Number(rankingData.posicion), total: Number(rankingData.total) }
+        : null,
     comercial: { nombre: comercial?.nombre ?? null, cestaClientes: clientesCargo.map((c) => c.id) },
     anio,
     clientesCargo: clientesCargo.length,
