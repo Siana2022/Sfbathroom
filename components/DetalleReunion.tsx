@@ -1,6 +1,5 @@
 'use client';
 import { useState, useTransition } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { EventoAgenda } from '@/lib/datos/agenda';
@@ -182,7 +181,6 @@ export default function DetalleReunion({
           <button type="button" className="boton" onClick={borrar} disabled={pending}>
             Borrar reunión
           </button>
-          <Link href="/agenda" className="boton">Volver a la agenda</Link>
         </div>
       </div>
     </div>
