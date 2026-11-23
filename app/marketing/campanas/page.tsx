@@ -34,7 +34,13 @@ export default async function CampanasPage() {
   return (
     <div>
       <p className="breadcrumb">Marketing · Email</p>
-      <h1>Campañas de email</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+        <h1 style={{ marginBottom: 6 }}>Campañas de email</h1>
+        <span style={{ display: 'flex', gap: 8 }}>
+          <Link href="/marketing/plantillas" className="boton">Plantillas</Link>
+          <Link href="/marketing/bajas" className="boton">Bajas</Link>
+        </span>
+      </div>
       {!puede ? (
         <div className="card"><p>Solo administración, dirección y comerciales pueden gestionar campañas.</p></div>
       ) : (
