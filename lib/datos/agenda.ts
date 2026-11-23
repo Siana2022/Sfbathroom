@@ -3,7 +3,7 @@ import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 import { getUsuario } from '@/lib/datos/role';
 
-export type NotaAgenda = { id: string; texto: string; fecha: string };
+export type NotaAgenda = { id: string; texto: string; fecha: string; tipo: string; motivo: string | null };
 
 export type EventoAgenda = {
   id: string;
@@ -65,14 +65,21 @@ export async function getAgenda(codigoEmpresa: string): Promise<AgendaData> {
 
   const { data: notasRaw } = await supabase
     .from('agenda_notas')
-    .select('id, agenda_id, texto, created_at')
+    .select('id, agenda_id, texto, created_at, tipo, motivo')
     .eq('empresa_id', empresa.id)
     .order('created_at', { ascending: true });
 
   const seguimientoPorEvento = new Map<string, NotaAgenda[]>();
-  for (const n of (notasRaw ?? []) as { id: string; agenda_id: string; texto: string; created_at: string }[]) {
+  for (const n of (notasRaw ?? []) as {
+    id: string;
+    agenda_id: string;
+    texto: string;
+    created_at: string;
+    tipo: string;
+    motivo: string | null;
+  }[]) {
     const arr = seguimientoPorEvento.get(n.agenda_id) ?? [];
-    arr.push({ id: n.id, texto: n.texto, fecha: n.created_at });
+    arr.push({ id: n.id, texto: n.texto, fecha: n.created_at, tipo: n.tipo, motivo: n.motivo });
     seguimientoPorEvento.set(n.agenda_id, arr);
   }
 
@@ -152,7 +159,7 @@ export async function getEventoAgenda(id: string): Promise<EventoAgenda | null> 
 
   const { data: notasRaw } = await supabase
     .from('agenda_notas')
-    .select('id, texto, created_at')
+    .select('id, texto, created_at, tipo, motivo')
     .eq('agenda_id', id)
     .order('created_at', { ascending: true });
 
@@ -166,10 +173,18 @@ export async function getEventoAgenda(id: string): Promise<EventoAgenda | null> 
     completada: fila.completada,
     clienteId: fila.cliente_id,
     clienteNombre,
-    seguimiento: ((notasRaw ?? []) as { id: string; texto: string; created_at: string }[]).map((n) => ({
+    seguimiento: ((notasRaw ?? []) as {
+      id: string;
+      texto: string;
+      created_at: string;
+      tipo: string;
+      motivo: string | null;
+    }[]).map((n) => ({
       id: n.id,
       texto: n.texto,
       fecha: n.created_at,
+      tipo: n.tipo,
+      motivo: n.motivo,
     })),
   };
 }
