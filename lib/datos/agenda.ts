@@ -18,6 +18,7 @@ export type EventoAgenda = {
   pedidoRef: string | null;
   motivoCierre: string | null;
   proximaReunionId: string | null;
+  pedido: { id: string; numero: string | null; importe: number } | null;
   clienteId: string | null;
   clienteNombre: string | null;
   seguimiento: NotaAgenda[];
@@ -131,6 +132,7 @@ export async function getAgenda(codigoEmpresa: string): Promise<AgendaData> {
     pedidoRef: e.pedido_ref,
     motivoCierre: e.motivo_cierre,
     proximaReunionId: e.proxima_reunion_id,
+    pedido: null,
     clienteId: e.cliente_id,
     clienteNombre: e.cliente_id ? (nombreCliente.get(e.cliente_id) ?? '—') : null,
     seguimiento: seguimientoPorEvento.get(e.id) ?? [],
@@ -150,7 +152,7 @@ export async function getEventoAgenda(id: string): Promise<EventoAgenda | null> 
   const supabase = createClient();
   const { data: e } = await supabase
     .from('agenda')
-    .select('id, cliente_id, fecha, hora, asunto, tipo, notas, completada, estado, importe_estimado, pedido_ref, motivo_cierre, proxima_reunion_id')
+    .select('id, cliente_id, fecha, hora, asunto, tipo, notas, completada, estado, importe_estimado, pedido_ref, pedido_id, motivo_cierre, proxima_reunion_id')
     .eq('id', id)
     .maybeSingle();
   if (!e) return null;
@@ -167,9 +169,21 @@ export async function getEventoAgenda(id: string): Promise<EventoAgenda | null> 
     estado: string;
     importe_estimado: number | null;
     pedido_ref: string | null;
+    pedido_id: string | null;
     motivo_cierre: string | null;
     proxima_reunion_id: string | null;
   };
+
+  let pedido: { id: string; numero: string | null; importe: number } | null = null;
+  if (fila.pedido_id) {
+    const { data: p } = await supabase
+      .from('pedidos')
+      .select('id, numero_erp, importe')
+      .eq('id', fila.pedido_id)
+      .maybeSingle();
+    const pf = p as { id: string; numero_erp: string | null; importe: number } | null;
+    if (pf) pedido = { id: pf.id, numero: pf.numero_erp, importe: Number(pf.importe ?? 0) };
+  }
 
   let clienteNombre: string | null = null;
   if (fila.cliente_id) {
@@ -196,6 +210,7 @@ export async function getEventoAgenda(id: string): Promise<EventoAgenda | null> 
     pedidoRef: fila.pedido_ref,
     motivoCierre: fila.motivo_cierre,
     proximaReunionId: fila.proxima_reunion_id,
+    pedido,
     clienteId: fila.cliente_id,
     clienteNombre,
     seguimiento: ((notasRaw ?? []) as {
