@@ -57,7 +57,7 @@ export default function Nav({ userEmail, rol }: { userEmail?: string; rol?: stri
         </Link>
       )}
 
-      {(rol === 'comercial' ? ['admin','direccion','comercial'] : ['admin','direccion']).includes(rol ?? '') && (
+      {['admin','direccion','comercial'].includes(rol ?? '') && (
         <Link key="/marketing/campanas" href="/marketing/campanas" className={activo('/marketing/campanas')}>
           Email marketing
         </Link>
