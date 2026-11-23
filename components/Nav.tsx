@@ -33,6 +33,21 @@ export default function Nav({ userEmail, rol }: { userEmail?: string; rol?: stri
       <Link key="/" href="/" className={activo('/')}>
         Resumen
       </Link>
+      {esComercial && (
+        <>
+          <p className="nav-group">Mi trabajo</p>
+          <Link key="/clientes" href="/clientes" className={activo('/clientes')}>
+            Clientes
+          </Link>
+          <Link key="/pedidos" href="/pedidos" className={activo('/pedidos')}>
+            Pedidos
+          </Link>
+          <Link key="/agenda" href="/agenda" className={activo('/agenda')}>
+            Mi agenda
+          </Link>
+        </>
+      )}
+
       {!esComercial && (
         <Link key="/mi-panel" href="/mi-panel" className={activo('/mi-panel')}>
           Mi panel
