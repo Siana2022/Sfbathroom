@@ -9,6 +9,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: { cli
   return (
     <div>
       <p className="breadcrumb">Mi trabajo</p>
+      <p style={{ marginBottom: 6 }}><a href="/configuracion/plantillas-reunion" className="enlace">Plantillas de reunión</a></p>
       <h1>Mi agenda</h1>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
         Visitas, llamadas y tareas de tu cartera. Lo que marques como hecho pasa al historial.
