@@ -258,7 +258,13 @@ export default function DetalleReunion({
           <div>
             <div style={{ color: 'var(--muted)', fontSize: 12 }}>Cliente</div>
             <strong>{evento.clienteNombre ?? '—'}</strong>
-            {evento.clienteContacto ? (
+            {evento.contacto?.nombre ? (
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                Contacto: {evento.contacto.nombre}
+                {evento.contacto.telefono ? ` · ${evento.contacto.telefono}` : ''}
+                {evento.contacto.email ? ` · ${evento.contacto.email}` : ''}
+              </div>
+            ) : evento.clienteContacto ? (
               <div style={{ fontSize: 12, color: 'var(--muted)' }}>
                 {evento.clienteContacto.persona ?? ''}
                 {evento.clienteContacto.telefono ? ` · ${evento.clienteContacto.telefono}` : ''}
