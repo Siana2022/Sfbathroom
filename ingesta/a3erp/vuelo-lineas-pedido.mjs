@@ -78,7 +78,7 @@ async function main() {
         if (!Number.isFinite(id)) continue;
         const lista = porPedido.get(id) ?? [];
         lista.push({
-          id_erp: id,
+          id_pedido_erp: id,
           codigo_articulo: limpio(l.CODART),
           descripcion: limpio(l.DESCLIN),
           cantidad: num(l.UNIDADES),
