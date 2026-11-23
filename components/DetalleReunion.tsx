@@ -1,5 +1,5 @@
 'use client';
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { EventoAgenda } from '@/lib/datos/agenda';
@@ -52,6 +52,7 @@ export default function DetalleReunion({
   const [motivo, setMotivo] = useState('');
 
   const [fechaNueva, setFechaNueva] = useState(evento.fecha);
+  const [plantillas, setPlantillas] = useState<{ id: string; nombre: string; puntos: string[] }[]>([]);
   const [horaNueva, setHoraNueva] = useState(evento.hora ? evento.hora.slice(0, 5) : '');
 
   const [subiendo, setSubiendo] = useState(false);
@@ -87,6 +88,20 @@ export default function DetalleReunion({
       }
     });
   }
+
+  useEffect(() => {
+    let cancelado = false;
+    supabase
+      .from('reunion_plantillas')
+      .select('id, nombre, puntos')
+      .order('nombre')
+      .then(({ data }) => {
+        if (!cancelado) setPlantillas((data ?? []) as { id: string; nombre: string; puntos: string[] }[]);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, []);
 
   async function reagendar() {
     if (!fechaNueva) return;
@@ -161,6 +176,22 @@ export default function DetalleReunion({
       }
       nuevaReunionId = (creada as { id: string }).id;
       texto = `Requiere seguimiento · próxima reunión ${proxFecha}${proxHora ? ` ${proxHora}` : ''}`;
+    }
+
+    if (!nuevaReunionId && resultado !== 'perdida' && resultado !== 'cancelada') {
+      const dentro = new Date();
+      dentro.setDate(dentro.getDate() + 7);
+      await supabase.from('agenda').insert({
+        empresa_id: empresaId,
+        comercial_id: comercialId,
+        cliente_id: evento.clienteId,
+        fecha: dentro.toISOString().slice(0, 10),
+        asunto: `Seguimiento: ${evento.asunto}`,
+        tipo: evento.tipo,
+        estado: 'programada',
+        notas: 'Recordatorio automático 7 días después de la reunión.',
+      });
+      texto += ' · seguimiento programado a 7 días';
     }
 
     let pedidoId: string | null = null;
@@ -486,6 +517,24 @@ export default function DetalleReunion({
           ) : null}
         </div>
 
+        {plantillas.length > 0 ? (
+          <label className="campo-filtro" style={{ marginTop: 10, display: 'block' }}>
+            Insertar plantilla
+            <select
+              value=""
+              onChange={(e) => {
+                const p = plantillas.find((x) => x.id === e.target.value);
+                if (!p) return;
+                setNota((prev) => `${prev ? `${prev}\n` : ''}${p.nombre}:\n- ${(p.puntos ?? []).join('\n- ')}`);
+              }}
+            >
+              <option value="">— Elegir —</option>
+              {plantillas.map((p) => (
+                <option key={p.id} value={p.id}>{p.nombre}</option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         <textarea
           value={nota}
           onChange={(e) => setNota(e.target.value)}
