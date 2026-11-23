@@ -64,16 +64,12 @@ export default async function RendimientoPage() {
     }),
   );
   mediciones.push(
-    await medir('Artículos (todas las filas)', async () => {
-      let desde = 0;
-      for (;;) {
-        const { data } = await supabase.from('articulos').select('id, familia').eq('empresa_id', empresa.id).range(desde, desde + 999);
-        if (!data || data.length < 1000) break;
-        desde += 1000;
-      }
+    await medir('Ping (1 fila)', async () => {
+      await supabase.from('empresas').select('id').limit(1);
     }),
   );
-  mediciones.push(await medir('getClientes', () => getClientes(codigo, ANIO_ACTUAL, {})));
+  mediciones.push(await medir('getClientes (sin caché)', () => getClientes(codigo, ANIO_ACTUAL, {})));
+  mediciones.push(await medir('getClientes (con caché)', () => getClientes(codigo, ANIO_ACTUAL, {})));
   mediciones.push(await medir('getFacturacion', () => getFacturacion(codigo, ANIO_ACTUAL, {})));
 
   const total = mediciones.reduce((s, m) => s + m.ms, 0);

@@ -4,6 +4,8 @@ import { filtrarPorIds, getFacturaIdsFiltradas, hayFiltros, type Filtros } from 
 import { lineasPorFacturas } from '@/lib/datos/lineas';
 import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 import { ventasFacturasRangoRpc } from '@/lib/datos/ventas';
+import { memo } from '@/lib/perf/memo';
+import { getUsuario } from '@/lib/datos/role';
 
 export type ClienteActividad = {
   id: string;
@@ -66,7 +68,17 @@ type FilaActividad = {
 
 const DIA = 86400000;
 
+/**
+ * Caché de 5 minutos por usuario/empresa/año/filtros. La ingesta es diaria,
+ * así que repetir la vista dentro de la misma instancia no vuelve a consultar.
+ */
 export async function getClientes(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<ClientesData> {
+  const usuario = await getUsuario();
+  const clave = `clientes:${usuario?.id ?? 'anon'}:${codigoEmpresa}:${anio}:${JSON.stringify(filtros ?? {})}`;
+  return memo(clave, () => calcularClientes(codigoEmpresa, anio, filtros), 5 * 60 * 1000);
+}
+
+async function calcularClientes(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<ClientesData> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
   const anioPrevio = anio - 1;
