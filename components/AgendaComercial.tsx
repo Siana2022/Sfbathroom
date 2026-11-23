@@ -60,6 +60,7 @@ export default function AgendaComercial({ datos }: { datos: AgendaData }) {
   }, [mes]);
 
   const puedeCrear = datos.esComercial && datos.comercialId;
+  const clienteSel = datos.clientes.find((c) => c.id === clienteId);
   const proximas = datos.eventos
     .filter((e) => !e.completada && e.fecha >= hoy)
     .sort((a, b) => (a.fecha + (a.hora ?? '')).localeCompare(b.fecha + (b.hora ?? '')))
@@ -131,6 +132,13 @@ export default function AgendaComercial({ datos }: { datos: AgendaData }) {
               <input type="text" value={asunto} onChange={(e) => setAsunto(e.target.value)} placeholder="Presentación, seguimiento…" />
             </label>
           </div>
+          {clienteSel ? (
+            <div style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)' }}>
+              {clienteSel.personaContacto ? <>Contacto: {clienteSel.personaContacto} · </> : null}
+              {clienteSel.telefono ? <>Tel. {clienteSel.telefono} · </> : null}
+              {clienteSel.email ? <>{clienteSel.email}</> : null}
+            </div>
+          ) : null}
           <textarea
             value={notas}
             onChange={(e) => setNotas(e.target.value)}
