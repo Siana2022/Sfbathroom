@@ -155,6 +155,17 @@ export default function DetalleReunion({
       texto = `Requiere seguimiento · próxima reunión ${proxFecha}${proxHora ? ` ${proxHora}` : ''}`;
     }
 
+    let pedidoId: string | null = null;
+    if (pedidoRef.trim()) {
+      const { data: ped } = await supabase
+        .from('pedidos')
+        .select('id')
+        .eq('empresa_id', empresaId)
+        .eq('numero_erp', pedidoRef.trim())
+        .maybeSingle();
+      pedidoId = (ped as { id: string } | null)?.id ?? null;
+    }
+
     const { error: e } = await supabase
       .from('agenda')
       .update({
@@ -162,6 +173,7 @@ export default function DetalleReunion({
         completada: true,
         importe_estimado: resultado === 'ganada' || resultado === 'pedido' ? Number(importe) || null : null,
         pedido_ref: pedidoRef.trim() || null,
+        pedido_id: pedidoId,
         motivo_cierre: resultado === 'perdida' ? motivoCierre.trim() || null : null,
         proxima_reunion_id: nuevaReunionId,
       })
@@ -243,6 +255,16 @@ export default function DetalleReunion({
             <div>
               <div style={{ color: 'var(--muted)', fontSize: 12 }}>Pedido</div>
               <strong>{evento.pedidoRef}</strong>
+              {evento.pedido ? (
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                  vinculado · {evento.pedido.importe.toFixed(2)} €
+                  {evento.importeEstimado !== null && Math.abs(evento.pedido.importe - evento.importeEstimado) > 0.01
+                    ? ' (no coincide con el importe estimado)'
+                    : ''}
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: 'var(--rojo)' }}>no encontrado en pedidos</div>
+              )}
             </div>
           ) : null}
         </div>
