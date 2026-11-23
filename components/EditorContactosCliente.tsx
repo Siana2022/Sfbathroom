@@ -18,32 +18,59 @@ export default function EditorContactosCliente({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
+  const [editandoId, setEditandoId] = useState<string | null>(null);
   const [nombre, setNombre] = useState('');
   const [cargo, setCargo] = useState('');
   const [telefono, setTelefono] = useState('');
   const [email, setEmail] = useState('');
   const [principal, setPrincipal] = useState(contactos.length === 0);
 
+  function limpiarFormulario() {
+    setEditandoId(null);
+    setNombre('');
+    setCargo('');
+    setTelefono('');
+    setEmail('');
+    setPrincipal(false);
+  }
+
+  function editar(c: ContactoCliente) {
+    setEditandoId(c.id);
+    setNombre(c.nombre);
+    setCargo(c.cargo ?? '');
+    setTelefono(c.telefono ?? '');
+    setEmail(c.email ?? '');
+    setPrincipal(c.esPrincipal);
+  }
+
   function añadir() {
     if (!nombre.trim()) return;
     setError(null);
     startTransition(async () => {
-      const { error: e } = await supabase.from('clientes_contactos').insert({
-        empresa_id: empresaId,
-        cliente_id: clienteId,
+      const cuerpo = {
         nombre: nombre.trim(),
         cargo: cargo.trim() || null,
         telefono: telefono.trim() || null,
         email: email.trim() || null,
         es_principal: principal,
-      });
+      };
+      const { error: e } = editandoId
+        ? await supabase.from('clientes_contactos').update(cuerpo).eq('id', editandoId)
+        : await supabase.from('clientes_contactos').insert({
+            empresa_id: empresaId,
+            cliente_id: clienteId,
+            ...cuerpo,
+          });
+      if (!e && principal) {
+        await supabase
+          .from('clientes_contactos')
+          .update({ es_principal: false })
+          .eq('cliente_id', clienteId)
+          .neq('id', editandoId ?? '00000000-0000-0000-0000-000000000000');
+      }
       if (e) setError(e.message);
       else {
-        setNombre('');
-        setCargo('');
-        setTelefono('');
-        setEmail('');
-        setPrincipal(false);
+        limpiarFormulario();
         router.refresh();
       }
     });
@@ -94,6 +121,9 @@ export default function EditorContactosCliente({
                 <td>{c.telefono ?? '—'}</td>
                 <td>{c.email ?? '—'}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>
+                  <button type="button" className="boton" onClick={() => editar(c)} disabled={pending}>
+                    Editar
+                  </button>{' '}
                   {!c.esPrincipal ? (
                     <button type="button" className="boton" onClick={() => marcarPrincipal(c.id)} disabled={pending}>
                       Hacer principal
@@ -109,7 +139,7 @@ export default function EditorContactosCliente({
         </table>
       )}
 
-      <h3 style={{ marginTop: 18 }}>Añadir contacto</h3>
+      <h3 style={{ marginTop: 18 }}>{editandoId ? 'Editar contacto' : 'Añadir contacto'}</h3>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <label className="campo-filtro" style={{ minWidth: 200 }}>
           Nombre *
@@ -135,8 +165,13 @@ export default function EditorContactosCliente({
       {error ? <p className="nota" style={{ color: 'var(--rojo)' }}>{error}</p> : null}
       <div style={{ marginTop: 10 }}>
         <button type="button" className="boton" onClick={añadir} disabled={pending || !nombre.trim()}>
-          {pending ? 'Guardando…' : 'Añadir contacto'}
+          {pending ? 'Guardando…' : editandoId ? 'Guardar cambios' : 'Añadir contacto'}
         </button>
+        {editandoId ? (
+          <button type="button" className="boton" onClick={limpiarFormulario} disabled={pending} style={{ marginLeft: 8 }}>
+            Cancelar
+          </button>
+        ) : null}
       </div>
     </div>
   );
