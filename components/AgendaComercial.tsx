@@ -188,8 +188,17 @@ export default function AgendaComercial({ datos }: { datos: AgendaData }) {
                         padding: '3px 6px',
                         borderRadius: 6,
                         fontSize: 11,
-                        textDecoration: e.completada ? 'line-through' : 'none',
-                        background: e.completada ? 'var(--wash)' : 'var(--accent-soft, #e8f0fb)',
+                        textDecoration: e.estado === 'cancelada' || e.estado === 'perdida' ? 'line-through' : 'none',
+                        background:
+                          e.estado === 'ganada'
+                            ? '#eaf4ee'
+                            : e.estado === 'perdida'
+                              ? '#fbeceb'
+                              : e.estado === 'realizada'
+                                ? '#fbf7ec'
+                                : e.estado === 'cancelada'
+                                  ? '#eeeeee'
+                                  : 'var(--accent-soft, #e8f0fb)',
                       }}
                       title={`${e.asunto} · ${e.clienteNombre ?? ''}`}
                     >
@@ -201,6 +210,41 @@ export default function AgendaComercial({ datos }: { datos: AgendaData }) {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="card">
+        <h2>Atrasadas</h2>
+        {datos.eventos.filter((e) => e.estado === 'programada' && e.fecha < hoy).length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>Nada atrasado.</p>
+        ) : (
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Hora</th>
+                <th>Cliente</th>
+                <th>Asunto</th>
+                <th>Tipo</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {datos.eventos
+                .filter((e) => e.estado === 'programada' && e.fecha < hoy)
+                .sort((a, b) => a.fecha.localeCompare(b.fecha))
+                .map((e) => (
+                  <tr key={e.id}>
+                    <td style={{ color: 'var(--rojo)' }}>{e.fecha}</td>
+                    <td>{e.hora ? e.hora.slice(0, 5) : '—'}</td>
+                    <td>{e.clienteNombre ?? '—'}</td>
+                    <td>{e.asunto}</td>
+                    <td>{TIPOS.find((t) => t.valor === e.tipo)?.etiqueta ?? e.tipo}</td>
+                    <td><Link href={`/agenda/${e.id}`} className="boton">Abrir</Link></td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       <div className="card">

@@ -213,3 +213,60 @@ export async function getEventoAgenda(id: string): Promise<EventoAgenda | null> 
     })),
   };
 }
+
+
+export type EventoResumen = {
+  id: string;
+  fecha: string;
+  hora: string | null;
+  asunto: string;
+  estado: string;
+  clienteNombre: string | null;
+};
+
+export async function getAgendaResumen(
+  codigoEmpresa: string,
+): Promise<{ empresaId: string; hoy: EventoResumen[]; atrasadas: EventoResumen[] }> {
+  const supabase = createClient();
+  const empresa = await getEmpresaPorCodigo(codigoEmpresa);
+  const hoy = new Date().toISOString().slice(0, 10);
+
+  const { data: filas } = await supabase
+    .from('agenda')
+    .select('id, fecha, hora, asunto, estado, cliente_id')
+    .eq('empresa_id', empresa.id)
+    .neq('estado', 'cancelada')
+    .order('fecha', { ascending: true })
+    .limit(200);
+
+  const eventos = ((filas ?? []) as {
+    id: string;
+    fecha: string;
+    hora: string | null;
+    asunto: string;
+    estado: string;
+    cliente_id: string | null;
+  }[]).filter((e) => e.estado === 'programada');
+
+  const idsClientes = [...new Set(eventos.map((e) => e.cliente_id).filter(Boolean))] as string[];
+  const nombres = new Map<string, string>();
+  if (idsClientes.length) {
+    const { data: clis } = await supabase.from('clientes').select('id, nombre').in('id', idsClientes);
+    for (const c of (clis ?? []) as { id: string; nombre: string }[]) nombres.set(c.id, c.nombre);
+  }
+
+  const mapear = (e: (typeof eventos)[number]): EventoResumen => ({
+    id: e.id,
+    fecha: e.fecha,
+    hora: e.hora,
+    asunto: e.asunto,
+    estado: e.estado,
+    clienteNombre: e.cliente_id ? (nombres.get(e.cliente_id) ?? null) : null,
+  });
+
+  return {
+    empresaId: empresa.id,
+    hoy: eventos.filter((e) => e.fecha === hoy).map(mapear),
+    atrasadas: eventos.filter((e) => e.fecha < hoy).slice(0, 10).map(mapear),
+  };
+}
