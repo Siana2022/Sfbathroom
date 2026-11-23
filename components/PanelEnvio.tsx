@@ -36,6 +36,7 @@ export default function PanelEnvio({
   const [resultados, setResultados] = useState<ClienteMini[]>([]);
   const [elegidos, setElegidos] = useState<ClienteMini[]>([]);
   const [prueba, setPrueba] = useState('');
+  const [fecha, setFecha] = useState('');
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,6 +78,28 @@ export default function PanelEnvio({
       if (e) setError(e.message);
       else {
         setMensaje('Segmento guardado.');
+        router.refresh();
+      }
+    });
+  }
+
+  function programar() {
+    if (!fecha) {
+      setError('Elige fecha y hora de envío.');
+      return;
+    }
+    setError(null);
+    setMensaje(null);
+    startTransition(async () => {
+      const res = await fetch('/api/marketing/programar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campanaId, fecha, segmento }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) setError(data.error ?? 'No se pudo programar.');
+      else {
+        setMensaje(`Campaña programada para ${new Date(fecha).toLocaleString('es-ES')}.`);
         router.refresh();
       }
     });
@@ -239,14 +262,23 @@ export default function PanelEnvio({
             Enviar prueba
           </button>
         </div>
-        <button
-          type="button"
-          className="boton boton-primario"
-          onClick={() => enviar(false)}
-          disabled={pending || estadoCampana === 'enviando'}
-        >
-          {pending ? 'Enviando…' : 'Enviar campaña'}
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <label className="campo-editor" style={{ marginBottom: 0, minWidth: 210 }}>
+            <span>Programar para</span>
+            <input type="datetime-local" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+          </label>
+          <button type="button" className="boton" onClick={programar} disabled={pending || !fecha}>
+            Programar
+          </button>
+          <button
+            type="button"
+            className="boton boton-primario"
+            onClick={() => enviar(false)}
+            disabled={pending || estadoCampana === 'enviando'}
+          >
+            {pending ? 'Enviando…' : 'Enviar ahora'}
+          </button>
+        </div>
       </div>
 
       {mensaje ? <p className="nota">{mensaje}</p> : null}

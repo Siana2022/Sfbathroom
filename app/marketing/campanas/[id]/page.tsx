@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import EditorEmail from '@/components/EditorEmail';
 import PanelEnvio from '@/components/PanelEnvio';
+import BotonDuplicar from '@/components/BotonDuplicar';
 import { esComercialValido } from '@/lib/datos/filtros';
 import { getUsuario } from '@/lib/datos/role';
 import type { BloqueEmail } from '@/lib/marketing/bloques';
@@ -44,7 +45,10 @@ export default async function CampanaPage({ params }: { params: { id: string } }
       <p className="breadcrumb">
         <Link href="/marketing/campanas" className="enlace">Campañas</Link> · {c.nombre}
       </p>
-      <h1>{c.nombre}</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+        <h1 style={{ marginBottom: 6 }}>{c.nombre}</h1>
+        <BotonDuplicar campanaId={c.id} />
+      </div>
       <p style={{ color: 'var(--muted)', marginTop: 0 }}>
         Estado: <strong>{c.estado}</strong> · Enviados: <strong>{c.enviados}</strong> · Fallidos: <strong>{c.fallidos}</strong>
       </p>
@@ -54,6 +58,7 @@ export default async function CampanaPage({ params }: { params: { id: string } }
       ) : (
         <EditorEmail
           campanaId={c.id}
+          empresaId={empresa.id}
           nombreInicial={c.nombre}
           asuntoInicial={c.asunto}
           bloquesIniciales={c.bloques ?? []}

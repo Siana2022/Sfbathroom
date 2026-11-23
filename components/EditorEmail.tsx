@@ -23,11 +23,13 @@ const ICONO: Record<BloqueEmail['tipo'], string> = {
 
 export default function EditorEmail({
   campanaId,
+  empresaId,
   nombreInicial,
   asuntoInicial,
   bloquesIniciales,
 }: {
   campanaId: string;
+  empresaId: string;
   nombreInicial: string;
   asuntoInicial: string;
   bloquesIniciales: BloqueEmail[];
@@ -85,6 +87,20 @@ export default function EditorEmail({
     }
     const { data } = supabase.storage.from('marketing-imagenes').getPublicUrl(ruta);
     cambiar(i, { url: data.publicUrl });
+  }
+
+  function guardarPlantilla() {
+    const nombrePlantilla = window.prompt('Nombre de la plantilla', nombre);
+    if (!nombrePlantilla) return;
+    startTransition(async () => {
+      const { error } = await supabase.from('plantillas_email').insert({
+        empresa_id: empresaId,
+        nombre: nombrePlantilla,
+        asunto,
+        bloques,
+      });
+      setEstado(error ? error.message : 'Guardada como plantilla.');
+    });
   }
 
   function guardar() {
@@ -258,9 +274,14 @@ export default function EditorEmail({
 
           {estado ? <p className="nota">{estado}</p> : null}
           <div style={{ marginTop: 14 }}>
-            <button type="button" className="boton boton-primario" onClick={guardar} disabled={pending}>
-              {pending ? 'Guardando…' : 'Guardar campaña'}
-            </button>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button type="button" className="boton boton-primario" onClick={guardar} disabled={pending}>
+                {pending ? 'Guardando…' : 'Guardar campaña'}
+              </button>
+              <button type="button" className="boton" onClick={guardarPlantilla} disabled={pending}>
+                Guardar como plantilla
+              </button>
+            </div>
           </div>
         </div>
       </div>
