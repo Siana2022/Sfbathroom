@@ -119,7 +119,7 @@ export async function getOpcionesFiltros(
   });
   const comercialesActivos = Array.isArray(activosRaw) ? new Set(activosRaw as string[]) : null;
   const usuario = await getUsuario();
-  const soloPropio = usuario?.rol === 'comercial' ? usuario.comercialId : null;
+  const soloPropio = usuario?.rol === 'comercial' ? usuario.comercialIds : [];
 
   const [{ data: empresaFila }, { data: marcasTodas }] = await Promise.all([
     supabase.from('empresas').select('nombre').eq('codigo', codigoEmpresa).maybeSingle(),
@@ -159,7 +159,7 @@ export async function getOpcionesFiltros(
   return {
     clientes: opcionesClientes,
     comerciales: (comerciales.data ?? [])
-      .filter((c) => !soloPropio || c.id === soloPropio)
+      .filter((c) => soloPropio.length === 0 || soloPropio.includes(c.id))
       .filter((c) => !comercialesActivos || comercialesActivos.has(c.id))
       .filter((c) => !COMERCIALES_INVALIDOS.has(normalizarNombre(String(c.nombre ?? ''))))
       .filter((c) => {

@@ -38,6 +38,12 @@ export default async function AdminPage() {
     esComercialValido(c.nombre),
   );
 
+  const { data: pcRaw } = await supabase.from('profiles_comerciales').select('profile_id, comercial_id');
+  const asignaciones: Record<string, string[]> = {};
+  for (const r of (pcRaw ?? []) as { profile_id: string; comercial_id: string }[]) {
+    asignaciones[r.profile_id] = [...(asignaciones[r.profile_id] ?? []), r.comercial_id];
+  }
+
   const esAdmin = rol === 'admin';
 
   return (
@@ -66,7 +72,7 @@ where id = (select id from auth.users where email = 'TU_EMAIL');`}
             instante vía RLS.
           </p>
 
-          <AdminUsuarios usuarios={usuarios} comerciales={comerciales} />
+          <AdminUsuarios usuarios={usuarios} comerciales={comerciales} asignaciones={asignaciones} />
         </>
       )}
     </div>

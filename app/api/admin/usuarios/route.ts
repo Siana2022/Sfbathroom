@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     password?: string;
     nombre?: string;
     rol?: string;
-    comercialId?: string | null;
+    comercialIds?: string[];
   };
 
   const email = String(body.email ?? '').trim().toLowerCase();
@@ -41,15 +41,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error?.message ?? 'No se pudo crear el usuario.' }, { status: 400 });
   }
 
+  const ids = Array.isArray(body.comercialIds) ? body.comercialIds.filter(Boolean) : [];
   const { error: e2 } = await admin
     .from('profiles')
     .upsert({
       id: data.user.id,
       role: rol,
-      comercial_id: body.comercialId || null,
+      comercial_id: ids[0] ?? null,
       full_name: String(body.nombre ?? '') || email,
     });
   if (e2) return NextResponse.json({ error: e2.message }, { status: 400 });
+
+  if (ids.length > 0) {
+    const { error: e3 } = await admin
+      .from('profiles_comerciales')
+      .insert(ids.map((cid) => ({ profile_id: data.user!.id, comercial_id: cid })));
+    if (e3) return NextResponse.json({ error: e3.message }, { status: 400 });
+  }
 
   return NextResponse.json({ ok: true, id: data.user.id });
 }
@@ -61,15 +69,24 @@ export async function PATCH(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) as {
     id?: string;
     rol?: string;
-    comercialId?: string | null;
+    comercialIds?: string[];
   };
   if (!body.id) return NextResponse.json({ error: 'Falta el usuario.' }, { status: 400 });
 
   const admin = createServiceClient();
+  const ids = Array.isArray(body.comercialIds) ? body.comercialIds.filter(Boolean) : [];
   const { error } = await admin
     .from('profiles')
-    .update({ role: body.rol ?? null, comercial_id: body.comercialId || null })
+    .update({ role: body.rol ?? null, comercial_id: ids[0] ?? null })
     .eq('id', body.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  await admin.from('profiles_comerciales').delete().eq('profile_id', body.id);
+  if (ids.length > 0) {
+    const { error: e2 } = await admin
+      .from('profiles_comerciales')
+      .insert(ids.map((cid) => ({ profile_id: body.id as string, comercial_id: cid })));
+    if (e2) return NextResponse.json({ error: e2.message }, { status: 400 });
+  }
   return NextResponse.json({ ok: true });
 }
