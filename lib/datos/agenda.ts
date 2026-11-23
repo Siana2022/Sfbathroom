@@ -3,15 +3,19 @@ import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 import { getUsuario } from '@/lib/datos/role';
 
+export type NotaAgenda = { id: string; texto: string; fecha: string };
+
 export type EventoAgenda = {
   id: string;
   fecha: string;
   hora: string | null;
-  titulo: string;
+  asunto: string;
+  tipo: string;
   notas: string | null;
   completada: boolean;
   clienteId: string | null;
   clienteNombre: string | null;
+  seguimiento: NotaAgenda[];
 };
 
 export type AgendaData = {
@@ -39,9 +43,22 @@ export async function getAgenda(codigoEmpresa: string): Promise<AgendaData> {
     comercialId = (perfil?.comercial_id as string | null) ?? null;
   }
 
+  const { data: notasRaw } = await supabase
+    .from('agenda_notas')
+    .select('id, agenda_id, texto, created_at')
+    .eq('empresa_id', empresa.id)
+    .order('created_at', { ascending: true });
+
+  const seguimientoPorEvento = new Map<string, NotaAgenda[]>();
+  for (const n of (notasRaw ?? []) as { id: string; agenda_id: string; texto: string; created_at: string }[]) {
+    const arr = seguimientoPorEvento.get(n.agenda_id) ?? [];
+    arr.push({ id: n.id, texto: n.texto, fecha: n.created_at });
+    seguimientoPorEvento.set(n.agenda_id, arr);
+  }
+
   const { data: eventosRaw } = await supabase
     .from('agenda')
-    .select('id, comercial_id, cliente_id, fecha, hora, titulo, notas, completada')
+    .select('id, comercial_id, cliente_id, fecha, hora, asunto, tipo, notas, completada')
     .eq('empresa_id', empresa.id)
     .order('fecha', { ascending: true });
 
@@ -60,18 +77,21 @@ export async function getAgenda(codigoEmpresa: string): Promise<AgendaData> {
     cliente_id: string | null;
     fecha: string;
     hora: string | null;
-    titulo: string;
+    asunto: string;
+    tipo: string;
     notas: string | null;
     completada: boolean;
   }[]).map((e) => ({
     id: e.id,
     fecha: e.fecha,
     hora: e.hora,
-    titulo: e.titulo,
+    asunto: e.asunto,
+    tipo: e.tipo,
     notas: e.notas,
     completada: e.completada,
     clienteId: e.cliente_id,
     clienteNombre: e.cliente_id ? (nombreCliente.get(e.cliente_id) ?? '—') : null,
+    seguimiento: seguimientoPorEvento.get(e.id) ?? [],
   }));
 
   return {
