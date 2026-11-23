@@ -61,7 +61,9 @@ export async function updateSession(request: NextRequest) {
     '/calidad', '/alertas', '/cuadros', '/configuracion', '/documentos', '/admin',
     '/datos', '/mi-panel', '/marketing', '/financiero', '/kpis', '/rentabilidad-clientes',
   ];
-  const esRutaCuadro = RUTAS_CUADRO.some((r) => path === r || path.startsWith(`${r}/`));
+  const esRutaCuadro =
+    RUTAS_CUADRO.some((r) => path === r || path.startsWith(`${r}/`)) &&
+    !path.startsWith('/marketing/campanas');
   if (user && esRutaCuadro) {
     const { data: perfil } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
     if ((perfil as { role: string | null } | null)?.role === 'comercial') {
