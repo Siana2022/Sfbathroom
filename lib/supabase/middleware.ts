@@ -56,7 +56,7 @@ export async function updateSession(request: NextRequest) {
 
   // El rol comercial solo entra a su "Mi día": el cuadro de mando queda restringido.
   const RUTAS_CUADRO = [
-    '/facturacion', '/pedidos', '/margen', '/stock', '/transporte', '/clientes',
+    '/facturacion', '/margen', '/stock', '/transporte',
     '/canal-y-marca', '/concentracion', '/credito-cobro', '/actividad-comercial',
     '/calidad', '/alertas', '/cuadros', '/configuracion', '/documentos', '/admin',
     '/datos', '/mi-panel', '/marketing', '/financiero', '/kpis', '/rentabilidad-clientes',
