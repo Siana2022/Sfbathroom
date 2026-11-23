@@ -39,6 +39,13 @@ export type ActividadData = {
     nuevos: { cliente: string; comercial: string }[];
     perdidos: { cliente: string; comercial: string }[];
   };
+  agenda: {
+    reuniones: number;
+    ganadas: number;
+    perdidas: number;
+    tasaCierre: number | null;
+    importe: number;
+  };
 };
 
 type Fila = { id: string; comercial_id: string | null; cliente_id: string | null; base_imponible: number; tipo_documento: string; descuento_pie: number; fecha: string };
@@ -197,6 +204,14 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
     }
   }
 
+  const agendaQ = supabase
+    .from('agenda')
+    .select('estado, importe_estimado, comercial_id')
+    .eq('empresa_id', empresa.id)
+    .gte('fecha', `${anio}-01-01`)
+    .lte('fecha', `${anio}-12-31`);
+  const { data: agendaFilas } = await agendaQ;
+
   const { data: comerciales } = await supabase.from('comerciales').select('id, nombre').eq('activo', true);
   const filasComerciales = ((comerciales ?? []) as FilaComercial[]).filter(
     (c) => esComercialValido(c.nombre) && (!filtros?.comercial || c.id === filtros.comercial),
@@ -244,6 +259,21 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
     .map((id) => ({ cliente: nombreCliente.get(id) ?? '—', comercial: comercialPrincipal(id) }))
     .sort((a, b) => a.cliente.localeCompare(b.cliente, 'es'));
 
+  let reuniones = 0;
+  let ganadas = 0;
+  let perdidas = 0;
+  let importeAgenda = 0;
+  for (const a of (agendaFilas ?? []) as { estado: string; importe_estimado: number | null; comercial_id: string | null }[]) {
+    if (filtros?.comercial && a.comercial_id !== filtros.comercial) continue;
+    reuniones += 1;
+    if (a.estado === 'ganada') {
+      ganadas += 1;
+      importeAgenda += Number(a.importe_estimado ?? 0);
+    } else if (a.estado === 'perdida') {
+      perdidas += 1;
+    }
+  }
+
   const comercialesRes: ComercialRow[] = filasComerciales.map((c) => {
     const v = porComercial.get(c.id);
     const previo = clientesPrevio.get(c.id);
@@ -282,6 +312,13 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
     sinAccesoMargen,
     comerciales: agrupar(comercialesRes),
     listas: { nuevos: listaNuevos, perdidos: listaPerdidos },
+    agenda: {
+      reuniones,
+      ganadas,
+      perdidas,
+      tasaCierre: ganadas + perdidas > 0 ? (ganadas / (ganadas + perdidas)) * 100 : null,
+      importe: importeAgenda,
+    },
   };
 }
 

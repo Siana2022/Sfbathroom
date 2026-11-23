@@ -2,8 +2,9 @@ import { Fragment } from 'react';
 import { cookies } from 'next/headers';
 import { getActividad, type ComercialRow } from '@/lib/datos/actividad';
 import { parseFiltros, getOpcionesFiltros, type SearchParams } from '@/lib/datos/filtros';
-import { eur2, numero, decimal } from '@/lib/formato';
+import { eur, eur2, numero, decimal } from '@/lib/formato';
 import KpisActividad from '@/components/KpisActividad';
+import Kpi from '@/components/Kpi';
 import DescargarExcel from '@/components/DescargarExcel';
 import Filtros from '@/components/Filtros';
 import Aviso from '@/components/Aviso';
@@ -105,6 +106,20 @@ export default async function ActividadComercialPage({ searchParams }: { searchP
         }))}
         listas={d.listas}
       />
+
+      <div className="card">
+        <h2>Agenda del ejercicio</h2>
+        <ul className="grid-kpis">
+          <Kpi etiqueta="Reuniones" valor={numero(d.agenda.reuniones)} nota="registradas en la agenda" />
+          <Kpi etiqueta="Ganadas" valor={numero(d.agenda.ganadas)} nota={`${numero(d.agenda.perdidas)} perdidas`} />
+          <Kpi
+            etiqueta="Tasa de cierre"
+            valor={d.agenda.tasaCierre === null ? '—' : `${decimal(d.agenda.tasaCierre)} %`}
+            nota="ganadas sobre cerradas"
+          />
+          <Kpi etiqueta="Importe cerrado" valor={eur(d.agenda.importe)} nota="de reuniones ganadas" />
+        </ul>
+      </div>
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
