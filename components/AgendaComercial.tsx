@@ -23,7 +23,7 @@ function ymd(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export default function AgendaComercial({ datos }: { datos: AgendaData }) {
+export default function AgendaComercial({ datos, clienteInicial }: { datos: AgendaData; clienteInicial?: string | null }) {
   const supabase = createClient();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -32,7 +32,7 @@ export default function AgendaComercial({ datos }: { datos: AgendaData }) {
   const hoy = hoyISO();
   const [fecha, setFecha] = useState(hoy);
   const [hora, setHora] = useState('');
-  const [clienteId, setClienteId] = useState('');
+  const [clienteId, setClienteId] = useState(clienteInicial ?? '');
   const [asunto, setAsunto] = useState('');
   const [tipo, setTipo] = useState('presencial');
   const [notas, setNotas] = useState('');
@@ -61,37 +61,39 @@ export default function AgendaComercial({ datos }: { datos: AgendaData }) {
 
   const puedeCrear = datos.esComercial && datos.comercialId;
   const clienteSel = datos.clientes.find((c) => c.id === clienteId);
-  const [persona, setPersona] = useState('');
-  const [telefono, setTelefono] = useState('');
-  const [email, setEmail] = useState('');
-  const [guardandoContacto, setGuardandoContacto] = useState(false);
-  const [contactoOk, setContactoOk] = useState(false);
+  const [contactos, setContactos] = useState<{ id: string; nombre: string; telefono: string | null; email: string | null; esPrincipal: boolean }[]>([]);
+  const [contactoId, setContactoId] = useState('');
 
   useEffect(() => {
-    setPersona(clienteSel?.personaContacto ?? '');
-    setTelefono(clienteSel?.telefono ?? '');
-    setEmail(clienteSel?.email ?? '');
-    setContactoOk(false);
+    let cancelado = false;
+    if (!clienteId) {
+      setContactos([]);
+      setContactoId('');
+      return;
+    }
+    supabase
+      .from('clientes_contactos')
+      .select('id, nombre, telefono, email, es_principal')
+      .eq('cliente_id', clienteId)
+      .order('es_principal', { ascending: false })
+      .order('nombre')
+      .then(({ data }) => {
+        if (cancelado) return;
+        const lista = ((data ?? []) as { id: string; nombre: string; telefono: string | null; email: string | null; es_principal: boolean }[]).map((c) => ({
+          id: c.id,
+          nombre: c.nombre,
+          telefono: c.telefono,
+          email: c.email,
+          esPrincipal: c.es_principal,
+        }));
+        setContactos(lista);
+        setContactoId(lista.find((c) => c.esPrincipal)?.id ?? lista[0]?.id ?? '');
+      });
+    return () => {
+      cancelado = true;
+    };
   }, [clienteId]);
 
-  async function guardarContacto() {
-    if (!clienteId) return;
-    setGuardandoContacto(true);
-    const { error: e } = await supabase
-      .from('clientes')
-      .update({
-        persona_contacto: persona.trim() || null,
-        telefono: telefono.trim() || null,
-        email: email.trim() || null,
-      })
-      .eq('id', clienteId);
-    setGuardandoContacto(false);
-    if (e) setError(e.message);
-    else {
-      setContactoOk(true);
-      router.refresh();
-    }
-  }
   const proximas = datos.eventos
     .filter((e) => !e.completada && e.fecha >= hoy)
     .sort((a, b) => (a.fecha + (a.hora ?? '')).localeCompare(b.fecha + (b.hora ?? '')))
@@ -101,10 +103,15 @@ export default function AgendaComercial({ datos }: { datos: AgendaData }) {
     if (!datos.comercialId || !clienteId || !asunto.trim() || !fecha) return;
     setError(null);
     startTransition(async () => {
+      const contacto = contactos.find((c) => c.id === contactoId) ?? null;
       const { error: e } = await supabase.from('agenda').insert({
         empresa_id: datos.empresaId,
         comercial_id: datos.comercialId,
         cliente_id: clienteId,
+        contacto_id: contacto?.id ?? null,
+        contacto_nombre: contacto?.nombre ?? null,
+        contacto_telefono: contacto?.telefono ?? null,
+        contacto_email: contacto?.email ?? null,
         fecha,
         hora: hora || null,
         asunto: asunto.trim(),
@@ -166,24 +173,30 @@ export default function AgendaComercial({ datos }: { datos: AgendaData }) {
           {clienteSel ? (
             <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border-2)' }}>
               <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 6 }}>Contacto del cliente</div>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                <label className="campo-filtro" style={{ minWidth: 200 }}>
-                  Persona de contacto
-                  <input type="text" value={persona} onChange={(e) => setPersona(e.target.value)} />
-                </label>
-                <label className="campo-filtro">
-                  Teléfono
-                  <input type="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
-                </label>
-                <label className="campo-filtro" style={{ minWidth: 220 }}>
-                  Email
-                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-                </label>
-                <button type="button" className="boton" onClick={guardarContacto} disabled={guardandoContacto}>
-                  {guardandoContacto ? 'Guardando…' : 'Guardar contacto'}
-                </button>
-              </div>
-              {contactoOk ? <p className="nota">Contacto actualizado.</p> : null}
+              {contactos.length === 0 ? (
+                <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
+                  Este cliente no tiene contactos todavía. Puedes añadirlos en su ficha.
+                </p>
+              ) : (
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                  <label className="campo-filtro" style={{ minWidth: 260 }}>
+                    Contacto
+                    <select value={contactoId} onChange={(e) => setContactoId(e.target.value)}>
+                      {contactos.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nombre}{c.esPrincipal ? ' (principal)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <span style={{ fontSize: 13, color: 'var(--muted)' }}>
+                    {contactos.find((c) => c.id === contactoId)?.telefono ?? ''}
+                    {contactos.find((c) => c.id === contactoId)?.email
+                      ? ` · ${contactos.find((c) => c.id === contactoId)?.email}`
+                      : ''}
+                  </span>
+                </div>
+              )}
             </div>
           ) : null}
           <textarea

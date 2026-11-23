@@ -5,7 +5,9 @@ import { getFichaCliente } from '@/lib/datos/fichaCliente';
 import { getCrossSell } from '@/lib/datos/crosssell';
 import { decimal, eur, numero, pct } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
-import EditorContactoCliente from '@/components/EditorContactoCliente';
+import EditorContactosCliente from '@/components/EditorContactosCliente';
+import { getContactosCliente } from '@/lib/datos/contactos';
+import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import GraficoBarras from '@/components/GraficoBarras';
 import { ANIO_ACTUAL } from '@/lib/ejercicio';
 
@@ -16,7 +18,11 @@ export default async function FichaClientePage({ params }: { params: { id: strin
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
   const d = await getFichaCliente(empresa, params.id, ANIO);
   if (!d) notFound();
-  const crossSell = await getCrossSell(empresa, params.id, ANIO);
+  const [crossSell, contactos, empresaData] = await Promise.all([
+    getCrossSell(empresa, params.id, ANIO),
+    getContactosCliente(params.id),
+    getEmpresaPorCodigo(empresa),
+  ]);
 
   const barras = d.historico.map((m) => ({ etiqueta: m.mes, valor: Math.max(0, m.neta), titulo: `${m.mes}: ${eur(m.neta)}` }));
 
@@ -25,7 +31,10 @@ export default async function FichaClientePage({ params }: { params: { id: strin
       <p className="breadcrumb">
         <Link href="/clientes">Clientes</Link> · Ficha 360º
       </p>
-      <h1>{d.cliente.nombre}</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+        <h1 style={{ marginBottom: 6 }}>{d.cliente.nombre}</h1>
+        <Link href={`/agenda?cliente=${d.cliente.id}#nueva`} className="boton">Agendar reunión</Link>
+      </div>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
         {d.cliente.codigoErp && <>Ref. {d.cliente.codigoErp} · </>}
         {d.cliente.cif && <>CIF {d.cliente.cif} · </>}
@@ -51,12 +60,7 @@ export default async function FichaClientePage({ params }: { params: { id: strin
         </div>
       )}
 
-      <EditorContactoCliente
-        clienteId={d.cliente.id}
-        personaContacto={d.cliente.personaContacto}
-        telefono={d.cliente.telefono}
-        email={d.cliente.email}
-      />
+      <EditorContactosCliente clienteId={d.cliente.id} empresaId={empresaData.id} contactos={contactos} />
 
       <ul className="grid-kpis">
         <Kpi etiqueta={`Facturación neta ${d.anio}`} valor={eur(d.neta)} nota={d.deltaPct === null ? 'sin dato previo' : `vs ${d.anio - 1}: ${pct(d.deltaPct)}`} />

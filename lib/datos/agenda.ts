@@ -23,6 +23,7 @@ export type EventoAgenda = {
   clienteId: string | null;
   clienteNombre: string | null;
   clienteContacto: { persona: string | null; telefono: string | null; email: string | null } | null;
+  contacto: { id: string | null; nombre: string | null; telefono: string | null; email: string | null } | null;
   seguimiento: NotaAgenda[];
 };
 
@@ -143,6 +144,7 @@ export async function getAgenda(codigoEmpresa: string): Promise<AgendaData> {
     pedido: null,
     adjuntos: [],
     clienteContacto: null,
+    contacto: null,
     clienteId: e.cliente_id,
     clienteNombre: e.cliente_id ? (nombreCliente.get(e.cliente_id) ?? '—') : null,
     seguimiento: seguimientoPorEvento.get(e.id) ?? [],
@@ -168,7 +170,7 @@ export async function getEventoAgenda(id: string): Promise<EventoAgenda | null> 
   const supabase = createClient();
   const { data: e } = await supabase
     .from('agenda')
-    .select('id, cliente_id, fecha, hora, asunto, tipo, notas, completada, estado, importe_estimado, pedido_ref, pedido_id, motivo_cierre, proxima_reunion_id')
+    .select('id, cliente_id, fecha, hora, asunto, tipo, notas, completada, estado, importe_estimado, pedido_ref, pedido_id, motivo_cierre, proxima_reunion_id, contacto_id, contacto_nombre, contacto_telefono, contacto_email')
     .eq('id', id)
     .maybeSingle();
   if (!e) return null;
@@ -188,6 +190,10 @@ export async function getEventoAgenda(id: string): Promise<EventoAgenda | null> 
     pedido_id: string | null;
     motivo_cierre: string | null;
     proxima_reunion_id: string | null;
+    contacto_id: string | null;
+    contacto_nombre: string | null;
+    contacto_telefono: string | null;
+    contacto_email: string | null;
   };
 
   let pedido: { id: string; numero: string | null; importe: number } | null = null;
@@ -245,6 +251,12 @@ export async function getEventoAgenda(id: string): Promise<EventoAgenda | null> 
     proximaReunionId: fila.proxima_reunion_id,
     pedido,
     adjuntos,
+    contacto: {
+      id: fila.contacto_id,
+      nombre: fila.contacto_nombre,
+      telefono: fila.contacto_telefono,
+      email: fila.contacto_email,
+    },
     clienteId: fila.cliente_id,
     clienteNombre,
     clienteContacto,
