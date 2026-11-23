@@ -153,8 +153,8 @@ export default async function FichaClientePage({ params }: { params: { id: strin
                 <tr key={`${p.articulo}-${i}`}>
                   <td>{p.articulo ?? '—'}</td>
                   <td className="td-num">{eur(p.precio)}</td>
-                  <td className="td-num">{p.unidades === null ? '—' : decimal(p.unidades)}</td>
-                  <td>{p.desde ?? '—'} → {p.hasta ?? '—'}</td>
+                  <td className="td-num">{p.unidades && p.unidades > 0 ? decimal(p.unidades) : '—'}</td>
+                  <td>{p.desde && p.desde > '1900-01-02' ? p.desde : 'Vigente'} {p.hasta && p.hasta < '9999-01-01' ? `→ ${p.hasta}` : ''}</td>
                 </tr>
               ))}
             </tbody>

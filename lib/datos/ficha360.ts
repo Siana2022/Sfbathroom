@@ -93,21 +93,29 @@ export async function getPreciosCliente(codigoCliente: string | null, limite = 6
     .order('codigo_articulo')
     .order('unidades')
     .limit(limite);
-  return ((data ?? []) as {
+  const vistos = new Set<string>();
+  const salida: PrecioCliente[] = [];
+  for (const p of (data ?? []) as {
     codigo_articulo: string | null;
     precio: number;
     unidades: number | null;
     fecha_desde: string | null;
     fecha_hasta: string | null;
     codigo_cliente: string | null;
-  }[]).map((p) => ({
-    articulo: p.codigo_articulo,
-    precio: Number(p.precio),
-    unidades: p.unidades === null ? null : Number(p.unidades),
-    desde: p.fecha_desde,
-    hasta: p.fecha_hasta,
-    cliente: p.codigo_cliente,
-  }));
+  }[]) {
+    const clave = `${p.codigo_articulo ?? ''}|${Number(p.precio)}`;
+    if (vistos.has(clave)) continue;
+    vistos.add(clave);
+    salida.push({
+      articulo: p.codigo_articulo,
+      precio: Number(p.precio),
+      unidades: p.unidades === null ? null : Number(p.unidades),
+      desde: p.fecha_desde,
+      hasta: p.fecha_hasta,
+      cliente: p.codigo_cliente,
+    });
+  }
+  return salida;
 }
 
 export async function getReunionesCliente(clienteId: string, limite = 10) {
