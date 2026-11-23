@@ -38,7 +38,9 @@ export default async function CampanasPage() {
         <h1 style={{ marginBottom: 6 }}>Campañas de email</h1>
         <span style={{ display: 'flex', gap: 8 }}>
           <Link href="/marketing/plantillas" className="boton">Plantillas</Link>
-          <Link href="/marketing/bajas" className="boton">Bajas</Link>
+          {(usuario?.rol === 'admin' || usuario?.rol === 'direccion') && (
+            <Link href="/marketing/bajas" className="boton">Bajas</Link>
+          )}
         </span>
       </div>
       {!puede ? (
