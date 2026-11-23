@@ -45,6 +45,9 @@ export default function Nav({ userEmail, rol }: { userEmail?: string; rol?: stri
           <Link key="/agenda" href="/agenda" className={activo('/agenda')}>
             Mi agenda
           </Link>
+          <Link key="/alertas-comercial" href="/alertas-comercial" className={activo('/alertas-comercial')}>
+            Mis alertas
+          </Link>
         </>
       )}
 

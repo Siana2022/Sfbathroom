@@ -6,6 +6,7 @@ import { getFacturacion, getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getKpisPersonalizadosVistos } from '@/lib/datos/kpisVisibles';
 import { getMiDia } from '@/lib/datos/miDia';
 import { getAgendaResumen } from '@/lib/datos/agenda';
+import { getAlertasComercial } from '@/lib/datos/alertasComercial';
 import { memo, memoDiario } from '@/lib/perf/memo';
 import { decimal, eur, numero, pct } from '@/lib/formato';
 import { FORMATOS } from '@/lib/datos/kpisCatalogo';
@@ -42,7 +43,7 @@ export default async function Home() {
   const [{ rol, uid }, mix] = await Promise.all([getRolUsuario(), getMiDia(empresa, ANIO)]);
 
   if (rol === 'comercial' && mix) {
-    const agenda = await getAgendaResumen(empresa);
+    const [agenda, alertas] = await Promise.all([getAgendaResumen(empresa), getAlertasComercial(empresa)]);
     return (
       <div>
         <p className="breadcrumb">Cuadro mando comercial · Mi día</p>
@@ -66,6 +67,19 @@ export default async function Home() {
             nota={mix.ranking ? `de ${mix.ranking.total} comerciales` : 'sin datos'}
           />
         </ul>
+
+        <div className="card">
+          <h2>Mis alertas</h2>
+          {alertas.alertas.length === 0 ? (
+            <p style={{ color: 'var(--muted)' }}>Sin alertas. Todo al día.</p>
+          ) : (
+            <p style={{ margin: 0 }}>
+              Tienes <strong style={{ color: 'var(--rojo)' }}>{alertas.criticas} críticas</strong> y{' '}
+              <strong>{alertas.avisos} avisos</strong>.{' '}
+              <Link href="/alertas-comercial" className="enlace">Ver todas →</Link>
+            </p>
+          )}
+        </div>
 
         <div className="card">
           <h2>Mi agenda de hoy</h2>
