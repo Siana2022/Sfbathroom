@@ -83,17 +83,17 @@ export default function PanelEnvio({
         Se enviará a los clientes que tengan email en su ficha o en sus contactos. Las bajas se excluyen automáticamente.
       </p>
 
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
-        <label className="campo-filtro">
-          Estado del cliente
+      <div className="fila-filtros" style={{ marginBottom: 12 }}>
+        <label className="campo-editor" style={{ marginBottom: 0 }}>
+          <span>Estado del cliente</span>
           <select value={estado} onChange={(e) => setEstado(e.target.value)}>
             <option value="todos">Todos</option>
             <option value="activo">Activos</option>
             <option value="inactivo">Inactivos</option>
           </select>
         </label>
-        <label className="campo-filtro" style={{ minWidth: 200 }}>
-          Provincia (contiene)
+        <label className="campo-editor" style={{ marginBottom: 0 }}>
+          <span>Provincia (contiene)</span>
           <input type="text" value={provincia} onChange={(e) => setProvincia(e.target.value)} placeholder="Madrid" />
         </label>
       </div>
