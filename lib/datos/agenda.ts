@@ -252,7 +252,13 @@ export type EventoResumen = {
 
 export async function getAgendaResumen(
   codigoEmpresa: string,
-): Promise<{ empresaId: string; hoy: EventoResumen[]; manana: EventoResumen[]; atrasadas: EventoResumen[] }> {
+): Promise<{
+  empresaId: string;
+  hoy: EventoResumen[];
+  manana: EventoResumen[];
+  atrasadas: EventoResumen[];
+  proximas: EventoResumen[];
+}> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
   const hoy = new Date().toISOString().slice(0, 10);
@@ -296,5 +302,9 @@ export async function getAgendaResumen(
     hoy: eventos.filter((e) => e.fecha === hoy).map(mapear),
     manana: eventos.filter((e) => e.fecha === mananaISO).map(mapear),
     atrasadas: eventos.filter((e) => e.fecha < hoy).slice(0, 10).map(mapear),
+    proximas: eventos
+      .filter((e) => e.fecha > hoy)
+      .slice(0, 8)
+      .map(mapear),
   };
 }
