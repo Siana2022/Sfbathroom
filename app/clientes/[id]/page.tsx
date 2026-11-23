@@ -7,6 +7,7 @@ import { decimal, eur, numero, pct } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import EditorContactosCliente from '@/components/EditorContactosCliente';
 import { getContactosCliente } from '@/lib/datos/contactos';
+import { getPedidosCliente, getPreciosCliente, getReunionesCliente } from '@/lib/datos/ficha360';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import GraficoBarras from '@/components/GraficoBarras';
 import { ANIO_ACTUAL } from '@/lib/ejercicio';
@@ -18,10 +19,13 @@ export default async function FichaClientePage({ params }: { params: { id: strin
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
   const d = await getFichaCliente(empresa, params.id, ANIO);
   if (!d) notFound();
-  const [crossSell, contactos, empresaData] = await Promise.all([
+  const [crossSell, contactos, empresaData, pedidos, precios, reuniones] = await Promise.all([
     getCrossSell(empresa, params.id, ANIO),
     getContactosCliente(params.id),
     getEmpresaPorCodigo(empresa),
+    getPedidosCliente(params.id),
+    getPreciosCliente(d.cliente.codigoErp),
+    getReunionesCliente(params.id),
   ]);
 
   const barras = d.historico.map((m) => ({ etiqueta: m.mes, valor: Math.max(0, m.neta), titulo: `${m.mes}: ${eur(m.neta)}` }));
@@ -31,6 +35,13 @@ export default async function FichaClientePage({ params }: { params: { id: strin
       <p className="breadcrumb">
         <Link href="/clientes">Clientes</Link> · Ficha 360º
       </p>
+      <nav style={{ display: 'flex', gap: 14, flexWrap: 'wrap', margin: '4px 0 14px', fontSize: 13 }}>
+        <a href="#resumen" className="enlace">Resumen</a>
+        <a href="#pedidos" className="enlace">Pedidos ({pedidos.length})</a>
+        <a href="#tarifas" className="enlace">Tarifas y precios</a>
+        <a href="#reuniones" className="enlace">Reuniones ({reuniones.length})</a>
+        <a href="#contactos" className="enlace">Contactos ({contactos.length})</a>
+      </nav>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
         <h1 style={{ marginBottom: 6 }}>{d.cliente.nombre}</h1>
         <Link href={`/agenda?cliente=${d.cliente.id}#nueva`} className="boton">Agendar reunión</Link>
@@ -68,8 +79,124 @@ export default async function FichaClientePage({ params }: { params: { id: strin
         </div>
       )}
 
-      <EditorContactosCliente clienteId={d.cliente.id} empresaId={empresaData.id} contactos={contactos} />
 
+      <div className="card" id="pedidos">
+        <h2>Últimos pedidos</h2>
+        {pedidos.length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>Sin pedidos registrados.</p>
+        ) : (
+          pedidos.map((p) => (
+            <details key={p.id} style={{ borderTop: '1px solid var(--border-2)', padding: '8px 0' }}>
+              <summary style={{ cursor: 'pointer', display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'baseline' }}>
+                <strong>{p.numero ?? '—'}</strong>
+                <span style={{ color: 'var(--muted)' }}>{p.fecha}</span>
+                <span className="badge listo">{p.estado}</span>
+                <span style={{ marginLeft: 'auto' }} className="td-num">
+                  {p.total === null ? '—' : eur(p.total)} · {p.lineas.length} líneas
+                </span>
+              </summary>
+              {p.lineas.length === 0 ? (
+                <p style={{ color: 'var(--muted)', margin: '8px 0 0' }}>Sin detalle de líneas cargado.</p>
+              ) : (
+                <table className="tabla" style={{ marginTop: 8 }}>
+                  <thead>
+                    <tr>
+                      <th>Artículo</th>
+                      <th>Descripción</th>
+                      <th className="td-num">Uds.</th>
+                      <th className="td-num">Precio</th>
+                      <th className="td-num">Dto.</th>
+                      <th className="td-num">Importe</th>
+                      <th>Lote</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {p.lineas.map((l) => (
+                      <tr key={l.id}>
+                        <td>{l.codigo ?? '—'}</td>
+                        <td>{l.descripcion ?? '—'}</td>
+                        <td className="td-num">{decimal(l.cantidad)}</td>
+                        <td className="td-num">{eur(l.precio)}</td>
+                        <td className="td-num">{l.descuento ? `${l.descuento}%` : '—'}</td>
+                        <td className="td-num">{eur(l.importe)}</td>
+                        <td>{l.lote ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </details>
+          ))
+        )}
+      </div>
+
+      <div className="card" id="tarifas">
+        <h2>Tarifas y precios</h2>
+        <p style={{ color: 'var(--muted)', marginTop: 0 }}>
+          Tarifa asignada: <strong>{d.cliente.tarifaCodigo ?? '—'}</strong>
+          {d.cliente.formaPago ? <> · Forma de pago: <strong>{d.cliente.formaPago}</strong></> : null}
+        </p>
+        {precios.length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>Sin precios especiales para este cliente.</p>
+        ) : (
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Artículo</th>
+                <th className="td-num">Precio</th>
+                <th className="td-num">Desde uds.</th>
+                <th>Vigencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              {precios.map((p, i) => (
+                <tr key={`${p.articulo}-${i}`}>
+                  <td>{p.articulo ?? '—'}</td>
+                  <td className="td-num">{eur(p.precio)}</td>
+                  <td className="td-num">{p.unidades === null ? '—' : decimal(p.unidades)}</td>
+                  <td>{p.desde ?? '—'} → {p.hasta ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="card" id="reuniones">
+        <h2>Reuniones</h2>
+        {reuniones.length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>Sin reuniones registradas.</p>
+        ) : (
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Asunto</th>
+                <th>Contacto</th>
+                <th>Estado</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {reuniones.map((r) => (
+                <tr key={r.id}>
+                  <td>{r.fecha}{r.hora ? ` ${r.hora.slice(0, 5)}` : ''}</td>
+                  <td>{r.asunto}</td>
+                  <td>{r.contacto ?? '—'}</td>
+                  <td><span className="badge listo">{r.estado ?? 'programada'}</span></td>
+                  <td><Link href={`/agenda/${r.id}`} className="enlace">Ver</Link></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div id="contactos">
+        <EditorContactosCliente clienteId={d.cliente.id} empresaId={empresaData.id} contactos={contactos} />
+      </div>
+
+      <div id="resumen"></div>
       <ul className="grid-kpis">
         <Kpi etiqueta={`Facturación neta ${d.anio}`} valor={eur(d.neta)} nota={d.deltaPct === null ? 'sin dato previo' : `vs ${d.anio - 1}: ${pct(d.deltaPct)}`} />
         <Kpi etiqueta="Facturas" valor={numero(d.facturas)} nota={`${numero(d.unidades)} unidades`} />
