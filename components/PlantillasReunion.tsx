@@ -58,15 +58,15 @@ export default function PlantillasReunion({
     <div>
       <div className="card">
         <h2>{editando ? 'Editar plantilla' : 'Nueva plantilla'}</h2>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <label className="campo-editor" style={{ minWidth: 240, marginBottom: 0 }}>
-            <span>Nombre</span>
-            <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Visita presencial" />
-          </label>
-          <label className="campo-editor" style={{ flex: 1, minWidth: 280, marginBottom: 0 }}>
-            <span>Puntos (uno por línea)</span>
-            <textarea value={puntos} onChange={(e) => setPuntos(e.target.value)} rows={4} style={{ width: '100%' }} />
-          </label>
+        <label className="campo-editor">
+          <span>Nombre de la plantilla</span>
+          <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Visita presencial" />
+        </label>
+        <label className="campo-editor">
+          <span>Puntos (uno por línea)</span>
+          <textarea value={puntos} onChange={(e) => setPuntos(e.target.value)} rows={5} placeholder="Presentación, revisar stock, próximos pasos…" />
+        </label>
+        <div style={{ display: 'flex', gap: 8 }}>
           <button type="button" className="boton boton-primario" onClick={guardar} disabled={pending || !nombre.trim()}>
             {pending ? 'Guardando…' : editando ? 'Guardar cambios' : 'Crear plantilla'}
           </button>
