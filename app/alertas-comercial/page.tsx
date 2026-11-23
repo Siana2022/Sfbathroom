@@ -1,6 +1,6 @@
-import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { getAlertasComercial } from '@/lib/datos/alertasComercial';
+import AlertasLista from '@/components/AlertasLista';
 
 export default async function AlertasComercialPage() {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
@@ -28,37 +28,7 @@ export default async function AlertasComercialPage() {
         </li>
       </ul>
 
-      <div className="card">
-        <h2>Alertas de tu cartera</h2>
-        {d.alertas.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>Sin alertas. Todo al día.</p>
-        ) : (
-          <table className="tabla">
-            <thead>
-              <tr>
-                <th>Severidad</th>
-                <th>Alerta</th>
-                <th>Detalle</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {d.alertas.map((a, i) => (
-                <tr key={`${a.tipo}-${i}`}>
-                  <td>
-                    <span className={`badge ${a.severidad === 'critico' ? 'construccion' : 'pendiente'}`}>
-                      {a.severidad === 'critico' ? 'Crítica' : 'Aviso'}
-                    </span>
-                  </td>
-                  <td>{a.titulo}</td>
-                  <td style={{ color: 'var(--muted)' }}>{a.detalle}</td>
-                  <td><Link href={a.enlace} className="enlace">Abrir</Link></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <AlertasLista alertas={d.alertas} />
     </div>
   );
 }
