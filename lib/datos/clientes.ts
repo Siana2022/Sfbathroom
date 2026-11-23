@@ -3,7 +3,7 @@ import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { filtrarPorIds, getFacturaIdsFiltradas, hayFiltros, type Filtros } from '@/lib/datos/filtros';
 import { lineasPorFacturas } from '@/lib/datos/lineas';
 import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
-import { ventasAnioRpc, ventasFacturasRangoRpc } from '@/lib/datos/ventas';
+import { ventasFacturasRangoRpc } from '@/lib/datos/ventas';
 
 export type ClienteActividad = {
   id: string;
@@ -77,10 +77,9 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
 
   // Camino rápido sin filtros: facturas (ventana 2 años) y líneas del año en una sola llamada.
   const sinFiltros = !filtros || !hayFiltros(filtros);
-  const [facturasRpc, ventasAnio] = await Promise.all([
-    sinFiltros ? ventasFacturasRangoRpc(supabase, codigoEmpresa, iso(730), `${anio}-12-31`) : Promise.resolve(null),
-    sinFiltros ? ventasAnioRpc(supabase, codigoEmpresa, anio) : Promise.resolve(null),
-  ]);
+  const facturasRpc = sinFiltros
+    ? await ventasFacturasRangoRpc(supabase, codigoEmpresa, iso(730), `${anio}-12-31`)
+    : null;
 
   let facturas: FilaFactura[];
   if (facturasRpc) {
@@ -346,12 +345,23 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
   const familiasOrden = [...new Set(articulosFilas.map((a) => a.familia).filter((f): f is string => Boolean(f)))].sort((a, b) => a.localeCompare(b, 'es'));
 
   const familiasCliente = new Map<string, Set<string>>();
-  // Líneas del año: del RPC ventas_anio si está disponible; si no, camino antiguo.
-  const lineasClientes: FilaLinea[] = ventasAnio
-    ? (ventasAnio.lineas as unknown as FilaLinea[])
-    : idsFacturasAnio.length
-      ? await lineasPorFacturas<FilaLinea>(supabase, 'factura_id, articulo_id', idsFacturasAnio)
-      : [];
+  // Solo las líneas de los clientes que entran en la matriz (top 12): antes se
+  // traían todas las líneas del año y se descartaban casi todas.
+  const top12Ids = [...porCliente.entries()]
+    .sort((a, b) => b[1].neta - a[1].neta)
+    .slice(0, 12)
+    .map(([id]) => id);
+  const top12 = new Set(top12Ids);
+  const idsFacturasTop = idsFacturasAnio.filter((fid) => top12.has(clienteDeFactura.get(fid) ?? ''));
+  const lineasClientes: FilaLinea[] = [];
+  for (let i = 0; i < idsFacturasTop.length; i += 200) {
+    const trozo = idsFacturasTop.slice(i, i + 200);
+    const { data } = await supabase
+      .from('factura_lineas')
+      .select('factura_id, articulo_id')
+      .in('factura_id', trozo);
+    if (data) lineasClientes.push(...(data as unknown as FilaLinea[]));
+  }
   if (lineasClientes.length) {
     for (const l of lineasClientes) {
       const cli = clienteDeFactura.get(l.factura_id);
