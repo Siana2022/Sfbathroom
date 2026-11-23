@@ -5,6 +5,7 @@ import { bloques } from '@/lib/bloques';
 import { getFacturacion, getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getKpisPersonalizadosVistos } from '@/lib/datos/kpisVisibles';
 import { getMiDia } from '@/lib/datos/miDia';
+import { getAgendaResumen } from '@/lib/datos/agenda';
 import { memo, memoDiario } from '@/lib/perf/memo';
 import { decimal, eur, numero, pct } from '@/lib/formato';
 import { FORMATOS } from '@/lib/datos/kpisCatalogo';
@@ -41,6 +42,7 @@ export default async function Home() {
   const [{ rol, uid }, mix] = await Promise.all([getRolUsuario(), getMiDia(empresa, ANIO)]);
 
   if (rol === 'comercial' && mix) {
+    const agenda = await getAgendaResumen(empresa);
     return (
       <div>
         <p className="breadcrumb">Cuadro mando comercial · Mi día</p>
@@ -54,6 +56,42 @@ export default async function Home() {
           <Kpi etiqueta="Facturas" valor={numero(mix.facturas)} nota="de tus clientes" />
           <Kpi etiqueta="Ticket medio" valor={eur(mix.ticketMedio)} nota="en tu cartera" />
         </ul>
+
+        <div className="card">
+          <h2>Mi agenda de hoy</h2>
+          {agenda.hoy.length === 0 && agenda.atrasadas.length === 0 ? (
+            <p style={{ color: 'var(--muted)' }}>Sin reuniones para hoy.</p>
+          ) : (
+            <>
+              {agenda.hoy.length > 0 ? (
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {agenda.hoy.map((e) => (
+                    <li key={e.id} style={{ marginBottom: 6 }}>
+                      {e.hora ? `${e.hora.slice(0, 5)} · ` : ''}
+                      <Link href={`/agenda/${e.id}`} className="enlace">{e.asunto}</Link>
+                      {e.clienteNombre ? ` · ${e.clienteNombre}` : ''}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p style={{ color: 'var(--muted)' }}>Sin reuniones para hoy.</p>
+              )}
+              {agenda.atrasadas.length > 0 ? (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ color: 'var(--rojo)', fontSize: 13, fontWeight: 700 }}>Atrasadas ({agenda.atrasadas.length})</div>
+                  <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                    {agenda.atrasadas.map((e) => (
+                      <li key={e.id} style={{ marginBottom: 4, color: 'var(--rojo)' }}>
+                        {e.fecha} · <Link href={`/agenda/${e.id}`} className="enlace">{e.asunto}</Link>
+                        {e.clienteNombre ? ` · ${e.clienteNombre}` : ''}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
 
         <div className="card">
           <h2>Clientes en riesgo de inactividad (&gt; 60 días)</h2>
