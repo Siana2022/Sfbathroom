@@ -39,6 +39,7 @@ export default function EditorEmail({
   const [bloques, setBloques] = useState<BloqueEmail[]>(bloquesIniciales);
   const [arrastrando, setArrastrando] = useState<number | null>(null);
   const [estado, setEstado] = useState<string | null>(null);
+  const [subiendo, setSubiendo] = useState<number | null>(null);
 
   const html = useMemo(() => renderizarEmail(bloques, 'https://sfbathroom.com/baja'), [bloques]);
 
@@ -65,6 +66,24 @@ export default function EditorEmail({
       return copia;
     });
     setArrastrando(null);
+  }
+
+  async function subirImagen(i: number, archivo: File) {
+    setSubiendo(i);
+    setEstado(null);
+    const nombreLimpio = archivo.name.replace(/[^a-zA-Z0-9._-]/g, '-');
+    const ruta = `${campanaId}/${Date.now()}-${nombreLimpio}`;
+    const { error } = await supabase.storage.from('marketing-imagenes').upload(ruta, archivo, {
+      cacheControl: '31536000',
+      upsert: false,
+    });
+    setSubiendo(null);
+    if (error) {
+      setEstado(error.message);
+      return;
+    }
+    const { data } = supabase.storage.from('marketing-imagenes').getPublicUrl(ruta);
+    cambiar(i, { url: data.publicUrl });
   }
 
   function guardar() {
@@ -162,15 +181,45 @@ export default function EditorEmail({
               ) : null}
 
               {b.tipo === 'imagen' ? (
-                <div className="dos-columnas">
-                  <label className="campo-editor" style={{ marginBottom: 0 }}>
-                    <span>URL de la imagen</span>
-                    <input type="url" value={b.url} onChange={(e) => cambiar(i, { url: e.target.value })} placeholder="https://…" />
-                  </label>
-                  <label className="campo-editor" style={{ marginBottom: 0 }}>
-                    <span>Enlace al pulsar (opcional)</span>
-                    <input type="url" value={b.enlace ?? ''} onChange={(e) => cambiar(i, { enlace: e.target.value })} placeholder="https://…" />
-                  </label>
+                <div>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
+                    <label
+                      className="boton boton-suave"
+                      style={{ cursor: subiendo === i ? 'wait' : 'pointer', opacity: subiendo === i ? 0.6 : 1 }}
+                    >
+                      {subiendo === i ? 'Subiendo…' : 'Subir imagen'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        disabled={subiendo === i}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) void subirImagen(i, f);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                    <span style={{ fontSize: 12, color: 'var(--tenue)' }}>o pega una URL</span>
+                  </div>
+                  <div className="dos-columnas">
+                    <label className="campo-editor" style={{ marginBottom: 0 }}>
+                      <span>URL de la imagen</span>
+                      <input type="url" value={b.url} onChange={(e) => cambiar(i, { url: e.target.value })} placeholder="https://…" />
+                    </label>
+                    <label className="campo-editor" style={{ marginBottom: 0 }}>
+                      <span>Enlace al pulsar (opcional)</span>
+                      <input type="url" value={b.enlace ?? ''} onChange={(e) => cambiar(i, { enlace: e.target.value })} placeholder="https://…" />
+                    </label>
+                  </div>
+                  {b.url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={b.url}
+                      alt=""
+                      style={{ marginTop: 10, maxHeight: 120, maxWidth: '100%', borderRadius: 8, border: '1px solid var(--border-2)' }}
+                    />
+                  ) : null}
                 </div>
               ) : null}
 
