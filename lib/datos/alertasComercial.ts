@@ -5,6 +5,7 @@ import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 
 export type AlertaComercial = {
   tipo: string;
+  categoria: 'clientes' | 'cobros' | 'pedidos' | 'agenda' | 'objetivo';
   severidad: 'critico' | 'aviso';
   titulo: string;
   detalle: string;
@@ -97,6 +98,7 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
     if (dias >= UMBRAL_SIN_COMPRAR) {
       alertas.push({
         tipo: 'sin_comprar',
+        categoria: 'clientes',
         severidad: 'critico',
         titulo: `${c.nombre} lleva ${dias === 999 ? 'sin compras registradas' : `${dias} días sin comprar`}`,
         detalle: ultimaFecha ? `Última compra: ${ultimaFecha}` : 'Sin facturas en el histórico consultado',
@@ -105,6 +107,7 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
     } else if (dias >= UMBRAL_SIN_COMPRAR_AVISO) {
       alertas.push({
         tipo: 'sin_comprar_aviso',
+        categoria: 'clientes',
         severidad: 'aviso',
         titulo: `${c.nombre} lleva ${dias} días sin comprar`,
         detalle: `Última compra: ${ultimaFecha}`,
@@ -117,6 +120,7 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
     if (nP > 0 && nA < nP * (UMBRAL_CAIDA / 100)) {
       alertas.push({
         tipo: 'caida',
+        categoria: 'clientes',
         severidad: 'aviso',
         titulo: `${c.nombre} cae un ${Math.round((1 - nA / nP) * 100)} %`,
         detalle: `${Math.round(nA)} € este año frente a ${Math.round(nP)} € el anterior`,
@@ -129,6 +133,7 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
       if (cobros.vencido >= UMBRAL_MORA_CRITICO) {
         alertas.push({
           tipo: 'mora',
+          categoria: 'cobros',
           severidad: 'critico',
           titulo: `${c.nombre} debe ${Math.round(cobros.vencido)} € vencidos`,
           detalle: 'Mora elevada: revisar cobro antes de seguir sirviendo',
@@ -137,6 +142,7 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
       } else if (cobros.vencido >= UMBRAL_MORA) {
         alertas.push({
           tipo: 'mora',
+          categoria: 'cobros',
           severidad: 'aviso',
           titulo: `${c.nombre} tiene ${Math.round(cobros.vencido)} € vencidos`,
           detalle: 'Mora pendiente de cobro',
@@ -150,6 +156,7 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
       if (uso >= 90) {
         alertas.push({
           tipo: 'limite',
+          categoria: 'cobros',
           severidad: uso >= 100 ? 'critico' : 'aviso',
           titulo: `${c.nombre} usa el ${Math.round(uso)} % de su límite`,
           detalle: `Saldo ${Math.round(cobros.saldo)} € de ${Math.round(c.limite_credito)} €`,
@@ -161,6 +168,7 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
     if ((facturasAnio.get(c.id) ?? 0) === 1 && dias > 45) {
       alertas.push({
         tipo: 'nuevo_sin_recompra',
+        categoria: 'clientes',
         severidad: 'aviso',
         titulo: `${c.nombre} solo ha comprado una vez`,
         detalle: 'Cliente nuevo sin segunda compra: oportunidad de seguimiento',
@@ -180,6 +188,7 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
       const cli = clientes.find((c) => c.id === p.cliente_id);
       alertas.push({
         tipo: 'pedido_atrasado',
+        categoria: 'pedidos',
         severidad: 'critico',
         titulo: `Pedido ${p.numero_erp ?? ''} con entrega pasada`,
         detalle: `${cli?.nombre ?? 'Cliente'} · prometido ${p.fecha_prometida} · ${Math.round(Number(p.importe ?? 0))} €`,
@@ -197,6 +206,7 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
   for (const a of (agendaRaw ?? []) as { id: string; asunto: string; fecha: string; cliente_id: string | null }[]) {
     alertas.push({
       tipo: 'reunion_atrasada',
+        categoria: 'agenda',
       severidad: 'aviso',
       titulo: `Reunión atrasada: ${a.asunto}`,
       detalle: `Programada para ${a.fecha}`,
@@ -219,6 +229,7 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
     if (netaTotal < esperado * 0.8) {
       alertas.push({
         tipo: 'objetivo',
+        categoria: 'objetivo',
         severidad: 'aviso',
         titulo: 'Ritmo por debajo del objetivo',
         detalle: `${Math.round(netaTotal)} € frente a ${Math.round(esperado)} € esperados a estas alturas`,
