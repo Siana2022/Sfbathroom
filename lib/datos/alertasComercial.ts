@@ -5,6 +5,7 @@ import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
 
 export type AlertaComercial = {
   tipo: string;
+  clave: string;
   categoria: 'clientes' | 'cobros' | 'pedidos' | 'agenda' | 'objetivo';
   severidad: 'critico' | 'aviso';
   titulo: string;
@@ -14,6 +15,8 @@ export type AlertaComercial = {
 
 export type AlertasComercialData = {
   esComercial: boolean;
+  empresaId: string;
+  comercialId: string | null;
   alertas: AlertaComercial[];
   criticas: number;
   avisos: number;
@@ -31,7 +34,9 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
   const usuario = await getUsuario();
   const esComercial = usuario?.rol === 'comercial';
-  if (!usuario) return { esComercial: false, alertas: [], criticas: 0, avisos: 0 };
+  if (!usuario) {
+    return { esComercial: false, empresaId: empresa.id, comercialId: null, alertas: [], criticas: 0, avisos: 0 };
+  }
 
   const hoy = new Date();
   const hoyISO = hoy.toISOString().slice(0, 10);
@@ -39,7 +44,9 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
   const anioPrev = anio - 1;
 
   let comercialId: string | null = usuario.comercialId;
-  if (esComercial && !comercialId) return { esComercial, alertas: [], criticas: 0, avisos: 0 };
+  if (esComercial && !comercialId) {
+    return { esComercial, empresaId: empresa.id, comercialId, alertas: [], criticas: 0, avisos: 0 };
+  }
 
   const { data: clientesRaw } = await supabase
     .from('clientes')
@@ -48,7 +55,9 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
     .eq('comercial_id', comercialId as string);
   const clientes = (clientesRaw ?? []) as { id: string; nombre: string; limite_credito: number | null }[];
   const ids = clientes.map((c) => c.id);
-  if (ids.length === 0) return { esComercial, alertas: [], criticas: 0, avisos: 0 };
+  if (ids.length === 0) {
+    return { esComercial, empresaId: empresa.id, comercialId, alertas: [], criticas: 0, avisos: 0 };
+  }
 
   const facturas = await todasLasFilas<{ cliente_id: string | null; fecha: string; base_imponible: number; tipo_documento: string }>(
     (desde) =>
@@ -99,6 +108,7 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
       alertas.push({
         tipo: 'sin_comprar',
         categoria: 'clientes',
+        clave: '' ,
         severidad: 'critico',
         titulo: `${c.nombre} lleva ${dias === 999 ? 'sin compras registradas' : `${dias} días sin comprar`}`,
         detalle: ultimaFecha ? `Última compra: ${ultimaFecha}` : 'Sin facturas en el histórico consultado',
@@ -108,6 +118,7 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
       alertas.push({
         tipo: 'sin_comprar_aviso',
         categoria: 'clientes',
+        clave: '' ,
         severidad: 'aviso',
         titulo: `${c.nombre} lleva ${dias} días sin comprar`,
         detalle: `Última compra: ${ultimaFecha}`,
@@ -121,6 +132,7 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
       alertas.push({
         tipo: 'caida',
         categoria: 'clientes',
+        clave: '' ,
         severidad: 'aviso',
         titulo: `${c.nombre} cae un ${Math.round((1 - nA / nP) * 100)} %`,
         detalle: `${Math.round(nA)} € este año frente a ${Math.round(nP)} € el anterior`,
@@ -134,6 +146,7 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
         alertas.push({
           tipo: 'mora',
           categoria: 'cobros',
+          clave: '',
           severidad: 'critico',
           titulo: `${c.nombre} debe ${Math.round(cobros.vencido)} € vencidos`,
           detalle: 'Mora elevada: revisar cobro antes de seguir sirviendo',
@@ -143,6 +156,7 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
         alertas.push({
           tipo: 'mora',
           categoria: 'cobros',
+          clave: '',
           severidad: 'aviso',
           titulo: `${c.nombre} tiene ${Math.round(cobros.vencido)} € vencidos`,
           detalle: 'Mora pendiente de cobro',
@@ -157,6 +171,7 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
         alertas.push({
           tipo: 'limite',
           categoria: 'cobros',
+          clave: '',
           severidad: uso >= 100 ? 'critico' : 'aviso',
           titulo: `${c.nombre} usa el ${Math.round(uso)} % de su límite`,
           detalle: `Saldo ${Math.round(cobros.saldo)} € de ${Math.round(c.limite_credito)} €`,
@@ -169,6 +184,7 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
       alertas.push({
         tipo: 'nuevo_sin_recompra',
         categoria: 'clientes',
+        clave: '' ,
         severidad: 'aviso',
         titulo: `${c.nombre} solo ha comprado una vez`,
         detalle: 'Cliente nuevo sin segunda compra: oportunidad de seguimiento',
@@ -189,6 +205,7 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
       alertas.push({
         tipo: 'pedido_atrasado',
         categoria: 'pedidos',
+        clave: '',
         severidad: 'critico',
         titulo: `Pedido ${p.numero_erp ?? ''} con entrega pasada`,
         detalle: `${cli?.nombre ?? 'Cliente'} · prometido ${p.fecha_prometida} · ${Math.round(Number(p.importe ?? 0))} €`,
@@ -207,6 +224,7 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
     alertas.push({
       tipo: 'reunion_atrasada',
         categoria: 'agenda',
+      clave: '',
       severidad: 'aviso',
       titulo: `Reunión atrasada: ${a.asunto}`,
       detalle: `Programada para ${a.fecha}`,
@@ -230,6 +248,7 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
       alertas.push({
         tipo: 'objetivo',
         categoria: 'objetivo',
+        clave: '',
         severidad: 'aviso',
         titulo: 'Ritmo por debajo del objetivo',
         detalle: `${Math.round(netaTotal)} € frente a ${Math.round(esperado)} € esperados a estas alturas`,
@@ -238,13 +257,26 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
     }
   }
 
+  // Clave estable por alerta (tipo + cliente/pedido/reunión) y silenciados.
+  for (const a of alertas) {
+    if (!a.clave) a.clave = `${a.tipo}:${a.enlace}`;
+  }
+  const { data: silenciadas } = await supabase
+    .from('alertas_silenciadas')
+    .select('clave')
+    .eq('empresa_id', empresa.id);
+  const ocultas = new Set(((silenciadas ?? []) as { clave: string }[]).map((s) => s.clave));
+  const visibles = alertas.filter((a) => !ocultas.has(a.clave));
+
   const orden = { critico: 0, aviso: 1 } as const;
-  alertas.sort((a, b) => orden[a.severidad] - orden[b.severidad]);
+  visibles.sort((a, b) => orden[a.severidad] - orden[b.severidad]);
 
   return {
     esComercial,
-    alertas,
-    criticas: alertas.filter((a) => a.severidad === 'critico').length,
-    avisos: alertas.filter((a) => a.severidad === 'aviso').length,
+    empresaId: empresa.id,
+    comercialId,
+    alertas: visibles,
+    criticas: visibles.filter((a) => a.severidad === 'critico').length,
+    avisos: visibles.filter((a) => a.severidad === 'aviso').length,
   };
 }

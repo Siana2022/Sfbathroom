@@ -1,5 +1,7 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import type { AlertaComercial } from '@/lib/datos/alertasComercial';
 
@@ -22,7 +24,18 @@ const TITULO: Record<AlertaComercial['categoria'], string> = {
   objetivo: 'Objetivo',
 };
 
-export default function AlertasLista({ alertas }: { alertas: AlertaComercial[] }) {
+export default function AlertasLista({
+  alertas,
+  empresaId,
+  comercialId,
+}: {
+  alertas: AlertaComercial[];
+  empresaId: string;
+  comercialId: string | null;
+}) {
+  const supabase = createClient();
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
   const [categoria, setCategoria] = useState<AlertaComercial['categoria'] | 'todas'>('todas');
   const [severidad, setSeveridad] = useState<'todas' | 'critico' | 'aviso'>('todas');
 
@@ -39,6 +52,19 @@ export default function AlertasLista({ alertas }: { alertas: AlertaComercial[] }
   }, [alertas, categoria, severidad]);
 
   const total = [...porCategoria.values()].reduce((s, v) => s + v.length, 0);
+
+  async function silenciar(clave: string) {
+    if (!comercialId) return;
+    if (!window.confirm('¿Ocultar esta alerta? No volverá a aparecer para ti.')) return;
+    startTransition(async () => {
+      await supabase.from('alertas_silenciadas').insert({
+        empresa_id: empresaId,
+        comercial_id: comercialId,
+        clave,
+      });
+      router.refresh();
+    });
+  }
 
   const cuenta = (c: AlertaComercial['categoria'] | 'todas') =>
     c === 'todas' ? alertas.length : alertas.filter((a) => a.categoria === c).length;
@@ -104,7 +130,12 @@ export default function AlertasLista({ alertas }: { alertas: AlertaComercial[] }
                       <div style={{ fontWeight: 600 }}>{a.titulo}</div>
                       <div style={{ color: 'var(--muted)', fontSize: 13 }}>{a.detalle}</div>
                     </div>
-                    <Link href={a.enlace} className="enlace" style={{ flexShrink: 0 }}>Abrir</Link>
+                    <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+                      <Link href={a.enlace} className="enlace">Abrir</Link>
+                      <button type="button" className="boton" onClick={() => silenciar(a.clave)} disabled={pending}>
+                        Silenciar
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
