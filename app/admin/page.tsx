@@ -1,5 +1,7 @@
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
+import AdminUsuarios from '@/components/AdminUsuarios';
+import { esComercialValido } from '@/lib/datos/filtros';
 
 
 type UsuarioAdmin = {
@@ -26,6 +28,15 @@ export default async function AdminPage() {
 
   const { data: usuariosRaw, error } = await supabase.rpc('admin_listar_usuarios');
   const usuarios = (usuariosRaw ?? []) as UsuarioAdmin[];
+
+  const { data: comercialesRaw } = await supabase
+    .from('comerciales')
+    .select('id, nombre')
+    .eq('activo', true)
+    .order('nombre');
+  const comerciales = ((comercialesRaw ?? []) as { id: string; nombre: string }[]).filter((c) =>
+    esComercialValido(c.nombre),
+  );
 
   const esAdmin = rol === 'admin';
 
@@ -55,60 +66,7 @@ where id = (select id from auth.users where email = 'TU_EMAIL');`}
             instante vía RLS.
           </p>
 
-          <div className="card">
-            <h2>Usuarios ({usuarios.length})</h2>
-            {error ? (
-              <p style={{ color: 'var(--muted)' }}>
-                No se pudo listar (¿existe la función <code>admin_listar_usuarios</code>?
-                Aplica la migración 0008 o pégala en SQL Editor).
-              </p>
-            ) : (
-              <div style={{ maxHeight: 420, overflowY: 'auto' }}>
-                <table className="tabla">
-                  <thead>
-                    <tr>
-                      <th>Email</th>
-                      <th>Rol</th>
-                      <th>Cartera (comercial_id)</th>
-                      <th>Creado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {usuarios.map((u) => (
-                      <tr key={u.id}>
-                        <td>{u.email ?? '—'}</td>
-                        <td>
-                          <span className={u.rol === 'admin' ? 'badge construccion' : 'badge listo'}>
-                            {u.rol ?? 'sin rol'}
-                          </span>
-                        </td>
-                        <td>{u.comercial_id ?? '—'}</td>
-                        <td>{u.created_at ? u.created_at.slice(0, 10) : '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          <div className="card">
-            <h2>Cambiar rol / cartera</h2>
-            <p style={{ color: 'var(--muted)', marginBottom: 12 }}>
-              Selecciona un usuario y guarda. Solo admin.
-            </p>
-            <pre style={{ background: 'var(--card-bg)', padding: 16, borderRadius: 8, fontSize: 12, overflowX: 'auto' }}>
-{`-- Asignar rol (admin|direccion|comercial|financiero|lectura|administracion|almacen)
-update public.profiles
-set role = 'direccion'
-where id = (select id from auth.users where email = 'email@ejemplo.com');
-
--- Asignar cartera a un comercial
-update public.profiles
-set comercial_id = (select id from public.comerciales where nombre = 'NOMBRE')
-where id = (select id from auth.users where email = 'email@ejemplo.com');`}
-            </pre>
-          </div>
+          <AdminUsuarios usuarios={usuarios} comerciales={comerciales} />
         </>
       )}
     </div>
