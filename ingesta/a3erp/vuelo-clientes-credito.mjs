@@ -63,17 +63,46 @@ async function main() {
     for (const e of empresas) {
       const base = `[${e.base}]`;
 
-      const formas = (await pool.request().query(`SELECT TOP 500 * FROM ${base}.dbo.FORMAPAGCLI`)).recordset;
       const mapaFormas = new Map();
-      for (const f of formas) {
-        const claves = Object.keys(f);
-        const colCod = claves.find((c) => /FORPAG|CODPAG|DOCPAG/i.test(c));
-        const colNom = claves.find((c) => /DESC|NOMBRE/i.test(c));
-        if (colCod && colNom) {
-          const valor = limpio(f[colCod]);
-          if (valor) mapaFormas.set(valor.toUpperCase(), limpio(f[colNom]));
+      try {
+        const formas = (await pool.request().query(`SELECT TOP 1000 * FROM ${base}.dbo.FORMAPAGCLI`)).recordset;
+        for (const f of formas) {
+          const claves = Object.keys(f);
+          const colCod = claves.find((c) => /^FORPAG$|^CODPAG$/i.test(c));
+          const colNom = claves.find((c) => /DESC|NOMBRE|TEXTO/i.test(c));
+          if (colCod && colNom) {
+            const valor = limpio(f[colCod]);
+            if (valor) mapaFormas.set(valor.toUpperCase(), limpio(f[colNom]));
+          }
         }
+      } catch {
+        /* sin FORMAPAGCLI se usa la traducción por código */
       }
+
+      const DOCPAG = {
+        TR: 'Transferencia',
+        R: 'Recibo',
+        G: 'Giro',
+        T: 'Talón',
+        C: 'Contado',
+        P: 'Pagaré',
+        E: 'Efectivo',
+        D: 'Domiciliación',
+      };
+      const traducirForma = (codigo) => {
+        if (!codigo) return null;
+        const c = codigo.toUpperCase();
+        if (mapaFormas.has(c)) return mapaFormas.get(c);
+        if (/^\d+$/.test(c)) {
+          const n = Number(c);
+          if (n === 0) return 'Contado';
+          return `A ${n} días`;
+        }
+        if (c === 'C' || c === 'CONT') return 'Contado';
+        if (c === 'ANT') return 'Anticipado';
+        if (c === 'PRE') return 'Prepago';
+        return codigo;
+      };
 
       const filas = (
         await pool.request().query(`
@@ -89,9 +118,11 @@ async function main() {
         const formaCodigo = limpio(c.FORPAG);
         registros.push({
           codigo,
-          forma_pago: formaCodigo ? (mapaFormas.get(formaCodigo.toUpperCase()) ?? formaCodigo) : null,
+          forma_pago: traducirForma(formaCodigo),
           forma_pago_codigo: formaCodigo,
-          documento_pago: limpio(c.DOCPAG),
+          documento_pago: limpio(c.DOCPAG)
+            ? (DOCPAG[String(c.DOCPAG).trim().toUpperCase()] ?? limpio(c.DOCPAG))
+            : null,
           tarifa_codigo: limpio(c.TARIFA),
           dias_pago: num(c.DIASPAGO1) === null ? null : Math.round(Number(c.DIASPAGO1)),
           riesgo_concedido: num(c.RIESGOCON),
@@ -99,7 +130,7 @@ async function main() {
         });
       }
 
-      console.log(`${e.codigo}: ${registros.length} clientes · ${mapaFormas.size} formas de pago mapeadas`);
+      console.log(`${e.codigo}: ${registros.length} clientes · ${mapaFormas.size} formas de pago desde FORMAPAGCLI`);
       let actualizados = 0;
       for (let i = 0; i < registros.length; i += LOTE) {
         const r = await rpc('actualizar_clientes_credito', {
