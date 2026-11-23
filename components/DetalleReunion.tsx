@@ -10,12 +10,28 @@ const TIPOS_SEGUIMIENTO: { valor: string; etiqueta: string }[] = [
   { valor: 'otros', etiqueta: 'Otros' },
 ];
 
-const TIPOS: Record<string, string> = {
+const TIPOS_REUNION: Record<string, string> = {
   presencial: 'Presencial',
   online: 'Online',
   telefonica: 'Telefónica',
   email: 'Email',
 };
+
+const ESTADOS: Record<string, string> = {
+  programada: 'Programada',
+  realizada: 'Realizada',
+  ganada: 'Cerrada · ganada',
+  perdida: 'Cerrada · perdida',
+  cancelada: 'Cancelada',
+};
+
+const RESULTADOS: { valor: string; etiqueta: string }[] = [
+  { valor: 'ganada', etiqueta: 'Cerrada / ganada' },
+  { valor: 'pedido', etiqueta: 'Pedido solicitado' },
+  { valor: 'seguimiento', etiqueta: 'Requiere seguimiento' },
+  { valor: 'perdida', etiqueta: 'Cerrada / perdida' },
+  { valor: 'cancelada', etiqueta: 'Cancelada / no asistió' },
+];
 
 export default function DetalleReunion({
   evento,
@@ -29,13 +45,25 @@ export default function DetalleReunion({
   const supabase = createClient();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
   const [nota, setNota] = useState('');
   const [tipoSeguimiento, setTipoSeguimiento] = useState('reunion_seguimiento');
   const [motivo, setMotivo] = useState('');
-  const [error, setError] = useState<string | null>(null);
+
   const [fechaNueva, setFechaNueva] = useState(evento.fecha);
   const [horaNueva, setHoraNueva] = useState(evento.hora ? evento.hora.slice(0, 5) : '');
-  const [reagendando, setReagendando] = useState(false);
+
+  const [finalizando, setFinalizando] = useState(false);
+  const [resultado, setResultado] = useState('ganada');
+  const [importe, setImporte] = useState(evento.importeEstimado !== null ? String(evento.importeEstimado) : '');
+  const [pedidoRef, setPedidoRef] = useState(evento.pedidoRef ?? '');
+  const [motivoCierre, setMotivoCierre] = useState(evento.motivoCierre ?? '');
+  const [proxFecha, setProxFecha] = useState(evento.fecha);
+  const [proxHora, setProxHora] = useState('');
+  const [proxAsunto, setProxAsunto] = useState(`Seguimiento: ${evento.asunto}`);
+
+  const finalizada = evento.estado !== 'programada';
 
   async function añadirNota() {
     if (!nota.trim()) return;
@@ -59,26 +87,8 @@ export default function DetalleReunion({
     });
   }
 
-  async function alternar() {
-    startTransition(async () => {
-      const { error: e } = await supabase.from('agenda').update({ completada: !evento.completada }).eq('id', evento.id);
-      if (e) {
-        setError(e.message);
-        return;
-      }
-      await supabase.from('agenda_notas').insert({
-        agenda_id: evento.id,
-        empresa_id: empresaId,
-        comercial_id: comercialId,
-        texto: evento.completada ? 'Reunión reabierta.' : 'Reunión marcada como hecha.',
-      });
-      router.refresh();
-    });
-  }
-
   async function reagendar() {
     if (!fechaNueva) return;
-    setReagendando(true);
     const antes = `${evento.fecha}${evento.hora ? ` ${evento.hora.slice(0, 5)}` : ''}`;
     const despues = `${fechaNueva}${horaNueva ? ` ${horaNueva}` : ''}`;
     const { error: e } = await supabase
@@ -87,7 +97,6 @@ export default function DetalleReunion({
       .eq('id', evento.id);
     if (e) {
       setError(e.message);
-      setReagendando(false);
       return;
     }
     await supabase.from('agenda_notas').insert({
@@ -95,8 +104,99 @@ export default function DetalleReunion({
       empresa_id: empresaId,
       comercial_id: comercialId,
       texto: `Reagendada: ${antes} → ${despues}`,
+      tipo: 'sistema',
     });
-    setReagendando(false);
+    router.refresh();
+  }
+
+  async function finalizar() {
+    setError(null);
+    let estado = 'realizada';
+    let texto = 'Reunión finalizada.';
+    let nuevaReunionId: string | null = null;
+
+    if (resultado === 'ganada' || resultado === 'pedido') {
+      estado = 'ganada';
+      texto =
+        resultado === 'pedido'
+          ? `Resultado: pedido solicitado${importe ? ` · ${importe} €` : ''}${pedidoRef ? ` · pedido ${pedidoRef}` : ''}`
+          : `Resultado: cerrada/ganada${importe ? ` · ${importe} €` : ''}${pedidoRef ? ` · pedido ${pedidoRef}` : ''}`;
+    } else if (resultado === 'perdida') {
+      estado = 'perdida';
+      texto = `Resultado: cerrada/perdida${motivoCierre ? ` · ${motivoCierre}` : ''}`;
+    } else if (resultado === 'cancelada') {
+      estado = 'cancelada';
+      texto = 'Reunión cancelada / no asistió.';
+    } else if (resultado === 'seguimiento') {
+      estado = 'realizada';
+      if (!proxFecha) {
+        setError('Indica la fecha de la próxima reunión.');
+        return;
+      }
+      const { data: creada, error: eCrear } = await supabase
+        .from('agenda')
+        .insert({
+          empresa_id: empresaId,
+          comercial_id: comercialId,
+          cliente_id: evento.clienteId,
+          fecha: proxFecha,
+          hora: proxHora || null,
+          asunto: proxAsunto.trim() || `Seguimiento: ${evento.asunto}`,
+          tipo: evento.tipo,
+          estado: 'programada',
+        })
+        .select('id')
+        .single();
+      if (eCrear) {
+        setError(eCrear.message);
+        return;
+      }
+      nuevaReunionId = (creada as { id: string }).id;
+      texto = `Requiere seguimiento · próxima reunión ${proxFecha}${proxHora ? ` ${proxHora}` : ''}`;
+    }
+
+    const { error: e } = await supabase
+      .from('agenda')
+      .update({
+        estado,
+        completada: true,
+        importe_estimado: resultado === 'ganada' || resultado === 'pedido' ? Number(importe) || null : null,
+        pedido_ref: pedidoRef.trim() || null,
+        motivo_cierre: resultado === 'perdida' ? motivoCierre.trim() || null : null,
+        proxima_reunion_id: nuevaReunionId,
+      })
+      .eq('id', evento.id);
+    if (e) {
+      setError(e.message);
+      return;
+    }
+    await supabase.from('agenda_notas').insert({
+      agenda_id: evento.id,
+      empresa_id: empresaId,
+      comercial_id: comercialId,
+      texto,
+      tipo: 'sistema',
+    });
+    setFinalizando(false);
+    router.refresh();
+  }
+
+  async function reabrir() {
+    const { error: e } = await supabase
+      .from('agenda')
+      .update({ estado: 'programada', completada: false, proxima_reunion_id: null })
+      .eq('id', evento.id);
+    if (e) {
+      setError(e.message);
+      return;
+    }
+    await supabase.from('agenda_notas').insert({
+      agenda_id: evento.id,
+      empresa_id: empresaId,
+      comercial_id: comercialId,
+      texto: 'Reunión reabierta.',
+      tipo: 'sistema',
+    });
     router.refresh();
   }
 
@@ -112,7 +212,7 @@ export default function DetalleReunion({
   return (
     <div>
       <div className="card">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
           <div>
             <div style={{ color: 'var(--muted)', fontSize: 12 }}>Fecha</div>
             <strong>{evento.fecha}</strong>
@@ -127,13 +227,26 @@ export default function DetalleReunion({
           </div>
           <div>
             <div style={{ color: 'var(--muted)', fontSize: 12 }}>Tipo</div>
-            <strong>{TIPOS[evento.tipo] ?? evento.tipo}</strong>
+            <strong>{TIPOS_REUNION[evento.tipo] ?? evento.tipo}</strong>
           </div>
           <div>
             <div style={{ color: 'var(--muted)', fontSize: 12 }}>Estado</div>
-            <strong>{evento.completada ? 'Hecha' : 'Pendiente'}</strong>
+            <strong>{ESTADOS[evento.estado] ?? evento.estado}</strong>
           </div>
+          {evento.importeEstimado !== null ? (
+            <div>
+              <div style={{ color: 'var(--muted)', fontSize: 12 }}>Importe</div>
+              <strong>{evento.importeEstimado} €</strong>
+            </div>
+          ) : null}
+          {evento.pedidoRef ? (
+            <div>
+              <div style={{ color: 'var(--muted)', fontSize: 12 }}>Pedido</div>
+              <strong>{evento.pedidoRef}</strong>
+            </div>
+          ) : null}
         </div>
+
         {evento.notas ? (
           <div style={{ marginTop: 14 }}>
             <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 4 }}>Notas iniciales</div>
@@ -141,35 +254,112 @@ export default function DetalleReunion({
           </div>
         ) : null}
 
-        <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border-2)' }}>
-          <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 6 }}>Reagendar</div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <label className="campo-filtro">
-              Nueva fecha
-              <input type="date" value={fechaNueva} onChange={(e) => setFechaNueva(e.target.value)} />
-            </label>
-            <label className="campo-filtro">
-              Nueva hora
-              <input type="time" value={horaNueva} onChange={(e) => setHoraNueva(e.target.value)} />
-            </label>
-            <button type="button" className="boton" onClick={reagendar} disabled={pending || reagendando || !fechaNueva}>
-              {reagendando ? 'Guardando…' : 'Reagendar'}
-            </button>
+        {evento.motivoCierre ? (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 4 }}>Motivo de cierre</div>
+            <p style={{ margin: 0 }}>{evento.motivoCierre}</p>
           </div>
-        </div>
+        ) : null}
+
+        {!finalizada ? (
+          <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border-2)' }}>
+            <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 6 }}>Reagendar</div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <label className="campo-filtro">
+                Nueva fecha
+                <input type="date" value={fechaNueva} onChange={(e) => setFechaNueva(e.target.value)} />
+              </label>
+              <label className="campo-filtro">
+                Nueva hora
+                <input type="time" value={horaNueva} onChange={(e) => setHoraNueva(e.target.value)} />
+              </label>
+              <button type="button" className="boton" onClick={reagendar} disabled={pending || !fechaNueva}>
+                Reagendar
+              </button>
+              <button type="button" className="boton" onClick={() => setFinalizando((v) => !v)}>
+                {finalizando ? 'Cancelar cierre' : 'Finalizar reunión'}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {finalizando && !finalizada ? (
+          <div style={{ marginTop: 14, padding: 14, background: 'var(--wash)', borderRadius: 10 }}>
+            <h3 style={{ margin: '0 0 8px' }}>Resultado de la reunión</h3>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <label className="campo-filtro">
+                Resultado
+                <select value={resultado} onChange={(e) => setResultado(e.target.value)}>
+                  {RESULTADOS.map((r) => (
+                    <option key={r.valor} value={r.valor}>{r.etiqueta}</option>
+                  ))}
+                </select>
+              </label>
+              {(resultado === 'ganada' || resultado === 'pedido') ? (
+                <>
+                  <label className="campo-filtro">
+                    Importe (€)
+                    <input type="number" min={0} step={0.01} value={importe} onChange={(e) => setImporte(e.target.value)} />
+                  </label>
+                  <label className="campo-filtro">
+                    Nº pedido
+                    <input type="text" value={pedidoRef} onChange={(e) => setPedidoRef(e.target.value)} />
+                  </label>
+                </>
+              ) : null}
+              {resultado === 'perdida' ? (
+                <label className="campo-filtro" style={{ flex: 1, minWidth: 220 }}>
+                  Motivo
+                  <input type="text" value={motivoCierre} onChange={(e) => setMotivoCierre(e.target.value)} placeholder="Precio, competencia, timing…" />
+                </label>
+              ) : null}
+              {resultado === 'seguimiento' ? (
+                <>
+                  <label className="campo-filtro">
+                    Próxima fecha *
+                    <input type="date" value={proxFecha} onChange={(e) => setProxFecha(e.target.value)} />
+                  </label>
+                  <label className="campo-filtro">
+                    Hora
+                    <input type="time" value={proxHora} onChange={(e) => setProxHora(e.target.value)} />
+                  </label>
+                  <label className="campo-filtro" style={{ flex: 1, minWidth: 220 }}>
+                    Asunto
+                    <input type="text" value={proxAsunto} onChange={(e) => setProxAsunto(e.target.value)} />
+                  </label>
+                </>
+              ) : null}
+            </div>
+            {error ? <p className="nota" style={{ color: 'var(--rojo)' }}>{error}</p> : null}
+            <div style={{ marginTop: 10 }}>
+              <button type="button" className="boton" onClick={finalizar} disabled={pending}>
+                Guardar resultado
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {finalizada ? (
+          <div style={{ marginTop: 14, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" className="boton" onClick={reabrir} disabled={pending}>Reabrir reunión</button>
+            <button type="button" className="boton" onClick={borrar} disabled={pending}>Borrar reunión</button>
+          </div>
+        ) : null}
       </div>
 
       <div className="card">
         <h2>Seguimiento completo</h2>
         {evento.seguimiento.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>Sin notas todavía.</p>
+          <p style={{ color: 'var(--muted)' }}>Sin seguimiento todavía.</p>
         ) : (
           <ul style={{ margin: 0, paddingLeft: 18 }}>
             {evento.seguimiento.map((n) => (
               <li key={n.id} style={{ marginBottom: 12 }}>
                 <span style={{ color: 'var(--muted)', fontSize: 12 }}>
                   {n.fecha.slice(0, 16).replace('T', ' ')} ·{' '}
-                  {TIPOS_SEGUIMIENTO.find((tp) => tp.valor === n.tipo)?.etiqueta ?? n.tipo}
+                  {n.tipo === 'sistema'
+                    ? 'Sistema'
+                    : (TIPOS_SEGUIMIENTO.find((tp) => tp.valor === n.tipo)?.etiqueta ?? n.tipo)}
                   {n.tipo === 'otros' && n.motivo ? `: ${n.motivo}` : ''}
                 </span>
                 <div style={{ whiteSpace: 'pre-wrap' }}>{n.texto}</div>
@@ -207,12 +397,11 @@ export default function DetalleReunion({
           <button type="button" className="boton" onClick={añadirNota} disabled={pending || !nota.trim()}>
             Guardar nota
           </button>
-          <button type="button" className="boton" onClick={alternar} disabled={pending}>
-            {evento.completada ? 'Reabrir' : 'Marcar hecha'}
-          </button>
-          <button type="button" className="boton" onClick={borrar} disabled={pending}>
-            Borrar reunión
-          </button>
+          {!finalizada ? (
+            <button type="button" className="boton" onClick={borrar} disabled={pending}>
+              Borrar reunión
+            </button>
+          ) : null}
         </div>
       </div>
     </div>

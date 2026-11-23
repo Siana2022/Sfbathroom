@@ -13,6 +13,11 @@ export type EventoAgenda = {
   tipo: string;
   notas: string | null;
   completada: boolean;
+  estado: string;
+  importeEstimado: number | null;
+  pedidoRef: string | null;
+  motivoCierre: string | null;
+  proximaReunionId: string | null;
   clienteId: string | null;
   clienteNombre: string | null;
   seguimiento: NotaAgenda[];
@@ -85,7 +90,7 @@ export async function getAgenda(codigoEmpresa: string): Promise<AgendaData> {
 
   const { data: eventosRaw } = await supabase
     .from('agenda')
-    .select('id, comercial_id, cliente_id, fecha, hora, asunto, tipo, notas, completada')
+    .select('id, comercial_id, cliente_id, fecha, hora, asunto, tipo, notas, completada, estado, importe_estimado, pedido_ref, motivo_cierre, proxima_reunion_id')
     .eq('empresa_id', empresa.id)
     .order('fecha', { ascending: true });
 
@@ -108,6 +113,11 @@ export async function getAgenda(codigoEmpresa: string): Promise<AgendaData> {
     tipo: string;
     notas: string | null;
     completada: boolean;
+    estado: string;
+    importe_estimado: number | null;
+    pedido_ref: string | null;
+    motivo_cierre: string | null;
+    proxima_reunion_id: string | null;
   }[]).map((e) => ({
     id: e.id,
     fecha: e.fecha,
@@ -116,6 +126,11 @@ export async function getAgenda(codigoEmpresa: string): Promise<AgendaData> {
     tipo: e.tipo,
     notas: e.notas,
     completada: e.completada,
+    estado: e.estado ?? 'programada',
+    importeEstimado: e.importe_estimado === null ? null : Number(e.importe_estimado),
+    pedidoRef: e.pedido_ref,
+    motivoCierre: e.motivo_cierre,
+    proximaReunionId: e.proxima_reunion_id,
     clienteId: e.cliente_id,
     clienteNombre: e.cliente_id ? (nombreCliente.get(e.cliente_id) ?? '—') : null,
     seguimiento: seguimientoPorEvento.get(e.id) ?? [],
@@ -135,7 +150,7 @@ export async function getEventoAgenda(id: string): Promise<EventoAgenda | null> 
   const supabase = createClient();
   const { data: e } = await supabase
     .from('agenda')
-    .select('id, cliente_id, fecha, hora, asunto, tipo, notas, completada')
+    .select('id, cliente_id, fecha, hora, asunto, tipo, notas, completada, estado, importe_estimado, pedido_ref, motivo_cierre, proxima_reunion_id')
     .eq('id', id)
     .maybeSingle();
   if (!e) return null;
@@ -149,6 +164,11 @@ export async function getEventoAgenda(id: string): Promise<EventoAgenda | null> 
     tipo: string;
     notas: string | null;
     completada: boolean;
+    estado: string;
+    importe_estimado: number | null;
+    pedido_ref: string | null;
+    motivo_cierre: string | null;
+    proxima_reunion_id: string | null;
   };
 
   let clienteNombre: string | null = null;
@@ -171,6 +191,11 @@ export async function getEventoAgenda(id: string): Promise<EventoAgenda | null> 
     tipo: fila.tipo,
     notas: fila.notas,
     completada: fila.completada,
+    estado: fila.estado ?? 'programada',
+    importeEstimado: fila.importe_estimado === null ? null : Number(fila.importe_estimado),
+    pedidoRef: fila.pedido_ref,
+    motivoCierre: fila.motivo_cierre,
+    proximaReunionId: fila.proxima_reunion_id,
     clienteId: fila.cliente_id,
     clienteNombre,
     seguimiento: ((notasRaw ?? []) as {
