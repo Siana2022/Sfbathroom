@@ -5,6 +5,7 @@ import { getFichaCliente } from '@/lib/datos/fichaCliente';
 import { getCrossSell } from '@/lib/datos/crosssell';
 import { decimal, eur, numero, pct } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
+import EditorContactoCliente from '@/components/EditorContactoCliente';
 import GraficoBarras from '@/components/GraficoBarras';
 import { ANIO_ACTUAL } from '@/lib/ejercicio';
 
@@ -43,11 +44,19 @@ export default async function FichaClientePage({ params }: { params: { id: strin
             )}
             {d.cliente.direccion && <li>{d.cliente.direccion}{d.cliente.poblacion ? `, ${d.cliente.poblacion}` : ''}</li>}
             {d.cliente.provincia && <li>Provincia: {d.cliente.provincia}{d.cliente.pais ? ` · ${d.cliente.pais}` : ''}</li>}
+            {d.cliente.personaContacto && <li>Persona de contacto: {d.cliente.personaContacto}</li>}
             {d.cliente.telefono && <li>Teléfono: {d.cliente.telefono}</li>}
             {d.cliente.email && <li>Email: {d.cliente.email}</li>}
           </ul>
         </div>
       )}
+
+      <EditorContactoCliente
+        clienteId={d.cliente.id}
+        personaContacto={d.cliente.personaContacto}
+        telefono={d.cliente.telefono}
+        email={d.cliente.email}
+      />
 
       <ul className="grid-kpis">
         <Kpi etiqueta={`Facturación neta ${d.anio}`} valor={eur(d.neta)} nota={d.deltaPct === null ? 'sin dato previo' : `vs ${d.anio - 1}: ${pct(d.deltaPct)}`} />

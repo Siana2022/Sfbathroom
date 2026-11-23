@@ -22,6 +22,7 @@ export type EventoAgenda = {
   adjuntos: { nombre: string; url: string | null }[];
   clienteId: string | null;
   clienteNombre: string | null;
+  clienteContacto: { persona: string | null; telefono: string | null; email: string | null } | null;
   seguimiento: NotaAgenda[];
 };
 
@@ -30,7 +31,7 @@ export type AgendaData = {
   comercialId: string | null;
   esComercial: boolean;
   eventos: EventoAgenda[];
-  clientes: { id: string; nombre: string }[];
+  clientes: { id: string; nombre: string; telefono: string | null; email: string | null; personaContacto: string | null }[];
 };
 
 export async function getAgendaContexto(
@@ -96,10 +97,16 @@ export async function getAgenda(codigoEmpresa: string): Promise<AgendaData> {
     .eq('empresa_id', empresa.id)
     .order('fecha', { ascending: true });
 
-  const clientes = await todasLasFilas<{ id: string; nombre: string }>((desde) =>
+  const clientes = await todasLasFilas<{
+    id: string;
+    nombre: string;
+    telefono: string | null;
+    email: string | null;
+    persona_contacto: string | null;
+  }>((desde) =>
     supabase
       .from('clientes')
-      .select('id, nombre')
+      .select('id, nombre, telefono, email, persona_contacto')
       .eq('empresa_id', empresa.id)
       .order('nombre')
       .range(desde, desde + TAMANO_PAGINA - 1),
@@ -135,6 +142,7 @@ export async function getAgenda(codigoEmpresa: string): Promise<AgendaData> {
     proximaReunionId: e.proxima_reunion_id,
     pedido: null,
     adjuntos: [],
+    clienteContacto: null,
     clienteId: e.cliente_id,
     clienteNombre: e.cliente_id ? (nombreCliente.get(e.cliente_id) ?? '—') : null,
     seguimiento: seguimientoPorEvento.get(e.id) ?? [],
@@ -145,7 +153,13 @@ export async function getAgenda(codigoEmpresa: string): Promise<AgendaData> {
     comercialId: esComercial ? comercialId : null,
     esComercial,
     eventos,
-    clientes: clientes.map((c) => ({ id: c.id, nombre: c.nombre })),
+    clientes: clientes.map((c) => ({
+      id: c.id,
+      nombre: c.nombre,
+      telefono: c.telefono,
+      email: c.email,
+      personaContacto: c.persona_contacto,
+    })),
   };
 }
 
@@ -196,9 +210,18 @@ export async function getEventoAgenda(id: string): Promise<EventoAgenda | null> 
   }
 
   let clienteNombre: string | null = null;
+  let clienteContacto: { persona: string | null; telefono: string | null; email: string | null } | null = null;
   if (fila.cliente_id) {
-    const { data: c } = await supabase.from('clientes').select('nombre').eq('id', fila.cliente_id).maybeSingle();
-    clienteNombre = (c as { nombre: string } | null)?.nombre ?? null;
+    const { data: c } = await supabase
+      .from('clientes')
+      .select('nombre, telefono, email, persona_contacto')
+      .eq('id', fila.cliente_id)
+      .maybeSingle();
+    const cf = c as { nombre: string; telefono: string | null; email: string | null; persona_contacto: string | null } | null;
+    clienteNombre = cf?.nombre ?? null;
+    clienteContacto = cf
+      ? { persona: cf.persona_contacto, telefono: cf.telefono, email: cf.email }
+      : null;
   }
 
   const { data: notasRaw } = await supabase
@@ -224,6 +247,7 @@ export async function getEventoAgenda(id: string): Promise<EventoAgenda | null> 
     adjuntos,
     clienteId: fila.cliente_id,
     clienteNombre,
+    clienteContacto,
     seguimiento: ((notasRaw ?? []) as {
       id: string;
       texto: string;
