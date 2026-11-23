@@ -96,7 +96,11 @@ export default async function FichaClientePage({ params }: { params: { id: strin
                 </span>
               </summary>
               {p.lineas.length === 0 ? (
-                <p style={{ color: 'var(--muted)', margin: '8px 0 0' }}>Sin detalle de líneas cargado.</p>
+                <p style={{ color: 'var(--muted)', margin: '8px 0 0' }}>
+                  {p.estado === 'anulado'
+                    ? 'Pedido anulado: no genera albarán ni líneas.'
+                    : 'Sin albarán asociado todavía, por eso no hay líneas.'}
+                </p>
               ) : (
                 <table className="tabla" style={{ marginTop: 8 }}>
                   <thead>
