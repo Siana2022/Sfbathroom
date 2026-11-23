@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) as {
     campanaId?: string;
     prueba?: string | null;
-    segmento?: { comerciales?: string[]; estado?: string; provincia?: string | null };
+    segmento?: { comerciales?: string[]; estado?: string; provincia?: string | null; clientes?: string[] };
   };
   if (!body.campanaId) return NextResponse.json({ error: 'Falta la campaña.' }, { status: 400 });
 
@@ -86,6 +86,7 @@ export async function POST(req: NextRequest) {
     comerciales?: string[];
     estado?: string;
     provincia?: string | null;
+    clientes?: string[];
   };
 
   if (yo.rol === 'comercial') {
@@ -105,14 +106,16 @@ export async function POST(req: NextRequest) {
     }
     seg.comerciales = propios;
   }
-  let consulta = admin
-    .from('clientes')
-    .select('id, email')
-    .eq('empresa_id', c.empresa_id)
-    .not('email', 'is', null);
-  if (seg.comerciales && seg.comerciales.length > 0) consulta = consulta.in('comercial_id', seg.comerciales);
-  if (seg.estado === 'activo' || seg.estado === 'inactivo') consulta = consulta.eq('estado', seg.estado);
-  if (seg.provincia) consulta = consulta.ilike('provincia', `%${seg.provincia}%`);
+  const elegidos = Array.isArray(seg.clientes) ? seg.clientes.filter(Boolean) : [];
+  let consulta = admin.from('clientes').select('id, email').eq('empresa_id', c.empresa_id);
+
+  if (elegidos.length > 0) {
+    consulta = consulta.in('id', elegidos);
+  } else {
+    if (seg.comerciales && seg.comerciales.length > 0) consulta = consulta.in('comercial_id', seg.comerciales);
+    if (seg.estado === 'activo' || seg.estado === 'inactivo') consulta = consulta.eq('estado', seg.estado);
+    if (seg.provincia) consulta = consulta.ilike('provincia', `%${seg.provincia}%`);
+  }
 
   const { data: clientes } = await consulta.limit(5000);
   const lista = (clientes ?? []) as { id: string; email: string | null }[];
@@ -135,6 +138,9 @@ export async function POST(req: NextRequest) {
 
   const emails = [...destinatarios.keys()];
   if (emails.length === 0) return NextResponse.json({ error: 'El segmento no tiene destinatarios con email.' }, { status: 400 });
+  if (elegidos.length > 0 && emails.length === 0) {
+    return NextResponse.json({ error: 'Los clientes elegidos no tienen email ni contactos con email.' }, { status: 400 });
+  }
 
   await admin.from('campanas_email').update({ estado: 'enviando', total: emails.length, segmento: seg }).eq('id', c.id);
 

@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
@@ -28,18 +28,51 @@ export default function PanelEnvio({
   );
   const [estado, setEstado] = useState(String(segmentoInicial.estado ?? 'todos'));
   const [provincia, setProvincia] = useState(String(segmentoInicial.provincia ?? ''));
+  const [modo, setModo] = useState<'todos' | 'elegir'>(
+    Array.isArray(segmentoInicial.clientes) && (segmentoInicial.clientes as string[]).length > 0 ? 'elegir' : 'todos',
+  );
+  const [busqueda, setBusqueda] = useState('');
+  const [resultados, setResultados] = useState<{ id: string; nombre: string; email: string | null }[]>([]);
+  const [elegidos, setElegidos] = useState<{ id: string; nombre: string; email: string | null }[]>([]);
   const [prueba, setPrueba] = useState('');
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const segmento = useMemo(
     () => ({
+      modo,
       comerciales: seleccion,
       estado,
       provincia: provincia.trim() || null,
+      clientes: modo === 'elegir' ? elegidos.map((c) => c.id) : [],
     }),
-    [seleccion, estado, provincia],
+    [modo, seleccion, estado, provincia, elegidos],
   );
+
+  useEffect(() => {
+    if (modo !== 'elegir') return;
+    let cancelado = false;
+    const t = setTimeout(() => {
+      const q = supabase
+        .from('clientes')
+        .select('id, nombre, email')
+        .order('nombre')
+        .limit(40);
+      const filtrada = busqueda.trim() ? q.ilike('nombre', `%${busqueda.trim()}%`) : q;
+      filtrada.then(({ data }) => {
+        if (cancelado) return;
+        setResultados((data ?? []) as { id: string; nombre: string; email: string | null }[]);
+      });
+    }, 250);
+    return () => {
+      cancelado = true;
+      clearTimeout(t);
+    };
+  }, [modo, busqueda]);
+
+  function alternarCliente(c: { id: string; nombre: string; email: string | null }) {
+    setElegidos((prev) => (prev.some((x) => x.id === c.id) ? prev.filter((x) => x.id !== c.id) : [...prev, c]));
+  }
 
   function guardarSegmento() {
     startTransition(async () => {
@@ -83,7 +116,66 @@ export default function PanelEnvio({
         Se enviará a los clientes que tengan email en su ficha o en sus contactos. Las bajas se excluyen automáticamente.
       </p>
 
-      <div className="fila-filtros" style={{ marginBottom: 12 }}>
+      <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginBottom: 12 }}>
+        <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14 }}>
+          <input type="radio" name="modo" checked={modo === 'todos'} onChange={() => setModo('todos')} />
+          Todos mis clientes
+        </label>
+        <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14 }}>
+          <input type="radio" name="modo" checked={modo === 'elegir'} onChange={() => setModo('elegir')} />
+          Elegir clientes
+        </label>
+      </div>
+
+      {modo === 'elegir' ? (
+        <div style={{ marginBottom: 12 }}>
+          <label className="campo-editor">
+            <span>Buscar cliente</span>
+            <input
+              type="search"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Nombre del cliente…"
+            />
+          </label>
+          <div style={{ maxHeight: 220, overflowY: 'auto', border: '1px solid var(--border-2)', borderRadius: 10, padding: 8 }}>
+            {resultados.length === 0 ? (
+              <p style={{ color: 'var(--muted)', margin: 0, fontSize: 13 }}>Sin resultados.</p>
+            ) : (
+              resultados.map((c) => (
+                <label key={c.id} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '3px 0', fontSize: 13 }}>
+                  <input type="checkbox" checked={elegidos.some((x) => x.id === c.id)} onChange={() => alternarCliente(c)} />
+                  <span style={{ flex: 1 }}>{c.nombre}</span>
+                  <span style={{ color: c.email ? 'var(--muted)' : 'var(--ambar)', fontSize: 12 }}>
+                    {c.email ?? 'sin email'}
+                  </span>
+                </label>
+              ))
+            )}
+          </div>
+          {elegidos.length > 0 ? (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+              {elegidos.map((c) => (
+                <span key={c.id} className="badge listo" style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                  {c.nombre}
+                  <button
+                    type="button"
+                    onClick={() => setElegidos(elegidos.filter((x) => x.id !== c.id))}
+                    style={{ border: 0, background: 'transparent', cursor: 'pointer', color: 'inherit' }}
+                    aria-label={`Quitar ${c.nombre}`}
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : null}
+          <p style={{ fontSize: 12, color: 'var(--muted)', margin: '6px 0 0' }}>
+            {elegidos.length} clientes seleccionados.
+          </p>
+        </div>
+      ) : null}
+      <div className="fila-filtros" style={{ marginBottom: 12, opacity: modo === 'elegir' ? 0.45 : 1 }}>
         <label className="campo-editor" style={{ marginBottom: 0 }}>
           <span>Estado del cliente</span>
           <select value={estado} onChange={(e) => setEstado(e.target.value)}>
