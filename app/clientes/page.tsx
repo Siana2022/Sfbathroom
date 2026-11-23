@@ -14,8 +14,10 @@ const ANIO = ANIO_ACTUAL;
 export default async function ClientesPage({ searchParams }: { searchParams: SearchParams }) {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
   const filtros = parseFiltros(searchParams);
-  const opciones = await getOpcionesFiltros(empresa);
-  const d = await getClientes(empresa, ANIO, filtros);
+  const [opciones, d] = await Promise.all([
+    getOpcionesFiltros(empresa),
+    getClientes(empresa, ANIO, filtros),
+  ]);
 
   return (
     <div>

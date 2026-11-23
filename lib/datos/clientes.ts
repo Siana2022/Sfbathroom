@@ -153,30 +153,36 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
 
   const nombreCliente = new Map(clientes.map((c) => [c.id, c.nombre]));
   const comercialDeCliente = new Map(clientes.map((c) => [c.id, c.comercial_id]));
-  const { data: comercialesRaw } = await supabase.from('comerciales').select('id, nombre');
+  const [comercialesRes, actividadRes, margenRes] = await Promise.all([
+    supabase.from('comerciales').select('id, nombre'),
+    supabase.rpc('clientes_actividad', {
+      p_codigo_empresa: codigoEmpresa,
+      p_anio: anio,
+      p_cliente: filtros?.cliente ?? null,
+      p_comercial: filtros?.comercial ?? null,
+      p_familia: filtros?.familia ?? null,
+      p_marca: filtros?.marca ?? null,
+    }),
+    supabase.rpc('clientes_margen', {
+      p_codigo_empresa: codigoEmpresa,
+      p_anio: anio,
+      p_cliente: filtros?.cliente ?? null,
+      p_comercial: filtros?.comercial ?? null,
+      p_familia: filtros?.familia ?? null,
+      p_marca: filtros?.marca ?? null,
+    }),
+  ]);
+
+  const comercialesRaw = comercialesRes.data;
   const nombreComercial = new Map(
     ((comercialesRaw ?? []) as { id: string; nombre: string }[]).map((c) => [c.id, c.nombre]),
   );
 
   // Actividad agregada en SQL: primera/última factura y facturación por ejercicio.
-  const { data: actividadRaw } = await supabase.rpc('clientes_actividad', {
-    p_codigo_empresa: codigoEmpresa,
-    p_anio: anio,
-    p_cliente: filtros?.cliente ?? null,
-    p_comercial: filtros?.comercial ?? null,
-    p_familia: filtros?.familia ?? null,
-    p_marca: filtros?.marca ?? null,
-  });
+  const actividadRaw = actividadRes.data;
   const actividad = Array.isArray(actividadRaw) ? (actividadRaw as FilaActividad[]) : null;
 
-  const { data: margenRaw } = await supabase.rpc('clientes_margen', {
-    p_codigo_empresa: codigoEmpresa,
-    p_anio: anio,
-    p_cliente: filtros?.cliente ?? null,
-    p_comercial: filtros?.comercial ?? null,
-    p_familia: filtros?.familia ?? null,
-    p_marca: filtros?.marca ?? null,
-  });
+  const margenRaw = margenRes.data;
   const costePorCliente = new Map<string, number>();
   if (Array.isArray(margenRaw)) {
     for (const m of margenRaw as { cliente_id: string; coste: number }[]) {
