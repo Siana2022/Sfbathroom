@@ -212,6 +212,38 @@ export default function AgendaComercial({ datos }: { datos: AgendaData }) {
         </div>
       </div>
 
+      {(() => {
+        const d = new Date(`${hoy}T00:00:00`);
+        const offset = (d.getDay() + 6) % 7;
+        const lunes = new Date(d.getTime() - offset * 86400000);
+        const domingo = new Date(lunes.getTime() + 6 * 86400000);
+        const l = ymd(lunes);
+        const r = ymd(domingo);
+        const semana = datos.eventos
+          .filter((e) => e.fecha >= l && e.fecha <= r)
+          .sort((a, b) => (a.fecha + (a.hora ?? '')).localeCompare(b.fecha + (b.hora ?? '')));
+        return (
+          <div className="card">
+            <h2>Esta semana</h2>
+            {semana.length === 0 ? (
+              <p style={{ color: 'var(--muted)' }}>Sin reuniones esta semana.</p>
+            ) : (
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {semana.map((e) => (
+                  <li key={e.id} style={{ marginBottom: 6 }}>
+                    {e.fecha} {e.hora ? `· ${e.hora.slice(0, 5)}` : ''} ·{' '}
+                    <Link href={`/agenda/${e.id}`} className="enlace">{e.asunto}</Link>
+                    {e.clienteNombre ? ` · ${e.clienteNombre}` : ''}
+                    {' '}
+                    <span style={{ color: 'var(--muted)', fontSize: 12 }}>({e.estado})</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        );
+      })()}
+
       <div className="card">
         <h2>Atrasadas</h2>
         {datos.eventos.filter((e) => e.estado === 'programada' && e.fecha < hoy).length === 0 ? (

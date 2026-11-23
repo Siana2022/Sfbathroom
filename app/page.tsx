@@ -76,6 +76,20 @@ export default async function Home() {
               ) : (
                 <p style={{ color: 'var(--muted)' }}>Sin reuniones para hoy.</p>
               )}
+              {agenda.manana.length > 0 ? (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>Mañana</div>
+                  <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                    {agenda.manana.map((e) => (
+                      <li key={e.id} style={{ marginBottom: 4 }}>
+                        {e.hora ? `${e.hora.slice(0, 5)} · ` : ''}
+                        <Link href={`/agenda/${e.id}`} className="enlace">{e.asunto}</Link>
+                        {e.clienteNombre ? ` · ${e.clienteNombre}` : ''}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
               {agenda.atrasadas.length > 0 ? (
                 <div style={{ marginTop: 12 }}>
                   <div style={{ color: 'var(--rojo)', fontSize: 13, fontWeight: 700 }}>Atrasadas ({agenda.atrasadas.length})</div>
@@ -174,13 +188,11 @@ export default async function Home() {
         </div>
 
         <div className="card">
-          <h2>Bloques del cuadro de mando</h2>
+          <h2>Mi trabajo</h2>
           <div className="chips">
-            {bloques.map((b) => (
-              <Link key={b.slug} href={b.slug} className="chip bloque chip-enlace">
-                {b.numero}. {b.titulo}
-              </Link>
-            ))}
+            <Link href="/clientes" className="chip bloque chip-enlace">Clientes</Link>
+            <Link href="/pedidos" className="chip bloque chip-enlace">Pedidos</Link>
+            <Link href="/agenda" className="chip bloque chip-enlace">Mi agenda</Link>
           </div>
         </div>
       </div>

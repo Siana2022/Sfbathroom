@@ -54,6 +54,7 @@ export default function DetalleReunion({
   const [fechaNueva, setFechaNueva] = useState(evento.fecha);
   const [horaNueva, setHoraNueva] = useState(evento.hora ? evento.hora.slice(0, 5) : '');
 
+  const [subiendo, setSubiendo] = useState(false);
   const [finalizando, setFinalizando] = useState(false);
   const [resultado, setResultado] = useState('ganada');
   const [importe, setImporte] = useState(evento.importeEstimado !== null ? String(evento.importeEstimado) : '');
@@ -212,6 +213,27 @@ export default function DetalleReunion({
     router.refresh();
   }
 
+  async function subirArchivo(file: File) {
+    setError(null);
+    setSubiendo(true);
+    const limpio = file.name.replace(/[^\w.\-]+/g, '_');
+    const ruta = `${evento.id}/${Date.now()}-${limpio}`;
+    const { error: e } = await supabase.storage.from('agenda-adjuntos').upload(ruta, file, { upsert: false });
+    setSubiendo(false);
+    if (e) {
+      setError(e.message);
+      return;
+    }
+    router.refresh();
+  }
+
+  async function borrarArchivo(nombre: string) {
+    if (!window.confirm('¿Eliminar este adjunto?')) return;
+    const { error: e } = await supabase.storage.from('agenda-adjuntos').remove([`${evento.id}/${nombre}`]);
+    if (e) setError(e.message);
+    else router.refresh();
+  }
+
   async function borrar() {
     if (!window.confirm('¿Borrar esta reunión y todo su seguimiento? No se puede deshacer.')) return;
     startTransition(async () => {
@@ -367,6 +389,43 @@ export default function DetalleReunion({
             <button type="button" className="boton" onClick={borrar} disabled={pending}>Borrar reunión</button>
           </div>
         ) : null}
+      </div>
+
+      <div className="card">
+        <h2>Adjuntos y actas</h2>
+        {evento.adjuntos.length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>Sin adjuntos.</p>
+        ) : (
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {evento.adjuntos.map((a) => (
+              <li key={a.nombre} style={{ marginBottom: 6 }}>
+                {a.url ? (
+                  <a href={a.url} target="_blank" rel="noreferrer" className="enlace">{a.nombre}</a>
+                ) : (
+                  a.nombre
+                )}{' '}
+                <button type="button" className="boton" onClick={() => borrarArchivo(a.nombre)} disabled={pending}>
+                  Eliminar
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div style={{ marginTop: 10 }}>
+          <label className="boton" style={{ cursor: 'pointer', display: 'inline-block' }}>
+            {subiendo ? 'Subiendo…' : 'Subir archivo'}
+            <input
+              type="file"
+              style={{ display: 'none' }}
+              disabled={subiendo}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) subirArchivo(f);
+                e.target.value = '';
+              }}
+            />
+          </label>
+        </div>
       </div>
 
       <div className="card">

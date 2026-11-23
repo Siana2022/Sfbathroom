@@ -19,6 +19,7 @@ export type EventoAgenda = {
   motivoCierre: string | null;
   proximaReunionId: string | null;
   pedido: { id: string; numero: string | null; importe: number } | null;
+  adjuntos: { nombre: string; url: string | null }[];
   clienteId: string | null;
   clienteNombre: string | null;
   seguimiento: NotaAgenda[];
@@ -133,6 +134,7 @@ export async function getAgenda(codigoEmpresa: string): Promise<AgendaData> {
     motivoCierre: e.motivo_cierre,
     proximaReunionId: e.proxima_reunion_id,
     pedido: null,
+    adjuntos: [],
     clienteId: e.cliente_id,
     clienteNombre: e.cliente_id ? (nombreCliente.get(e.cliente_id) ?? '—') : null,
     seguimiento: seguimientoPorEvento.get(e.id) ?? [],
@@ -185,6 +187,14 @@ export async function getEventoAgenda(id: string): Promise<EventoAgenda | null> 
     if (pf) pedido = { id: pf.id, numero: pf.numero_erp, importe: Number(pf.importe ?? 0) };
   }
 
+  const { data: archivos } = await supabase.storage.from('agenda-adjuntos').list(id, { limit: 100 });
+  const adjuntos: { nombre: string; url: string | null }[] = [];
+  for (const a of archivos ?? []) {
+    if (!a.name) continue;
+    const { data: firmada } = await supabase.storage.from('agenda-adjuntos').createSignedUrl(`${id}/${a.name}`, 3600);
+    adjuntos.push({ nombre: a.name, url: firmada?.signedUrl ?? null });
+  }
+
   let clienteNombre: string | null = null;
   if (fila.cliente_id) {
     const { data: c } = await supabase.from('clientes').select('nombre').eq('id', fila.cliente_id).maybeSingle();
@@ -211,6 +221,7 @@ export async function getEventoAgenda(id: string): Promise<EventoAgenda | null> 
     motivoCierre: fila.motivo_cierre,
     proximaReunionId: fila.proxima_reunion_id,
     pedido,
+    adjuntos,
     clienteId: fila.cliente_id,
     clienteNombre,
     seguimiento: ((notasRaw ?? []) as {
@@ -241,10 +252,11 @@ export type EventoResumen = {
 
 export async function getAgendaResumen(
   codigoEmpresa: string,
-): Promise<{ empresaId: string; hoy: EventoResumen[]; atrasadas: EventoResumen[] }> {
+): Promise<{ empresaId: string; hoy: EventoResumen[]; manana: EventoResumen[]; atrasadas: EventoResumen[] }> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
   const hoy = new Date().toISOString().slice(0, 10);
+  const mananaISO = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
 
   const { data: filas } = await supabase
     .from('agenda')
@@ -282,6 +294,7 @@ export async function getAgendaResumen(
   return {
     empresaId: empresa.id,
     hoy: eventos.filter((e) => e.fecha === hoy).map(mapear),
+    manana: eventos.filter((e) => e.fecha === mananaISO).map(mapear),
     atrasadas: eventos.filter((e) => e.fecha < hoy).slice(0, 10).map(mapear),
   };
 }
