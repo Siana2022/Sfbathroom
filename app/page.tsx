@@ -75,7 +75,10 @@ export default async function Home() {
         </div>
 
         <div className="card">
-          <h2>Próximas reuniones</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2 style={{ margin: 0 }}>Próximas reuniones</h2>
+            <Link href="/agenda#nueva" className="boton">Agendar reunión</Link>
+          </div>
           {agenda.proximas.length === 0 ? (
             <p style={{ color: 'var(--muted)' }}>Sin reuniones próximas.</p>
           ) : (
@@ -92,7 +95,10 @@ export default async function Home() {
         </div>
 
         <div className="card">
-          <h2>Reuniones vencidas</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2 style={{ margin: 0 }}>Reuniones vencidas</h2>
+            <Link href="/agenda#nueva" className="boton">Agendar reunión</Link>
+          </div>
           {agenda.atrasadas.length === 0 ? (
             <p style={{ color: 'var(--muted)' }}>Ninguna reunión atrasada.</p>
           ) : (

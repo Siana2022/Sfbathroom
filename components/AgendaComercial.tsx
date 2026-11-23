@@ -98,7 +98,7 @@ export default function AgendaComercial({ datos }: { datos: AgendaData }) {
   return (
     <div>
       {puedeCrear ? (
-        <div className="card">
+        <div className="card" id="nueva">
           <h2>Nueva reunión</h2>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <label className="campo-filtro">
