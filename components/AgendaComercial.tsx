@@ -1,5 +1,6 @@
 'use client';
 import { useMemo, useState, useTransition } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { AgendaData, EventoAgenda } from '@/lib/datos/agenda';
@@ -37,8 +38,6 @@ export default function AgendaComercial({ datos }: { datos: AgendaData }) {
   const [notas, setNotas] = useState('');
 
   const [mes, setMes] = useState(() => hoy.slice(0, 7));
-  const [sel, setSel] = useState<EventoAgenda | null>(null);
-  const [nuevaNota, setNuevaNota] = useState('');
 
   const porFecha = useMemo(() => {
     const m = new Map<string, EventoAgenda[]>();
@@ -85,46 +84,6 @@ export default function AgendaComercial({ datos }: { datos: AgendaData }) {
         setAsunto('');
         setNotas('');
         setClienteId('');
-        router.refresh();
-      }
-    });
-  }
-
-  async function alternar(e: EventoAgenda) {
-    startTransition(async () => {
-      const { error: err } = await supabase.from('agenda').update({ completada: !e.completada }).eq('id', e.id);
-      if (err) setError(err.message);
-      else {
-        setSel(null);
-        router.refresh();
-      }
-    });
-  }
-
-  async function borrar(id: string) {
-    startTransition(async () => {
-      const { error: err } = await supabase.from('agenda').delete().eq('id', id);
-      if (err) setError(err.message);
-      else {
-        setSel(null);
-        router.refresh();
-      }
-    });
-  }
-
-  async function añadirNota(e: EventoAgenda) {
-    if (!nuevaNota.trim()) return;
-    startTransition(async () => {
-      const { error: err } = await supabase.from('agenda_notas').insert({
-        agenda_id: e.id,
-        empresa_id: datos.empresaId,
-        comercial_id: datos.comercialId,
-        texto: nuevaNota.trim(),
-      });
-      if (err) setError(err.message);
-      else {
-        setNuevaNota('');
-        setSel(null);
         router.refresh();
       }
     });
@@ -218,10 +177,9 @@ export default function AgendaComercial({ datos }: { datos: AgendaData }) {
                 <>
                   <div style={{ fontSize: 12, color: 'var(--muted)' }}>{Number(f.slice(8, 10))}</div>
                   {(porFecha.get(f) ?? []).map((e) => (
-                    <button
+                    <Link
                       key={e.id}
-                      type="button"
-                      onClick={() => setSel(e)}
+                      href={`/agenda/${e.id}`}
                       style={{
                         display: 'block',
                         width: '100%',
@@ -229,16 +187,14 @@ export default function AgendaComercial({ datos }: { datos: AgendaData }) {
                         marginTop: 4,
                         padding: '3px 6px',
                         borderRadius: 6,
-                        border: 'none',
-                        cursor: 'pointer',
                         fontSize: 11,
-                        background: e.completada ? 'var(--wash)' : 'var(--accent-soft, #e8f0fb)',
                         textDecoration: e.completada ? 'line-through' : 'none',
+                        background: e.completada ? 'var(--wash)' : 'var(--accent-soft, #e8f0fb)',
                       }}
                       title={`${e.asunto} · ${e.clienteNombre ?? ''}`}
                     >
                       {e.hora ? `${e.hora.slice(0, 5)} ` : ''}{e.asunto}
-                    </button>
+                    </Link>
                   ))}
                 </>
               ) : null}
@@ -274,7 +230,7 @@ export default function AgendaComercial({ datos }: { datos: AgendaData }) {
                   <td>{TIPOS.find((t) => t.valor === e.tipo)?.etiqueta ?? e.tipo}</td>
                   <td>{e.seguimiento.length}</td>
                   <td>
-                    <button type="button" className="boton" onClick={() => setSel(e)}>Abrir</button>
+                    <Link href={`/agenda/${e.id}`} className="boton">Abrir</Link>
                   </td>
                 </tr>
               ))}
@@ -283,60 +239,6 @@ export default function AgendaComercial({ datos }: { datos: AgendaData }) {
         )}
       </div>
 
-      {sel ? (
-        <div className="modal-fondo" onClick={() => setSel(null)} role="dialog" aria-modal="true">
-          <div className="modal-caja modal-ancho" onClick={(ev) => ev.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <h3 style={{ margin: 0 }}>{sel.asunto}</h3>
-                <p style={{ color: 'var(--muted)', margin: '4px 0 0', fontSize: 13 }}>
-                  {sel.fecha} {sel.hora ? `· ${sel.hora.slice(0, 5)}` : ''} · {sel.clienteNombre ?? '—'} ·{' '}
-                  {TIPOS.find((t) => t.valor === sel.tipo)?.etiqueta ?? sel.tipo}
-                </p>
-              </div>
-              <button type="button" className="modal-cerrar" onClick={() => setSel(null)} aria-label="Cerrar">✕</button>
-            </div>
-
-            {sel.notas ? (
-              <p style={{ marginTop: 12, whiteSpace: 'pre-wrap' }}>{sel.notas}</p>
-            ) : null}
-
-            <h4 style={{ margin: '16px 0 6px' }}>Notas de seguimiento</h4>
-            {sel.seguimiento.length === 0 ? (
-              <p style={{ color: 'var(--muted)' }}>Sin notas todavía.</p>
-            ) : (
-              <ul style={{ margin: 0, paddingLeft: 18 }}>
-                {sel.seguimiento.map((n) => (
-                  <li key={n.id} style={{ marginBottom: 8 }}>
-                    <span style={{ color: 'var(--muted)', fontSize: 12 }}>{n.fecha.slice(0, 16).replace('T', ' ')}</span>
-                    <div style={{ whiteSpace: 'pre-wrap' }}>{n.texto}</div>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            <textarea
-              value={nuevaNota}
-              onChange={(e) => setNuevaNota(e.target.value)}
-              placeholder="Añadir nota de seguimiento"
-              rows={3}
-              style={{ width: '100%', marginTop: 10, padding: 10, border: '1px solid var(--border-2)', borderRadius: 8 }}
-            />
-            {error ? <p className="nota" style={{ color: 'var(--rojo)' }}>{error}</p> : null}
-            <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-              <button type="button" className="boton" onClick={() => añadirNota(sel)} disabled={pending || !nuevaNota.trim()}>
-                Guardar nota
-              </button>
-              <button type="button" className="boton" onClick={() => alternar(sel)} disabled={pending}>
-                {sel.completada ? 'Reabrir' : 'Marcar hecha'}
-              </button>
-              <button type="button" className="boton" onClick={() => borrar(sel.id)} disabled={pending}>
-                Borrar reunión
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
