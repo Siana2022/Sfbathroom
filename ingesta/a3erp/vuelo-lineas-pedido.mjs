@@ -67,7 +67,7 @@ async function main() {
       const base = `[${e.base}]`;
       const filtro = desde ? `AND l.FECHA >= '${desde}'` : '';
       const sql = `
-        SELECT l.IDPEDV, l.CODART, l.DESCLIN, l.UNIDADES, l.PRECIO, l.DESC1, l.LOTE, l.NUMLINPED
+        SELECT l.IDPEDV, l.CODART, l.DESCLIN, l.UNIDADES, l.PRECIO, l.DESC1, l.LOTE, l.NUMLINPED, l.ORIGENPRECIO
         FROM ${base}.dbo.LINEALBA l
         WHERE l.IDPEDV IS NOT NULL ${filtro}`;
 
@@ -86,6 +86,7 @@ async function main() {
           descuento: num(l.DESC1),
           lote: limpio(l.LOTE),
           numero_linea: l.NUMLINPED === null ? null : Number(l.NUMLINPED),
+          origen_precio: limpio(l.ORIGENPRECIO),
         });
         porPedido.set(id, lista);
       }

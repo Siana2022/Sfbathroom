@@ -9,6 +9,7 @@ export type LineaPedido = {
   descuento: number;
   importe: number;
   lote: string | null;
+  origen: string | null;
 };
 
 export type PedidoCliente = {
@@ -43,7 +44,7 @@ export async function getPedidosCliente(clienteId: string, limite = 10): Promise
 
   const { data: lineas } = await supabase
     .from('pedido_lineas')
-    .select('id, pedido_id, codigo_articulo, descripcion, cantidad, precio_unitario, descuento_pct, importe, lote')
+    .select('id, pedido_id, codigo_articulo, descripcion, cantidad, precio_unitario, descuento_pct, importe, lote, origen_precio')
     .in('pedido_id', lista.map((p) => p.id))
     .order('numero_linea');
 
@@ -58,6 +59,7 @@ export async function getPedidosCliente(clienteId: string, limite = 10): Promise
     descuento_pct: number;
     importe: number;
     lote: string | null;
+    origen_precio: string | null;
   }[]) {
     const arr = porPedido.get(l.pedido_id) ?? [];
     arr.push({
@@ -69,6 +71,7 @@ export async function getPedidosCliente(clienteId: string, limite = 10): Promise
       descuento: Number(l.descuento_pct),
       importe: Number(l.importe),
       lote: l.lote,
+      origen: l.origen_precio,
     });
     porPedido.set(l.pedido_id, arr);
   }
@@ -80,6 +83,23 @@ export async function getPedidosCliente(clienteId: string, limite = 10): Promise
     estado: p.estado,
     total: p.total === null ? null : Number(p.total),
     lineas: porPedido.get(p.id) ?? [],
+  }));
+}
+
+export async function getPreciosFamilia(limite = 40): Promise<{ proveedor: string | null; articulo: string | null; precio: number; unidades: number | null }[]> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from('precios_especiales')
+    .select('codigo_proveedor, codigo_articulo, precio, unidades')
+    .is('codigo_cliente', null)
+    .not('codigo_proveedor', 'is', null)
+    .order('codigo_proveedor')
+    .limit(limite);
+  return ((data ?? []) as { codigo_proveedor: string | null; codigo_articulo: string | null; precio: number; unidades: number | null }[]).map((p) => ({
+    proveedor: p.codigo_proveedor,
+    articulo: p.codigo_articulo,
+    precio: Number(p.precio),
+    unidades: p.unidades === null ? null : Number(p.unidades),
   }));
 }
 
