@@ -56,8 +56,9 @@ async function rpc(nombre, cuerpo) {
     headers: CABECERAS,
     body: JSON.stringify(cuerpo),
   });
-  if (!res.ok) throw new Error(`${nombre} ${res.status}: ${await res.text()}`);
-  return res.json();
+  const texto = await res.text();
+  if (!res.ok) throw new Error(`${nombre} ${res.status}: ${texto}`);
+  return texto ? JSON.parse(texto) : null;
 }
 
 async function main() {
