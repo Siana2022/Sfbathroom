@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -61,6 +61,37 @@ export default function AgendaComercial({ datos }: { datos: AgendaData }) {
 
   const puedeCrear = datos.esComercial && datos.comercialId;
   const clienteSel = datos.clientes.find((c) => c.id === clienteId);
+  const [persona, setPersona] = useState('');
+  const [telefono, setTelefono] = useState('');
+  const [email, setEmail] = useState('');
+  const [guardandoContacto, setGuardandoContacto] = useState(false);
+  const [contactoOk, setContactoOk] = useState(false);
+
+  useEffect(() => {
+    setPersona(clienteSel?.personaContacto ?? '');
+    setTelefono(clienteSel?.telefono ?? '');
+    setEmail(clienteSel?.email ?? '');
+    setContactoOk(false);
+  }, [clienteId]);
+
+  async function guardarContacto() {
+    if (!clienteId) return;
+    setGuardandoContacto(true);
+    const { error: e } = await supabase
+      .from('clientes')
+      .update({
+        persona_contacto: persona.trim() || null,
+        telefono: telefono.trim() || null,
+        email: email.trim() || null,
+      })
+      .eq('id', clienteId);
+    setGuardandoContacto(false);
+    if (e) setError(e.message);
+    else {
+      setContactoOk(true);
+      router.refresh();
+    }
+  }
   const proximas = datos.eventos
     .filter((e) => !e.completada && e.fecha >= hoy)
     .sort((a, b) => (a.fecha + (a.hora ?? '')).localeCompare(b.fecha + (b.hora ?? '')))
@@ -133,10 +164,26 @@ export default function AgendaComercial({ datos }: { datos: AgendaData }) {
             </label>
           </div>
           {clienteSel ? (
-            <div style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)' }}>
-              {clienteSel.personaContacto ? <>Contacto: {clienteSel.personaContacto} · </> : null}
-              {clienteSel.telefono ? <>Tel. {clienteSel.telefono} · </> : null}
-              {clienteSel.email ? <>{clienteSel.email}</> : null}
+            <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border-2)' }}>
+              <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 6 }}>Contacto del cliente</div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                <label className="campo-filtro" style={{ minWidth: 200 }}>
+                  Persona de contacto
+                  <input type="text" value={persona} onChange={(e) => setPersona(e.target.value)} />
+                </label>
+                <label className="campo-filtro">
+                  Teléfono
+                  <input type="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+                </label>
+                <label className="campo-filtro" style={{ minWidth: 220 }}>
+                  Email
+                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                </label>
+                <button type="button" className="boton" onClick={guardarContacto} disabled={guardandoContacto}>
+                  {guardandoContacto ? 'Guardando…' : 'Guardar contacto'}
+                </button>
+              </div>
+              {contactoOk ? <p className="nota">Contacto actualizado.</p> : null}
             </div>
           ) : null}
           <textarea
