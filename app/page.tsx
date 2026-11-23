@@ -55,6 +55,16 @@ export default async function Home() {
           <Kpi etiqueta={`Facturación neta ${mix.anio}`} valor={eur(mix.neta)} nota="de tu cartera" />
           <Kpi etiqueta="Facturas" valor={numero(mix.facturas)} nota="de tus clientes" />
           <Kpi etiqueta="Ticket medio" valor={eur(mix.ticketMedio)} nota="en tu cartera" />
+          <Kpi
+            etiqueta="Objetivo anual"
+            valor={mix.objetivo > 0 ? eur(mix.objetivo) : '—'}
+            nota={mix.cumplimiento === null ? 'sin objetivo asignado' : `${decimal(mix.cumplimiento)} % cumplido`}
+          />
+          <Kpi
+            etiqueta="Posición en el ranking"
+            valor={mix.ranking ? `${mix.ranking.posicion}º` : '—'}
+            nota={mix.ranking ? `de ${mix.ranking.total} comerciales` : 'sin datos'}
+          />
         </ul>
 
         <div className="card">
