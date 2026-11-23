@@ -6,12 +6,15 @@ import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import EditorEmail from '@/components/EditorEmail';
 import PanelEnvio from '@/components/PanelEnvio';
 import { esComercialValido } from '@/lib/datos/filtros';
+import { getUsuario } from '@/lib/datos/role';
 import type { BloqueEmail } from '@/lib/marketing/bloques';
 
 export default async function CampanaPage({ params }: { params: { id: string } }) {
   const empresaCodigo = cookies().get('sfb_empresa')?.value ?? 'SF';
   const empresa = await getEmpresaPorCodigo(empresaCodigo);
   const supabase = createClient();
+  const usuario = await getUsuario();
+  const esComercial = usuario?.rol === 'comercial';
 
   const { data } = await supabase
     .from('campanas_email')
@@ -63,6 +66,7 @@ export default async function CampanaPage({ params }: { params: { id: string } }
         comerciales={comerciales}
         segmentoInicial={c.segmento ?? {}}
         estadoCampana={c.estado}
+        esComercial={esComercial}
       />
     </div>
   );
