@@ -334,15 +334,12 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
     .sort((a, b) => b.neta - a.neta)
     .slice(0, 15);
 
-  const articulosFilas = await todasLasFilas<FilaArticulo>((desde) =>
-    supabase
-      .from('articulos')
-      .select('id, familia')
-      .eq('empresa_id', empresa.id)
-      .range(desde, desde + TAMANO_PAGINA - 1)
-  );
-  const familiaDeArticulo = new Map<string, string | null>(articulosFilas.map((a) => [a.id, a.familia]));
-  const familiasOrden = [...new Set(articulosFilas.map((a) => a.familia).filter((f): f is string => Boolean(f)))].sort((a, b) => a.localeCompare(b, 'es'));
+  // Familias para las columnas de la matriz: RPC ligero en vez de toda la tabla.
+  const { data: familiasRaw } = await supabase.rpc('familias_articulos', { p_codigo_empresa: codigoEmpresa });
+  const familiasOrden = ((familiasRaw ?? []) as { familia: string }[])
+    .map((f) => f.familia)
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, 'es'));
 
   const familiasCliente = new Map<string, Set<string>>();
   // Solo las líneas de los clientes que entran en la matriz (top 12): antes se
@@ -361,6 +358,19 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
       .select('factura_id, articulo_id')
       .in('factura_id', trozo);
     if (data) lineasClientes.push(...(data as unknown as FilaLinea[]));
+  }
+  const familiaDeArticulo = new Map<string, string | null>();
+  if (lineasClientes.length) {
+    const idsArticulo = [...new Set(lineasClientes.map((l) => l.articulo_id).filter((x): x is string => Boolean(x)))];
+    for (let i = 0; i < idsArticulo.length; i += 200) {
+      const { data } = await supabase
+        .from('articulos')
+        .select('id, familia')
+        .in('id', idsArticulo.slice(i, i + 200));
+      for (const a of (data ?? []) as { id: string; familia: string | null }[]) {
+        familiaDeArticulo.set(a.id, a.familia);
+      }
+    }
   }
   if (lineasClientes.length) {
     for (const l of lineasClientes) {
