@@ -98,7 +98,13 @@ export async function enviarCampana(opciones: {
     const res = await fetch(RESEND_UNO, {
       method: 'POST',
       headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to: [opciones.prueba], subject: `[PRUEBA] ${c.asunto}`, html }),
+      body: JSON.stringify({
+        from,
+        to: [opciones.prueba],
+        subject: `[PRUEBA] ${c.asunto}`,
+        html,
+        tags: [{ name: 'campana', value: c.id }],
+      }),
     });
     if (!res.ok) return { ok: false, enviados: 0, fallidos: 0, error: await res.text() };
     return { ok: true, enviados: 1, fallidos: 0 };
@@ -191,6 +197,7 @@ export async function enviarCampana(opciones: {
       to: [email],
       subject: c.asunto,
       html: renderizarEmail(c.bloques, enlaceBaja(email, base)),
+      tags: [{ name: 'campana', value: c.id }],
     }));
 
     const res = await fetch(RESEND_BATCH, {

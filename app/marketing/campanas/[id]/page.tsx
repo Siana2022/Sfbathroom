@@ -37,6 +37,22 @@ export default async function CampanaPage({ params }: { params: { id: string } }
     total: number;
   };
 
+  const { data: eventosRaw } = await supabase
+    .from('campana_eventos')
+    .select('email, tipo')
+    .eq('campana_id', c.id)
+    .limit(20000);
+
+  const eventos = (eventosRaw ?? []) as { email: string | null; tipo: string }[];
+  const unicos = (tipo: string) =>
+    new Set(eventos.filter((e) => e.tipo === tipo).map((e) => (e.email ?? '').toLowerCase())).size;
+  const metricas = {
+    aperturas: unicos('apertura'),
+    clics: unicos('clic'),
+    rebotes: unicos('rebote'),
+    quejas: unicos('queja'),
+  };
+
   const { data: comercialesRaw } = await supabase.from('comerciales').select('id, nombre').eq('activo', true).order('nombre');
   const comerciales = ((comercialesRaw ?? []) as { id: string; nombre: string }[]).filter((x) => esComercialValido(x.nombre));
 
@@ -52,6 +68,13 @@ export default async function CampanaPage({ params }: { params: { id: string } }
       <p style={{ color: 'var(--muted)', marginTop: 0 }}>
         Estado: <strong>{c.estado}</strong> · Enviados: <strong>{c.enviados}</strong> · Fallidos: <strong>{c.fallidos}</strong>
       </p>
+
+      <ul className="grid-kpis">
+        <li className="kpi"><span className="kpi-etiqueta">Aperturas únicas</span><strong className="kpi-valor">{metricas.aperturas}</strong><span className="kpi-nota">{c.enviados > 0 ? `${Math.round((metricas.aperturas / c.enviados) * 100)}%` : '—'} de enviados</span></li>
+        <li className="kpi"><span className="kpi-etiqueta">Clics únicos</span><strong className="kpi-valor">{metricas.clics}</strong><span className="kpi-nota">{c.enviados > 0 ? `${Math.round((metricas.clics / c.enviados) * 100)}%` : '—'} de enviados</span></li>
+        <li className="kpi"><span className="kpi-etiqueta">Rebotes</span><strong className="kpi-valor">{metricas.rebotes}</strong><span className="kpi-nota">direcciones no entregadas</span></li>
+        <li className="kpi"><span className="kpi-etiqueta">Quejas</span><strong className="kpi-valor">{metricas.quejas}</strong><span className="kpi-nota">marcados como spam</span></li>
+      </ul>
 
       {c.estado === 'enviada' ? (
         <div className="card"><p>Esta campaña ya se envió. Duplícala para volver a usarla.</p></div>
