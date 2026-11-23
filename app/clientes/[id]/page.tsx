@@ -56,6 +56,14 @@ export default async function FichaClientePage({ params }: { params: { id: strin
             {d.cliente.personaContacto && <li>Persona de contacto: {d.cliente.personaContacto}</li>}
             {d.cliente.telefono && <li>Teléfono: {d.cliente.telefono}</li>}
             {d.cliente.email && <li>Email: {d.cliente.email}</li>}
+            {d.cliente.formaPago && <li>Forma de pago: {d.cliente.formaPago}{d.cliente.diasPago != null ? ` (${d.cliente.diasPago} días)` : ''}</li>}
+            {d.cliente.tarifaCodigo && <li>Tarifa asignada: {d.cliente.tarifaCodigo}</li>}
+            {d.cliente.riesgoConcedido != null && (
+              <li>
+                Riesgo concedido: {eur(d.cliente.riesgoConcedido)}
+                {d.cliente.riesgoActual != null ? ` · pendiente actual: ${eur(d.cliente.riesgoActual)}` : ''}
+              </li>
+            )}
           </ul>
         </div>
       )}

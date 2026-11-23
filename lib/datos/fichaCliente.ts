@@ -19,6 +19,11 @@ export type FichaCliente = {
     telefono: string | null;
     email: string | null;
     personaContacto: string | null;
+    formaPago: string | null;
+    tarifaCodigo: string | null;
+    diasPago: number | null;
+    riesgoConcedido: number | null;
+    riesgoActual: number | null;
     estado: string;
     fechaPrimerPedido: string | null;
     comercial: string | null;
@@ -50,7 +55,7 @@ export async function getFichaCliente(codigoEmpresa: string, clienteId: string, 
 
   const { data: clienteRaw } = await supabase
     .from('clientes')
-    .select('id, nombre, codigo_erp, cif, nombre_fiscal, direccion, poblacion, provincia, pais_facturacion, telefono, email, persona_contacto, estado, fecha_primer_pedido, comercial_id, grupo_id')
+    .select('id, nombre, codigo_erp, cif, nombre_fiscal, direccion, poblacion, provincia, pais_facturacion, telefono, email, persona_contacto, forma_pago, tarifa_codigo, dias_pago, riesgo_concedido, riesgo_actual, estado, fecha_primer_pedido, comercial_id, grupo_id')
     .eq('id', clienteId)
     .eq('empresa_id', empresa.id)
     .maybeSingle();
@@ -59,7 +64,9 @@ export async function getFichaCliente(codigoEmpresa: string, clienteId: string, 
     id: string; nombre: string; codigo_erp: string | null; cif: string | null;
     nombre_fiscal: string | null; direccion: string | null; poblacion: string | null;
     provincia: string | null; pais_facturacion: string | null;
-    telefono: string | null; email: string | null; persona_contacto: string | null; estado: string;
+    telefono: string | null; email: string | null; persona_contacto: string | null;
+    forma_pago: string | null; tarifa_codigo: string | null; dias_pago: number | null;
+    riesgo_concedido: number | null; riesgo_actual: number | null; estado: string;
     fecha_primer_pedido: string | null; comercial_id: string | null; grupo_id: string | null;
   };
 
@@ -169,6 +176,11 @@ export async function getFichaCliente(codigoEmpresa: string, clienteId: string, 
       telefono: c.telefono,
       email: c.email,
       personaContacto: c.persona_contacto,
+      formaPago: c.forma_pago,
+      tarifaCodigo: c.tarifa_codigo,
+      diasPago: c.dias_pago,
+      riesgoConcedido: c.riesgo_concedido,
+      riesgoActual: c.riesgo_actual,
       estado: c.estado,
       fechaPrimerPedido: c.fecha_primer_pedido,
       comercial: (comercialRes.data as { nombre?: string } | null)?.nombre ?? null,
