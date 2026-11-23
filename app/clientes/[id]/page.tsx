@@ -7,7 +7,7 @@ import { decimal, eur, numero, pct } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
 import EditorContactosCliente from '@/components/EditorContactosCliente';
 import { getContactosCliente } from '@/lib/datos/contactos';
-import { getPedidosCliente, getPreciosCliente, getReunionesCliente } from '@/lib/datos/ficha360';
+import { getPedidosCliente, getPreciosCliente, getPreciosFamilia, getReunionesCliente } from '@/lib/datos/ficha360';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import GraficoBarras from '@/components/GraficoBarras';
 import { ANIO_ACTUAL } from '@/lib/ejercicio';
@@ -19,12 +19,13 @@ export default async function FichaClientePage({ params }: { params: { id: strin
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
   const d = await getFichaCliente(empresa, params.id, ANIO);
   if (!d) notFound();
-  const [crossSell, contactos, empresaData, pedidos, precios, reuniones] = await Promise.all([
+  const [crossSell, contactos, empresaData, pedidos, precios, preciosFamilia, reuniones] = await Promise.all([
     getCrossSell(empresa, params.id, ANIO),
     getContactosCliente(params.id),
     getEmpresaPorCodigo(empresa),
     getPedidosCliente(params.id),
     getPreciosCliente(d.cliente.codigoErp),
+    getPreciosFamilia(),
     getReunionesCliente(params.id),
   ]);
 
@@ -108,6 +109,7 @@ export default async function FichaClientePage({ params }: { params: { id: strin
                       <th className="td-num">Dto.</th>
                       <th className="td-num">Importe</th>
                       <th>Lote</th>
+                      <th>Origen</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -120,6 +122,12 @@ export default async function FichaClientePage({ params }: { params: { id: strin
                         <td className="td-num">{l.descuento ? `${l.descuento}%` : '—'}</td>
                         <td className="td-num">{eur(l.importe)}</td>
                         <td>{l.lote ?? '—'}</td>
+                        <td>{
+                          l.origen === 'TA' ? 'Tarifa'
+                          : l.origen === 'FA' ? 'Fabricante'
+                          : l.origen === 'MA' ? 'Manual'
+                          : l.origen ?? '—'
+                        }</td>
                       </tr>
                     ))}
                   </tbody>
@@ -136,6 +144,26 @@ export default async function FichaClientePage({ params }: { params: { id: strin
           Tarifa asignada: <strong>{d.cliente.tarifaCodigo ?? '—'}</strong>
           {d.cliente.formaPago ? <> · Forma de pago: <strong>{d.cliente.formaPago}</strong></> : null}
         </p>
+        {preciosFamilia.length > 0 ? (
+          <details style={{ marginTop: 10 }}>
+            <summary style={{ cursor: 'pointer', fontSize: 13 }}>Tarifas de familia / proveedor ({preciosFamilia.length})</summary>
+            <table className="tabla" style={{ marginTop: 8 }}>
+              <thead>
+                <tr><th>Proveedor</th><th>Artículo</th><th className="td-num">Precio</th><th className="td-num">Desde uds.</th></tr>
+              </thead>
+              <tbody>
+                {preciosFamilia.map((p, i) => (
+                  <tr key={i}>
+                    <td>{p.proveedor ?? '—'}</td>
+                    <td>{p.articulo ?? '—'}</td>
+                    <td className="td-num">{eur(p.precio)}</td>
+                    <td className="td-num">{p.unidades && p.unidades > 0 ? decimal(p.unidades) : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </details>
+        ) : null}
         {precios.length === 0 ? (
           <p style={{ color: 'var(--muted)' }}>Sin precios especiales para este cliente.</p>
         ) : (
