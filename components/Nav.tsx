@@ -57,6 +57,12 @@ export default function Nav({ userEmail, rol }: { userEmail?: string; rol?: stri
         </Link>
       )}
 
+      {(rol === 'comercial' ? ['admin','direccion','comercial'] : ['admin','direccion']).includes(rol ?? '') && (
+        <Link key="/marketing/campanas" href="/marketing/campanas" className={activo('/marketing/campanas')}>
+          Email marketing
+        </Link>
+      )}
+
       {!esComercial && <p className="nav-group">Cuadro mando comercial</p>}
       {!esComercial && bloques.map((b) => (
         <Link key={b.slug} href={b.slug} className={activo(b.slug)}>
@@ -85,11 +91,6 @@ export default function Nav({ userEmail, rol }: { userEmail?: string; rol?: stri
       ))}
       {!esComercial && (
         <>
-          {(rol === 'admin' || rol === 'direccion') && (
-            <Link key="/marketing/campanas" href="/marketing/campanas" className={activo('/marketing/campanas')}>
-              Email marketing
-            </Link>
-          )}
           <Link key="/admin" href="/admin" className={activo('/admin')}>
             Administración
           </Link>

@@ -11,12 +11,14 @@ export default function PanelEnvio({
   comerciales,
   segmentoInicial,
   estadoCampana,
+  esComercial = false,
 }: {
   campanaId: string;
   empresaId: string;
   comerciales: Comercial[];
   segmentoInicial: Record<string, unknown>;
   estadoCampana: string;
+  esComercial?: boolean;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -96,7 +98,12 @@ export default function PanelEnvio({
         </label>
       </div>
 
-      <details style={{ marginBottom: 10 }}>
+      {esComercial ? (
+        <p style={{ fontSize: 13, color: 'var(--muted)' }}>
+          Se enviará solo a <strong>tus clientes</strong>, según el estado y la provincia que elijas.
+        </p>
+      ) : null}
+      <details style={{ marginBottom: 10, display: esComercial ? 'none' : undefined }}>
         <summary style={{ cursor: 'pointer' }}>Comerciales ({seleccion.length} seleccionados)</summary>
         <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border-2)', borderRadius: 8, padding: 8, marginTop: 6 }}>
           {comerciales.map((c) => (
