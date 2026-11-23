@@ -38,6 +38,7 @@ export default function AgendaComercial({ datos, clienteInicial }: { datos: Agen
   const [notas, setNotas] = useState('');
 
   const [mes, setMes] = useState(() => hoy.slice(0, 7));
+  const [arrastrandoId, setArrastrandoId] = useState<string | null>(null);
 
   const porFecha = useMemo(() => {
     const m = new Map<string, EventoAgenda[]>();
@@ -104,6 +105,34 @@ export default function AgendaComercial({ datos, clienteInicial }: { datos: Agen
       cancelado = true;
     };
   }, [clienteId, refetch]);
+
+  function moverA(id: string, nuevaFecha: string) {
+    const ev = datos.eventos.find((e) => e.id === id);
+    if (!ev || ev.fecha === nuevaFecha) return;
+    startTransition(async () => {
+      const { error } = await supabase.from('agenda').update({ fecha: nuevaFecha }).eq('id', id);
+      if (error) {
+        setError(error.message);
+        return;
+      }
+      await supabase.from('agenda_cambios').insert({
+        agenda_id: id,
+        fecha_anterior: ev.fecha,
+        hora_anterior: ev.hora,
+        fecha_nueva: nuevaFecha,
+        hora_nueva: ev.hora,
+        motivo: 'Reprogramada desde el calendario',
+      });
+      await supabase.from('agenda_notas').insert({
+        agenda_id: id,
+        empresa_id: datos.empresaId,
+        comercial_id: datos.comercialId,
+        texto: `Reagendada: ${ev.fecha} → ${nuevaFecha}`,
+        tipo: 'sistema',
+      });
+      router.refresh();
+    });
+  }
 
   function abrirEdicion() {
     const c = contactos.find((x) => x.id === contactoId) ?? contactos[0];
@@ -370,13 +399,23 @@ export default function AgendaComercial({ datos, clienteInicial }: { datos: Agen
             <button type="button" className="boton" onClick={() => cambiarMes(1)}>→</button>
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginTop: 12 }}>
+        <p style={{ color: 'var(--muted)', fontSize: 12, margin: '8px 0 0' }}>
+          Arrastra una reunión a otro día para reprogramarla (queda en el historial).
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginTop: 8 }}>
           {DIAS.map((d) => (
             <div key={d} style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', fontWeight: 700 }}>{d}</div>
           ))}
           {celdas.map((f, i) => (
             <div
               key={`${f ?? 'v'}-${i}`}
+              onDragOver={(e) => {
+                if (f && arrastrandoId) e.preventDefault();
+              }}
+              onDrop={() => {
+                if (f && arrastrandoId) moverA(arrastrandoId, f);
+                setArrastrandoId(null);
+              }}
               style={{
                 minHeight: 84,
                 border: '1px solid var(--border-2)',
@@ -392,6 +431,9 @@ export default function AgendaComercial({ datos, clienteInicial }: { datos: Agen
                     <Link
                       key={e.id}
                       href={`/agenda/${e.id}`}
+                      draggable
+                      onDragStart={() => setArrastrandoId(e.id)}
+                      onDragEnd={() => setArrastrandoId(null)}
                       style={{
                         display: 'block',
                         width: '100%',
