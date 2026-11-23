@@ -54,6 +54,24 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // El rol comercial solo entra a su "Mi día": el cuadro de mando queda restringido.
+  const RUTAS_CUADRO = [
+    '/facturacion', '/pedidos', '/margen', '/stock', '/transporte', '/clientes',
+    '/canal-y-marca', '/concentracion', '/credito-cobro', '/actividad-comercial',
+    '/calidad', '/alertas', '/cuadros', '/configuracion', '/documentos', '/admin',
+    '/datos', '/mi-panel', '/marketing', '/financiero', '/kpis', '/rentabilidad-clientes',
+  ];
+  const esRutaCuadro = RUTAS_CUADRO.some((r) => path === r || path.startsWith(`${r}/`));
+  if (user && esRutaCuadro) {
+    const { data: perfil } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
+    if ((perfil as { role: string | null } | null)?.role === 'comercial') {
+      const url = request.nextUrl.clone();
+      url.pathname = '/';
+      url.search = '';
+      return NextResponse.redirect(url);
+    }
+  }
+
   if (user && esRutaLogin) {
     const url = request.nextUrl.clone();
     url.pathname = '/';
