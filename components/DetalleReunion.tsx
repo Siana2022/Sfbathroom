@@ -101,6 +101,7 @@ export default function DetalleReunion({
   }
 
   async function borrar() {
+    if (!window.confirm('¿Borrar esta reunión y todo su seguimiento? No se puede deshacer.')) return;
     startTransition(async () => {
       const { error: e } = await supabase.from('agenda').delete().eq('id', evento.id);
       if (e) setError(e.message);
