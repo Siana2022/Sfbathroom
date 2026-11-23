@@ -107,6 +107,13 @@ export default function DetalleReunion({
       texto: `Reagendada: ${antes} → ${despues}`,
       tipo: 'sistema',
     });
+    await supabase.from('agenda_cambios').insert({
+      agenda_id: evento.id,
+      fecha_anterior: evento.fecha,
+      hora_anterior: evento.hora,
+      fecha_nueva: fechaNueva,
+      hora_nueva: horaNueva || null,
+    });
     router.refresh();
   }
 
