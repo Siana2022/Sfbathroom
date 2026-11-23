@@ -109,7 +109,8 @@ async function main() {
       );
 
       const filtro = desdeFijo ? `WHERE FECHA >= '${desdeFijo}'` : '';
-      const sql = `SELECT CAST(CAST(NUMDOC AS bigint) AS varchar(20)) AS NUMDOC,
+      const sql = `SELECT IDTOT,
+                          CAST(CAST(NUMDOC AS bigint) AS varchar(20)) AS NUMDOC,
                           LTRIM(RTRIM(SERIE)) AS SERIE,
                           CONVERT(varchar(10), FECHA, 120) AS FECHA,
                           CONVERT(varchar(10), FECENTREGA, 120) AS ENTREGA,
@@ -124,6 +125,7 @@ async function main() {
 
       const filas = (await pool.request().query(sql)).recordset;
       const salida = filas.map((f) => ({
+        id_erp: f.IDTOT ?? null,
         numero_erp: norm(f.NUMDOC),
         serie: norm(f.SERIE),
         fecha: norm(f.FECHA),
