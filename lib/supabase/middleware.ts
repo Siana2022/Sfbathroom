@@ -44,9 +44,12 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
+  // getSession lee el JWT de la cookie sin llamar al servidor de Auth en cada
+  // navegación; la autorización real la siguen aplicando las políticas RLS.
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user ?? null;
 
   if (!user && !esRutaLogin) {
     const url = request.nextUrl.clone();
