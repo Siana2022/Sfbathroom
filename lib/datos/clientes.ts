@@ -75,11 +75,47 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
   const hoy = Math.floor(Date.now() / DIA);
   const iso = (dias: number) => new Date((hoy - dias) * DIA).toISOString().slice(0, 10);
 
-  // Camino rápido sin filtros: facturas (ventana 2 años) y líneas del año en una sola llamada.
   const sinFiltros = !filtros || !hayFiltros(filtros);
-  const facturasRpc = sinFiltros
-    ? await ventasFacturasRangoRpc(supabase, codigoEmpresa, iso(730), `${anio}-12-31`)
-    : null;
+
+  // Todo lo independiente sale en paralelo: cada ida y vuelta cuesta 150-300 ms.
+  const [facturasRpc, pedidos, clientes, comercialesRes, actividadRes, margenRes, familiasRaw] = await Promise.all([
+    sinFiltros ? ventasFacturasRangoRpc(supabase, codigoEmpresa, iso(730), `${anio}-12-31`) : Promise.resolve(null),
+    todasLasFilas<FilaPedido>((desde) => {
+      let q = supabase
+        .from('pedidos')
+        .select('cliente_id, fecha_entrada')
+        .eq('empresa_id', empresa.id)
+        .gte('fecha_entrada', iso(365));
+      if (filtros?.cliente) q = q.eq('cliente_id', filtros.cliente);
+      if (filtros?.comercial) q = q.eq('comercial_id', filtros.comercial);
+      return q.range(desde, desde + TAMANO_PAGINA - 1);
+    }),
+    todasLasFilas<FilaCliente>((desde) =>
+      supabase
+        .from('clientes')
+        .select('id, nombre, estado, fecha_primer_pedido, comercial_id')
+        .eq('empresa_id', empresa.id)
+        .range(desde, desde + TAMANO_PAGINA - 1),
+    ),
+    supabase.from('comerciales').select('id, nombre'),
+    supabase.rpc('clientes_actividad', {
+      p_codigo_empresa: codigoEmpresa,
+      p_anio: anio,
+      p_cliente: filtros?.cliente ?? null,
+      p_comercial: filtros?.comercial ?? null,
+      p_familia: filtros?.familia ?? null,
+      p_marca: filtros?.marca ?? null,
+    }),
+    supabase.rpc('clientes_margen', {
+      p_codigo_empresa: codigoEmpresa,
+      p_anio: anio,
+      p_cliente: filtros?.cliente ?? null,
+      p_comercial: filtros?.comercial ?? null,
+      p_familia: filtros?.familia ?? null,
+      p_marca: filtros?.marca ?? null,
+    }),
+    supabase.rpc('familias_articulos', { p_codigo_empresa: codigoEmpresa }),
+  ]);
 
   let facturas: FilaFactura[];
   if (facturasRpc) {
@@ -124,53 +160,16 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
     fechasCliente.set(f.cliente_id, s);
   }
 
-  const pedidos = await todasLasFilas<FilaPedido>((desde) => {
-    let q = supabase
-      .from('pedidos')
-      .select('cliente_id, fecha_entrada')
-      .eq('empresa_id', empresa.id)
-      .gte('fecha_entrada', iso(365));
-    if (filtros?.cliente) q = q.eq('cliente_id', filtros.cliente);
-    if (filtros?.comercial) q = q.eq('comercial_id', filtros.comercial);
-    return q.range(desde, desde + TAMANO_PAGINA - 1);
-  });
-  const activos12m = new Set(pedidos.map((p) => p.cliente_id).filter(Boolean));
+  const nombreCliente = new Map(clientes.map((c) => [c.id, c.nombre]));
+  const comercialDeCliente = new Map(clientes.map((c) => [c.id, c.comercial_id]));
+
+  const activos12m = new Set(pedidos.map((p) => p.cliente_id).filter((x): x is string => Boolean(x)));
   const ultimoPedido = new Map<string, string>();
   for (const p of pedidos) {
     if (!p.cliente_id) continue;
     const prev = ultimoPedido.get(p.cliente_id);
     if (!prev || p.fecha_entrada > prev) ultimoPedido.set(p.cliente_id, p.fecha_entrada);
   }
-
-  const clientes = await todasLasFilas<FilaCliente>((desde) =>
-    supabase
-      .from('clientes')
-      .select('id, nombre, estado, fecha_primer_pedido, comercial_id')
-      .eq('empresa_id', empresa.id)
-      .range(desde, desde + TAMANO_PAGINA - 1)
-  );
-
-  const nombreCliente = new Map(clientes.map((c) => [c.id, c.nombre]));
-  const comercialDeCliente = new Map(clientes.map((c) => [c.id, c.comercial_id]));
-  const [comercialesRes, actividadRes, margenRes] = await Promise.all([
-    supabase.from('comerciales').select('id, nombre'),
-    supabase.rpc('clientes_actividad', {
-      p_codigo_empresa: codigoEmpresa,
-      p_anio: anio,
-      p_cliente: filtros?.cliente ?? null,
-      p_comercial: filtros?.comercial ?? null,
-      p_familia: filtros?.familia ?? null,
-      p_marca: filtros?.marca ?? null,
-    }),
-    supabase.rpc('clientes_margen', {
-      p_codigo_empresa: codigoEmpresa,
-      p_anio: anio,
-      p_cliente: filtros?.cliente ?? null,
-      p_comercial: filtros?.comercial ?? null,
-      p_familia: filtros?.familia ?? null,
-      p_marca: filtros?.marca ?? null,
-    }),
-  ]);
 
   const comercialesRaw = comercialesRes.data;
   const nombreComercial = new Map(
@@ -334,16 +333,14 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
     .sort((a, b) => b.neta - a.neta)
     .slice(0, 15);
 
-  // Familias para las columnas de la matriz: RPC ligero en vez de toda la tabla.
-  const { data: familiasRaw } = await supabase.rpc('familias_articulos', { p_codigo_empresa: codigoEmpresa });
-  const familiasOrden = ((familiasRaw ?? []) as { familia: string }[])
+  // Familias para las columnas de la matriz: ya vienen en el Promise.all.
+  const familiasOrden = (((familiasRaw as { data: { familia: string }[] | null } | null)?.data ?? []) as { familia: string }[])
     .map((f) => f.familia)
     .filter(Boolean)
     .sort((a, b) => a.localeCompare(b, 'es'));
 
   const familiasCliente = new Map<string, Set<string>>();
-  // Solo las líneas de los clientes que entran en la matriz (top 12): antes se
-  // traían todas las líneas del año y se descartaban casi todas.
+  // Solo las líneas de los 12 clientes de la matriz.
   const top12Ids = [...porCliente.entries()]
     .sort((a, b) => b[1].neta - a[1].neta)
     .slice(0, 12)
@@ -352,13 +349,13 @@ export async function getClientes(codigoEmpresa: string, anio: number, filtros?:
   const idsFacturasTop = idsFacturasAnio.filter((fid) => top12.has(clienteDeFactura.get(fid) ?? ''));
   const lineasClientes: FilaLinea[] = [];
   for (let i = 0; i < idsFacturasTop.length; i += 200) {
-    const trozo = idsFacturasTop.slice(i, i + 200);
     const { data } = await supabase
       .from('factura_lineas')
       .select('factura_id, articulo_id')
-      .in('factura_id', trozo);
+      .in('factura_id', idsFacturasTop.slice(i, i + 200));
     if (data) lineasClientes.push(...(data as unknown as FilaLinea[]));
   }
+
   const familiaDeArticulo = new Map<string, string | null>();
   if (lineasClientes.length) {
     const idsArticulo = [...new Set(lineasClientes.map((l) => l.articulo_id).filter((x): x is string => Boolean(x)))];
