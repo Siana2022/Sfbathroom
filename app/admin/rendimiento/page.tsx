@@ -5,6 +5,7 @@ import { getClientes } from '@/lib/datos/clientes';
 import { getFacturacion } from '@/lib/datos/facturacion';
 import { getUsuario } from '@/lib/datos/role';
 import { ANIO_ACTUAL } from '@/lib/ejercicio';
+import { ventasFacturasRangoRpc } from '@/lib/datos/ventas';
 
 async function medir<T>(nombre: string, fn: () => Promise<T>): Promise<{ nombre: string; ms: number; ok: boolean; error?: string }> {
   const t0 = performance.now();
@@ -34,6 +35,42 @@ export default async function RendimientoPage() {
   mediciones.push(
     await medir('Conteo clientes (head)', async () => {
       await supabase.from('clientes').select('id', { count: 'exact', head: true }).eq('empresa_id', empresa.id);
+    }),
+  );
+  const hace730 = new Date(Date.now() - 730 * 86400000).toISOString().slice(0, 10);
+  mediciones.push(await medir('Facturas 2 años (RPC)', () => ventasFacturasRangoRpc(supabase, codigo, hace730, `${ANIO_ACTUAL}-12-31`)));
+  mediciones.push(
+    await medir('RPC clientes_actividad', async () => {
+      await supabase.rpc('clientes_actividad', {
+        p_codigo_empresa: codigo,
+        p_anio: ANIO_ACTUAL,
+        p_cliente: null,
+        p_comercial: null,
+        p_familia: null,
+        p_marca: null,
+      });
+    }),
+  );
+  mediciones.push(
+    await medir('RPC clientes_margen', async () => {
+      await supabase.rpc('clientes_margen', {
+        p_codigo_empresa: codigo,
+        p_anio: ANIO_ACTUAL,
+        p_cliente: null,
+        p_comercial: null,
+        p_familia: null,
+        p_marca: null,
+      });
+    }),
+  );
+  mediciones.push(
+    await medir('Artículos (todas las filas)', async () => {
+      let desde = 0;
+      for (;;) {
+        const { data } = await supabase.from('articulos').select('id, familia').eq('empresa_id', empresa.id).range(desde, desde + 999);
+        if (!data || data.length < 1000) break;
+        desde += 1000;
+      }
     }),
   );
   mediciones.push(await medir('getClientes', () => getClientes(codigo, ANIO_ACTUAL, {})));
