@@ -29,14 +29,14 @@ export default async function CampanasPage() {
     enviada_at: string | null;
   }[];
 
-  const puede = usuario?.rol === 'admin' || usuario?.rol === 'direccion';
+  const puede = usuario?.rol === 'admin' || usuario?.rol === 'direccion' || usuario?.rol === 'comercial';
 
   return (
     <div>
       <p className="breadcrumb">Marketing · Email</p>
       <h1>Campañas de email</h1>
       {!puede ? (
-        <div className="card"><p>Solo administración y dirección pueden gestionar campañas.</p></div>
+        <div className="card"><p>Solo administración, dirección y comerciales pueden gestionar campañas.</p></div>
       ) : (
         <>
           <NuevaCampana empresaId={empresa.id} />

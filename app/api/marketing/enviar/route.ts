@@ -7,13 +7,12 @@ import { enlaceBaja } from '@/lib/marketing/firma';
 const RESEND = 'https://api.resend.com/emails/batch';
 const LOTE = 100;
 
-async function soyAdmin(): Promise<boolean> {
+async function quienSoy(): Promise<{ id: string; rol: string | null } | null> {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return false;
+  if (!user) return null;
   const { data } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
-  const rol = (data as { role: string | null } | null)?.role;
-  return rol === 'admin' || rol === 'direccion';
+  return { id: user.id, rol: (data as { role: string | null } | null)?.role ?? null };
 }
 
 function parseRemitente(valor: string): string {
@@ -27,7 +26,10 @@ function baseUrl(req: NextRequest): string {
 }
 
 export async function POST(req: NextRequest) {
-  if (!(await soyAdmin())) return NextResponse.json({ error: 'No autorizado.' }, { status: 403 });
+  const yo = await quienSoy();
+  if (!yo || !['admin', 'direccion', 'comercial'].includes(yo.rol ?? '')) {
+    return NextResponse.json({ error: 'No autorizado.' }, { status: 403 });
+  }
   if (!hayServiceRole()) return NextResponse.json({ error: 'Falta SUPABASE_SERVICE_ROLE_KEY.' }, { status: 500 });
   if (!process.env.RESEND_API_KEY) {
     return NextResponse.json({ error: 'Falta RESEND_API_KEY. El envío se activará cuando se verifique el dominio.' }, { status: 500 });
@@ -49,6 +51,7 @@ export async function POST(req: NextRequest) {
   if (error || !campana) return NextResponse.json({ error: 'Campaña no encontrada.' }, { status: 404 });
 
   const c = campana as {
+    creado_por?: string | null;
     id: string;
     empresa_id: string;
     nombre: string;
@@ -59,6 +62,10 @@ export async function POST(req: NextRequest) {
   };
   if (!c.asunto || (c.bloques ?? []).length === 0) {
     return NextResponse.json({ error: 'La campaña necesita asunto y al menos un bloque.' }, { status: 400 });
+  }
+
+  if (yo.rol === 'comercial' && (c as { creado_por?: string | null }).creado_por !== yo.id) {
+    return NextResponse.json({ error: 'Esta campaña no es tuya.' }, { status: 403 });
   }
 
   const base = baseUrl(req);
@@ -75,7 +82,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, enviados: 1, fallidos: 0 });
   }
 
-  const seg = body.segmento ?? c.segmento ?? {};
+  const seg = { ...(body.segmento ?? c.segmento ?? {}) } as {
+    comerciales?: string[];
+    estado?: string;
+    provincia?: string | null;
+  };
+
+  if (yo.rol === 'comercial') {
+    const { data: pcs } = await admin
+      .from('profiles_comerciales')
+      .select('comercial_id')
+      .eq('profile_id', yo.id);
+    const { data: perfil } = await admin.from('profiles').select('comercial_id').eq('id', yo.id).maybeSingle();
+    const propios = [
+      ...new Set([
+        ...((pcs ?? []) as { comercial_id: string }[]).map((x) => x.comercial_id),
+        ...(((perfil as { comercial_id: string | null } | null)?.comercial_id) ? [(perfil as { comercial_id: string }).comercial_id] : []),
+      ]),
+    ];
+    if (propios.length === 0) {
+      return NextResponse.json({ error: 'No tienes cartera asignada.' }, { status: 400 });
+    }
+    seg.comerciales = propios;
+  }
   let consulta = admin
     .from('clientes')
     .select('id, email')
