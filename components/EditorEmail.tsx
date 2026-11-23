@@ -3,6 +3,7 @@ import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { bloqueVacio, renderizarEmail, type BloqueEmail } from '@/lib/marketing/bloques';
+import EditorTextoRico from '@/components/EditorTextoRico';
 
 const TIPOS: { tipo: BloqueEmail['tipo']; etiqueta: string; icono: string }[] = [
   { tipo: 'titulo', etiqueta: 'Título', icono: 'H' },
@@ -170,14 +171,13 @@ export default function EditorEmail({
               ) : null}
 
               {b.tipo === 'texto' ? (
-                <label className="campo-editor" style={{ marginBottom: 0 }}>
+                <div className="campo-editor" style={{ marginBottom: 0 }}>
                   <span>Párrafo</span>
-                  <textarea
-                    value={b.texto}
-                    onChange={(e) => cambiar(i, { texto: e.target.value })}
-                    placeholder="Escribe aquí el mensaje…"
+                  <EditorTextoRico
+                    valor={b.html ?? b.texto ?? ''}
+                    onCambio={(html) => cambiar(i, { html, texto: '' })}
                   />
-                </label>
+                </div>
               ) : null}
 
               {b.tipo === 'imagen' ? (

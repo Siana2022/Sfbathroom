@@ -1313,3 +1313,33 @@ table.tabla td[title] { cursor: help; }
 @media (max-width: 900px) {
   .dos-columnas, .fila-filtros { grid-template-columns: 1fr; }
 }
+
+/* Destinatarios de campaña */
+.modo-opciones { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.modo-opcion {
+  text-align: left; border: 1px solid var(--border-2); background: var(--panel);
+  border-radius: 12px; padding: 12px 14px; cursor: pointer; display: flex;
+  flex-direction: column; gap: 3px; font-family: inherit; color: var(--text);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.modo-opcion span { font-size: 12px; color: var(--muted); }
+.modo-opcion.activa { border-color: var(--accent); background: var(--wash); box-shadow: inset 0 0 0 1px var(--accent); }
+.modo-opcion:hover { border-color: var(--accent-suave); }
+.segmento-filtros {
+  display: grid; grid-template-columns: 200px minmax(200px, 280px); gap: 12px;
+  background: var(--panel-alto); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px; margin-bottom: 14px;
+}
+.lista-check {
+  display: flex; flex-direction: column; gap: 2px; margin-top: 6px;
+  border: 1px solid var(--border-2); border-radius: 9px; padding: 8px; background: #fff;
+}
+.lista-check label { display: flex; gap: 8px; align-items: center; font-size: 13px; padding: 2px 0; }
+.acciones-envio {
+  display: flex; justify-content: space-between; align-items: flex-end;
+  gap: 12px; flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 14px;
+}
+@media (max-width: 900px) {
+  .segmento-filtros { grid-template-columns: 1fr; }
+  .acciones-envio { flex-direction: column; align-items: stretch; }
+}

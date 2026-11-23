@@ -1,9 +1,21 @@
 export type BloqueEmail =
   | { tipo: 'titulo'; texto: string }
-  | { tipo: 'texto'; texto: string }
+  | { tipo: 'texto'; texto: string; html?: string }
   | { tipo: 'imagen'; url: string; enlace?: string; alt?: string }
   | { tipo: 'boton'; texto: string; url: string }
   | { tipo: 'separador' };
+
+const PERMITIDAS = /<(\/?)(b|strong|i|em|u|a|ul|ol|li|br|p)(\s[^>]*)?>/gi;
+
+export function limpiarHtml(html: string): string {
+  const sinPeligro = html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/\son\w+="[^"]*"/gi, '')
+    .replace(/\son\w+='[^']*'/gi, '')
+    .replace(/javascript:/gi, '');
+  return sinPeligro.replace(/<(?!\/?\b(b|strong|i|em|u|a|ul|ol|li|br|p)\b)[^>]*>/gi, '');
+}
 
 export function bloqueVacio(tipo: BloqueEmail['tipo']): BloqueEmail {
   switch (tipo) {
@@ -29,8 +41,10 @@ export function renderizarEmail(bloques: BloqueEmail[], bajaUrl: string): string
       switch (b.tipo) {
         case 'titulo':
           return `<h2 style="margin:0 0 12px;font:700 22px/1.3 Georgia,serif;color:#1f2933">${esc(b.texto)}</h2>`;
-        case 'texto':
-          return `<p style="margin:0 0 14px;font:400 15px/1.6 Arial,sans-serif;color:#3e4c59;white-space:pre-line">${esc(b.texto)}</p>`;
+        case 'texto': {
+          const contenido = b.html ? limpiarHtml(b.html) : esc(b.texto);
+          return `<div style="margin:0 0 14px;font:400 15px/1.6 Arial,sans-serif;color:#3e4c59">${contenido}</div>`;
+        }
         case 'imagen':
           return b.url
             ? `<div style="margin:0 0 14px">${b.enlace ? `<a href="${esc(b.enlace)}">` : ''}<img src="${esc(b.url)}" alt="${esc(b.alt ?? '')}" style="max-width:100%;border-radius:8px;display:block">${b.enlace ? '</a>' : ''}</div>`

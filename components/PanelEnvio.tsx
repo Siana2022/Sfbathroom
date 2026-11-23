@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
 type Comercial = { id: string; nombre: string };
+type ClienteMini = { id: string; nombre: string; email: string | null };
 
 export default function PanelEnvio({
   campanaId,
@@ -32,8 +33,8 @@ export default function PanelEnvio({
     Array.isArray(segmentoInicial.clientes) && (segmentoInicial.clientes as string[]).length > 0 ? 'elegir' : 'todos',
   );
   const [busqueda, setBusqueda] = useState('');
-  const [resultados, setResultados] = useState<{ id: string; nombre: string; email: string | null }[]>([]);
-  const [elegidos, setElegidos] = useState<{ id: string; nombre: string; email: string | null }[]>([]);
+  const [resultados, setResultados] = useState<ClienteMini[]>([]);
+  const [elegidos, setElegidos] = useState<ClienteMini[]>([]);
   const [prueba, setPrueba] = useState('');
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -53,15 +54,11 @@ export default function PanelEnvio({
     if (modo !== 'elegir') return;
     let cancelado = false;
     const t = setTimeout(() => {
-      const q = supabase
-        .from('clientes')
-        .select('id, nombre, email')
-        .order('nombre')
-        .limit(40);
+      const q = supabase.from('clientes').select('id, nombre, email').order('nombre').limit(40);
       const filtrada = busqueda.trim() ? q.ilike('nombre', `%${busqueda.trim()}%`) : q;
       filtrada.then(({ data }) => {
         if (cancelado) return;
-        setResultados((data ?? []) as { id: string; nombre: string; email: string | null }[]);
+        setResultados((data ?? []) as ClienteMini[]);
       });
     }, 250);
     return () => {
@@ -70,7 +67,7 @@ export default function PanelEnvio({
     };
   }, [modo, busqueda]);
 
-  function alternarCliente(c: { id: string; nombre: string; email: string | null }) {
+  function alternarCliente(c: ClienteMini) {
     setElegidos((prev) => (prev.some((x) => x.id === c.id) ? prev.filter((x) => x.id !== c.id) : [...prev, c]));
   }
 
@@ -109,44 +106,97 @@ export default function PanelEnvio({
     });
   }
 
+  const totalElegidos = elegidos.length;
+
   return (
     <div className="card">
-      <h2>Segmento y envío</h2>
-      <p style={{ color: 'var(--muted)', fontSize: 13 }}>
-        Se enviará a los clientes que tengan email en su ficha o en sus contactos. Las bajas se excluyen automáticamente.
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <h2 style={{ margin: 0 }}>¿A quién se envía?</h2>
+        <span style={{ fontSize: 12, color: 'var(--tenue)' }}>Las bajas se excluyen automáticamente</span>
+      </div>
+      <p style={{ color: 'var(--muted)', fontSize: 13, margin: '6px 0 14px' }}>
+        Se usará el email del cliente y el de sus contactos.
       </p>
 
-      <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginBottom: 12 }}>
-        <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14 }}>
-          <input type="radio" name="modo" checked={modo === 'todos'} onChange={() => setModo('todos')} />
-          Todos mis clientes
-        </label>
-        <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14 }}>
-          <input type="radio" name="modo" checked={modo === 'elegir'} onChange={() => setModo('elegir')} />
-          Elegir clientes
-        </label>
+      <div className="modo-opciones">
+        <button
+          type="button"
+          className={`modo-opcion${modo === 'todos' ? ' activa' : ''}`}
+          onClick={() => setModo('todos')}
+        >
+          <strong>Todos mis clientes</strong>
+          <span>Con filtros de estado y provincia</span>
+        </button>
+        <button
+          type="button"
+          className={`modo-opcion${modo === 'elegir' ? ' activa' : ''}`}
+          onClick={() => setModo('elegir')}
+        >
+          <strong>Elegir clientes</strong>
+          <span>Marca uno a uno a quién escribir</span>
+        </button>
       </div>
 
-      {modo === 'elegir' ? (
-        <div style={{ marginBottom: 12 }}>
-          <label className="campo-editor">
+      {modo === 'todos' ? (
+        <div className="segmento-filtros">
+          <label className="campo-editor" style={{ marginBottom: 0 }}>
+            <span>Estado del cliente</span>
+            <select value={estado} onChange={(e) => setEstado(e.target.value)}>
+              <option value="todos">Todos</option>
+              <option value="activo">Activos</option>
+              <option value="inactivo">Inactivos</option>
+            </select>
+          </label>
+          <label className="campo-editor" style={{ marginBottom: 0 }}>
+            <span>Provincia (contiene)</span>
+            <input type="text" value={provincia} onChange={(e) => setProvincia(e.target.value)} placeholder="Madrid" />
+          </label>
+          {!esComercial ? (
+            <details style={{ gridColumn: '1 / -1' }}>
+              <summary style={{ cursor: 'pointer', fontSize: 13 }}>
+                Comerciales ({seleccion.length} seleccionados)
+              </summary>
+              <div className="lista-check">
+                {comerciales.map((c) => (
+                  <label key={c.id}>
+                    <input
+                      type="checkbox"
+                      checked={seleccion.includes(c.id)}
+                      onChange={() =>
+                        setSeleccion(seleccion.includes(c.id) ? seleccion.filter((x) => x !== c.id) : [...seleccion, c.id])
+                      }
+                    />
+                    {c.nombre}
+                  </label>
+                ))}
+              </div>
+            </details>
+          ) : (
+            <p style={{ gridColumn: '1 / -1', fontSize: 13, color: 'var(--muted)', margin: 0 }}>
+              Se enviará solo a <strong>tu cartera</strong>, según el estado y la provincia que elijas.
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="segmento-filtros">
+          <label className="campo-editor" style={{ gridColumn: '1 / -1', marginBottom: 0 }}>
             <span>Buscar cliente</span>
             <input
               type="search"
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Nombre del cliente…"
+              placeholder="Escribe el nombre…"
             />
           </label>
-          <div style={{ maxHeight: 220, overflowY: 'auto', border: '1px solid var(--border-2)', borderRadius: 10, padding: 8 }}>
+          <div className="lista-check" style={{ gridColumn: '1 / -1', maxHeight: 220, overflowY: 'auto' }}>
             {resultados.length === 0 ? (
               <p style={{ color: 'var(--muted)', margin: 0, fontSize: 13 }}>Sin resultados.</p>
             ) : (
               resultados.map((c) => (
-                <label key={c.id} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '3px 0', fontSize: 13 }}>
+                <label key={c.id}>
                   <input type="checkbox" checked={elegidos.some((x) => x.id === c.id)} onChange={() => alternarCliente(c)} />
                   <span style={{ flex: 1 }}>{c.nombre}</span>
-                  <span style={{ color: c.email ? 'var(--muted)' : 'var(--ambar)', fontSize: 12 }}>
+                  <span style={{ fontSize: 12, color: c.email ? 'var(--muted)' : 'var(--ambar)' }}>
                     {c.email ?? 'sin email'}
                   </span>
                 </label>
@@ -154,7 +204,7 @@ export default function PanelEnvio({
             )}
           </div>
           {elegidos.length > 0 ? (
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+            <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {elegidos.map((c) => (
                 <span key={c.id} className="badge listo" style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                   {c.nombre}
@@ -170,60 +220,32 @@ export default function PanelEnvio({
               ))}
             </div>
           ) : null}
-          <p style={{ fontSize: 12, color: 'var(--muted)', margin: '6px 0 0' }}>
-            {elegidos.length} clientes seleccionados.
+          <p style={{ gridColumn: '1 / -1', fontSize: 12, color: 'var(--muted)', margin: 0 }}>
+            {totalElegidos} clientes seleccionados.
           </p>
         </div>
-      ) : null}
-      <div className="fila-filtros" style={{ marginBottom: 12, opacity: modo === 'elegir' ? 0.45 : 1 }}>
-        <label className="campo-editor" style={{ marginBottom: 0 }}>
-          <span>Estado del cliente</span>
-          <select value={estado} onChange={(e) => setEstado(e.target.value)}>
-            <option value="todos">Todos</option>
-            <option value="activo">Activos</option>
-            <option value="inactivo">Inactivos</option>
-          </select>
-        </label>
-        <label className="campo-editor" style={{ marginBottom: 0 }}>
-          <span>Provincia (contiene)</span>
-          <input type="text" value={provincia} onChange={(e) => setProvincia(e.target.value)} placeholder="Madrid" />
-        </label>
-      </div>
+      )}
 
-      {esComercial ? (
-        <p style={{ fontSize: 13, color: 'var(--muted)' }}>
-          Se enviará solo a <strong>tus clientes</strong>, según el estado y la provincia que elijas.
-        </p>
-      ) : null}
-      <details style={{ marginBottom: 10, display: esComercial ? 'none' : undefined }}>
-        <summary style={{ cursor: 'pointer' }}>Comerciales ({seleccion.length} seleccionados)</summary>
-        <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border-2)', borderRadius: 8, padding: 8, marginTop: 6 }}>
-          {comerciales.map((c) => (
-            <label key={c.id} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, padding: '2px 0' }}>
-              <input
-                type="checkbox"
-                checked={seleccion.includes(c.id)}
-                onChange={() =>
-                  setSeleccion(seleccion.includes(c.id) ? seleccion.filter((x) => x !== c.id) : [...seleccion, c.id])
-                }
-              />
-              {c.nombre}
-            </label>
-          ))}
+      <div className="acciones-envio">
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button type="button" className="boton" onClick={guardarSegmento} disabled={pending}>
+            Guardar segmento
+          </button>
+          <label className="campo-editor" style={{ marginBottom: 0, minWidth: 240 }}>
+            <span>Email de prueba</span>
+            <input type="email" value={prueba} onChange={(e) => setPrueba(e.target.value)} placeholder="tu@sfbathroom.com" />
+          </label>
+          <button type="button" className="boton" onClick={() => enviar(true)} disabled={pending || !prueba.includes('@')}>
+            Enviar prueba
+          </button>
         </div>
-      </details>
-
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-        <button type="button" className="boton" onClick={guardarSegmento} disabled={pending}>Guardar segmento</button>
-        <label className="campo-filtro" style={{ minWidth: 240 }}>
-          Email de prueba
-          <input type="email" value={prueba} onChange={(e) => setPrueba(e.target.value)} placeholder="tu@sfbathroom.com" />
-        </label>
-        <button type="button" className="boton" onClick={() => enviar(true)} disabled={pending || !prueba.includes('@')}>
-          Enviar prueba
-        </button>
-        <button type="button" className="boton" onClick={() => enviar(false)} disabled={pending || estadoCampana === 'enviando'}>
-          Enviar campaña
+        <button
+          type="button"
+          className="boton boton-primario"
+          onClick={() => enviar(false)}
+          disabled={pending || estadoCampana === 'enviando'}
+        >
+          {pending ? 'Enviando…' : 'Enviar campaña'}
         </button>
       </div>
 
