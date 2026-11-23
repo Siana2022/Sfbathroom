@@ -1264,3 +1264,52 @@ table.tabla td[title] { cursor: help; }
 .kpi-clic:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .kpi-ver { margin-top: 6px; font-size: 11.5px; color: var(--accent); font-weight: 700; letter-spacing: 0.02em; }
 .modal-ancho { max-width: min(1100px, 94vw); width: 100%; }
+
+/* Editor de email marketing */
+.bloque-editor {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel-alto);
+  padding: 14px;
+  margin-bottom: 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.bloque-editor:hover { border-color: var(--border-2); }
+.bloque-editor.arrastrando {
+  border-color: var(--accent);
+  background: var(--panel);
+  box-shadow: 0 10px 28px rgba(25, 28, 32, 0.1);
+}
+.bloque-cabecera { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.bloque-icono {
+  width: 28px; height: 28px; border-radius: 9px; background: var(--wash);
+  display: flex; align-items: center; justify-content: center; font-size: 13px;
+}
+.bloque-tipo {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--accent);
+}
+.bloque-acciones { margin-left: auto; display: flex; gap: 4px; }
+.boton.icono { width: 30px; height: 30px; padding: 0; justify-content: center; }
+.boton-primario { background: var(--accent); border-color: var(--accent); color: #fff; }
+.boton-primario:hover { background: var(--accent-suave); border-color: var(--accent-suave); }
+.boton-suave { background: var(--wash); }
+.barra-bloques {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  padding-top: 14px; margin-top: 4px; border-top: 1px dashed var(--border-2);
+}
+.previsualizacion { position: sticky; top: 16px; }
+.previsualizacion-marco { background: var(--wash); border-radius: 14px; padding: 14px; }
+.previsualizacion-marco iframe { display: block; width: 100%; height: 560px; border: 0; border-radius: 10px; background: #fff; }
+.campo-editor { display: block; margin-bottom: 12px; }
+.campo-editor span { display: block; font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--tenue); margin-bottom: 4px; }
+.campo-editor input, .campo-editor textarea {
+  width: 100%; border: 1px solid var(--border-2); border-radius: 9px;
+  padding: 9px 11px; font-family: inherit; font-size: 14px; background: #fff; color: var(--text);
+}
+.campo-editor textarea { min-height: 84px; resize: vertical; }
+.dos-columnas { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.fila-filtros { display: grid; grid-template-columns: 200px minmax(180px, 260px); gap: 12px; align-items: end; }
+@media (max-width: 900px) {
+  .dos-columnas, .fila-filtros { grid-template-columns: 1fr; }
+}

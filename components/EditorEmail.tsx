@@ -4,13 +4,21 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { bloqueVacio, renderizarEmail, type BloqueEmail } from '@/lib/marketing/bloques';
 
-const TIPOS: { tipo: BloqueEmail['tipo']; etiqueta: string }[] = [
-  { tipo: 'titulo', etiqueta: 'Título' },
-  { tipo: 'texto', etiqueta: 'Texto' },
-  { tipo: 'imagen', etiqueta: 'Imagen' },
-  { tipo: 'boton', etiqueta: 'Botón' },
-  { tipo: 'separador', etiqueta: 'Separador' },
+const TIPOS: { tipo: BloqueEmail['tipo']; etiqueta: string; icono: string }[] = [
+  { tipo: 'titulo', etiqueta: 'Título', icono: 'H' },
+  { tipo: 'texto', etiqueta: 'Texto', icono: '¶' },
+  { tipo: 'imagen', etiqueta: 'Imagen', icono: '▣' },
+  { tipo: 'boton', etiqueta: 'Botón', icono: '▷' },
+  { tipo: 'separador', etiqueta: 'Separador', icono: '—' },
 ];
+
+const ICONO: Record<BloqueEmail['tipo'], string> = {
+  titulo: 'H',
+  texto: '¶',
+  imagen: '▣',
+  boton: '▷',
+  separador: '—',
+};
 
 export default function EditorEmail({
   campanaId,
@@ -71,91 +79,151 @@ export default function EditorEmail({
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 340px', gap: 18, alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 360px', gap: 18, alignItems: 'start' }}>
       <div>
         <div className="card">
-          <label className="campo-filtro" style={{ display: 'block', marginBottom: 10 }}>
-            Nombre de la campaña
-            <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} />
-          </label>
-          <label className="campo-filtro" style={{ display: 'block' }}>
-            Asunto
-            <input type="text" value={asunto} onChange={(e) => setAsunto(e.target.value)} placeholder="Novedades de sfbathroom" />
-          </label>
+          <h2>Contenido</h2>
+          <div className="dos-columnas">
+            <label className="campo-editor">
+              <span>Nombre de la campaña</span>
+              <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+            </label>
+            <label className="campo-editor">
+              <span>Asunto del email</span>
+              <input type="text" value={asunto} onChange={(e) => setAsunto(e.target.value)} placeholder="Novedades de sfbathroom" />
+            </label>
+          </div>
         </div>
 
         <div className="card">
-          <h2>Bloques</h2>
-          {bloques.length === 0 ? <p style={{ color: 'var(--muted)' }}>Añade el primer bloque abajo.</p> : null}
+          <h2>Bloques del email</h2>
+          <p style={{ color: 'var(--muted)', marginTop: 0, fontSize: 13 }}>
+            Arrastra con el asa para ordenar. Los cambios se ven al instante en la vista previa.
+          </p>
+
+          {bloques.length === 0 ? (
+            <div
+              style={{
+                border: '1px dashed var(--border-2)',
+                borderRadius: 12,
+                padding: 28,
+                textAlign: 'center',
+                color: 'var(--muted)',
+                marginBottom: 12,
+              }}
+            >
+              El email está vacío. Añade un bloque para empezar.
+            </div>
+          ) : null}
+
           {bloques.map((b, i) => (
             <div
               key={i}
               draggable
               onDragStart={() => setArrastrando(i)}
+              onDragEnd={() => setArrastrando(null)}
               onDragOver={(e) => e.preventDefault()}
               onDrop={() => soltar(i)}
-              style={{
-                border: '1px solid var(--border-2)',
-                borderRadius: 10,
-                padding: 12,
-                marginBottom: 10,
-                background: arrastrando === i ? 'var(--wash)' : '#fff',
-              }}
+              className={`bloque-editor${arrastrando === i ? ' arrastrando' : ''}`}
             >
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-                <span style={{ cursor: 'grab', color: 'var(--muted)' }}>⠿</span>
-                <strong style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--muted)' }}>{b.tipo}</strong>
-                <span style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
-                  <button type="button" className="boton" onClick={() => mover(i, -1)}>↑</button>
-                  <button type="button" className="boton" onClick={() => mover(i, 1)}>↓</button>
-                  <button type="button" className="boton" onClick={() => setBloques(bloques.filter((_, j) => j !== i))}>✕</button>
+              <div className="bloque-cabecera">
+                <span className="bloque-icono" aria-hidden="true">{ICONO[b.tipo]}</span>
+                <span className="bloque-tipo">{b.tipo}</span>
+                <span className="bloque-acciones">
+                  <button type="button" className="boton icono" title="Subir" onClick={() => mover(i, -1)}>↑</button>
+                  <button type="button" className="boton icono" title="Bajar" onClick={() => mover(i, 1)}>↓</button>
+                  <button
+                    type="button"
+                    className="boton icono"
+                    title="Eliminar"
+                    onClick={() => setBloques(bloques.filter((_, j) => j !== i))}
+                  >
+                    ✕
+                  </button>
                 </span>
               </div>
 
-              {b.tipo === 'titulo' || b.tipo === 'texto' ? (
-                b.tipo === 'texto' ? (
-                  <textarea value={b.texto} onChange={(e) => cambiar(i, { texto: e.target.value })} rows={3} style={{ width: '100%' }} />
-                ) : (
-                  <input type="text" value={b.texto} onChange={(e) => cambiar(i, { texto: e.target.value })} style={{ width: '100%' }} />
-                )
+              {b.tipo === 'titulo' ? (
+                <label className="campo-editor" style={{ marginBottom: 0 }}>
+                  <span>Texto del título</span>
+                  <input type="text" value={b.texto} onChange={(e) => cambiar(i, { texto: e.target.value })} />
+                </label>
+              ) : null}
+
+              {b.tipo === 'texto' ? (
+                <label className="campo-editor" style={{ marginBottom: 0 }}>
+                  <span>Párrafo</span>
+                  <textarea
+                    value={b.texto}
+                    onChange={(e) => cambiar(i, { texto: e.target.value })}
+                    placeholder="Escribe aquí el mensaje…"
+                  />
+                </label>
               ) : null}
 
               {b.tipo === 'imagen' ? (
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <input type="url" placeholder="URL de la imagen" value={b.url} onChange={(e) => cambiar(i, { url: e.target.value })} style={{ flex: 1, minWidth: 220 }} />
-                  <input type="url" placeholder="Enlace (opcional)" value={b.enlace ?? ''} onChange={(e) => cambiar(i, { enlace: e.target.value })} style={{ flex: 1, minWidth: 180 }} />
+                <div className="dos-columnas">
+                  <label className="campo-editor" style={{ marginBottom: 0 }}>
+                    <span>URL de la imagen</span>
+                    <input type="url" value={b.url} onChange={(e) => cambiar(i, { url: e.target.value })} placeholder="https://…" />
+                  </label>
+                  <label className="campo-editor" style={{ marginBottom: 0 }}>
+                    <span>Enlace al pulsar (opcional)</span>
+                    <input type="url" value={b.enlace ?? ''} onChange={(e) => cambiar(i, { enlace: e.target.value })} placeholder="https://…" />
+                  </label>
                 </div>
               ) : null}
 
               {b.tipo === 'boton' ? (
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <input type="text" placeholder="Texto" value={b.texto} onChange={(e) => cambiar(i, { texto: e.target.value })} style={{ flex: 1, minWidth: 140 }} />
-                  <input type="url" placeholder="https://…" value={b.url} onChange={(e) => cambiar(i, { url: e.target.value })} style={{ flex: 2, minWidth: 220 }} />
+                <div className="dos-columnas">
+                  <label className="campo-editor" style={{ marginBottom: 0 }}>
+                    <span>Texto del botón</span>
+                    <input type="text" value={b.texto} onChange={(e) => cambiar(i, { texto: e.target.value })} />
+                  </label>
+                  <label className="campo-editor" style={{ marginBottom: 0 }}>
+                    <span>Enlace</span>
+                    <input type="url" value={b.url} onChange={(e) => cambiar(i, { url: e.target.value })} />
+                  </label>
                 </div>
+              ) : null}
+
+              {b.tipo === 'separador' ? (
+                <hr style={{ border: 'none', borderTop: '1px solid var(--border-2)', margin: 0 }} />
               ) : null}
             </div>
           ))}
 
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+          <div className="barra-bloques">
+            <span style={{ fontSize: 12, color: 'var(--tenue)', marginRight: 4 }}>Añadir:</span>
             {TIPOS.map((t) => (
-              <button key={t.tipo} type="button" className="boton" onClick={() => setBloques([...bloques, bloqueVacio(t.tipo)])}>
-                + {t.etiqueta}
+              <button
+                key={t.tipo}
+                type="button"
+                className="boton boton-suave"
+                onClick={() => setBloques([...bloques, bloqueVacio(t.tipo)])}
+              >
+                <span aria-hidden="true">{t.icono}</span> {t.etiqueta}
               </button>
             ))}
           </div>
 
           {estado ? <p className="nota">{estado}</p> : null}
-          <div style={{ marginTop: 10 }}>
-            <button type="button" className="boton" onClick={guardar} disabled={pending}>
+          <div style={{ marginTop: 14 }}>
+            <button type="button" className="boton boton-primario" onClick={guardar} disabled={pending}>
               {pending ? 'Guardando…' : 'Guardar campaña'}
             </button>
           </div>
         </div>
       </div>
 
-      <div className="card" style={{ position: 'sticky', top: 16 }}>
-        <h2>Vista previa</h2>
-        <iframe title="Vista previa" srcDoc={html} style={{ width: '100%', height: 520, border: '1px solid var(--border-2)', borderRadius: 8 }} />
+      <div className="previsualizacion">
+        <div className="card" style={{ marginBottom: 0 }}>
+          <h2>Vista previa</h2>
+          <p style={{ color: 'var(--muted)', marginTop: 0, fontSize: 12 }}>Así lo verá el cliente en su correo.</p>
+          <div className="previsualizacion-marco">
+            <iframe title="Vista previa" srcDoc={html} />
+          </div>
+        </div>
       </div>
     </div>
   );
