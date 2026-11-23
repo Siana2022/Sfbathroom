@@ -100,6 +100,10 @@ export default function Nav({ userEmail, rol }: { userEmail?: string; rol?: stri
         </>
       )}
 
+      <Link key="/mi-cuenta" href="/mi-cuenta" className={activo('/mi-cuenta')}>
+        Mi cuenta
+      </Link>
+
       {userEmail && (
         <div className="sidebar-usuario">
           <span>{userEmail}</span>
