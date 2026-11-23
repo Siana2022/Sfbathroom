@@ -171,31 +171,78 @@ export default function AgendaComercial({ datos, clienteInicial }: { datos: Agen
             </label>
           </div>
           {clienteSel ? (
-            <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border-2)' }}>
+            <div style={{ marginTop: 14 }}>
               <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 6 }}>Contacto del cliente</div>
               {contactos.length === 0 ? (
                 <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
                   Este cliente no tiene contactos todavía. Puedes añadirlos en su ficha.
                 </p>
               ) : (
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                  <label className="campo-filtro" style={{ minWidth: 260 }}>
-                    Contacto
-                    <select value={contactoId} onChange={(e) => setContactoId(e.target.value)}>
-                      {contactos.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.nombre}{c.esPrincipal ? ' (principal)' : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <span style={{ fontSize: 13, color: 'var(--muted)' }}>
-                    {contactos.find((c) => c.id === contactoId)?.telefono ?? ''}
-                    {contactos.find((c) => c.id === contactoId)?.email
-                      ? ` · ${contactos.find((c) => c.id === contactoId)?.email}`
-                      : ''}
-                  </span>
-                </div>
+                (() => {
+                  const c = contactos.find((x) => x.id === contactoId) ?? contactos[0];
+                  const iniciales = c.nombre
+                    .split(/\s+/)
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map((w) => w[0]?.toUpperCase())
+                    .join('');
+                  return (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        padding: '12px 14px',
+                        border: '1px solid var(--border-2)',
+                        borderRadius: 12,
+                        background: 'var(--wash)',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: '50%',
+                          background: 'var(--accent)',
+                          color: '#fff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 700,
+                          fontSize: 14,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {iniciales || '?'}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 15 }}>
+                          {c.nombre}
+                          {c.esPrincipal ? (
+                            <span className="badge listo" style={{ marginLeft: 8, fontSize: 10 }}>Principal</span>
+                          ) : null}
+                        </div>
+                        <div style={{ fontSize: 13, color: 'var(--muted)' }}>
+                          {c.telefono ? <a href={`tel:${c.telefono}`} className="enlace">{c.telefono}</a> : 'Sin teléfono'}
+                          {c.email ? <> · <a href={`mailto:${c.email}`} className="enlace">{c.email}</a></> : null}
+                        </div>
+                      </div>
+                      {contactos.length > 1 ? (
+                        <select
+                          value={contactoId}
+                          onChange={(e) => setContactoId(e.target.value)}
+                          style={{ padding: '6px 8px', border: '1px solid var(--border-2)', borderRadius: 8, background: '#fff', maxWidth: 220 }}
+                        >
+                          {contactos.map((x) => (
+                            <option key={x.id} value={x.id}>
+                              {x.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      ) : null}
+                    </div>
+                  );
+                })()
               )}
             </div>
           ) : null}
