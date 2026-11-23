@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import BotonUsarPlantilla from '@/components/BotonUsarPlantilla';
+import BotonNuevaPlantilla from '@/components/BotonNuevaPlantilla';
 
 export default async function PlantillasPage() {
   const empresaCodigo = cookies().get('sfb_empresa')?.value ?? 'SF';
@@ -20,7 +21,10 @@ export default async function PlantillasPage() {
   return (
     <div>
       <p className="breadcrumb"><Link href="/marketing/campanas" className="enlace">Campañas</Link> · Plantillas</p>
-      <h1>Plantillas de email</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+        <h1 style={{ marginBottom: 6 }}>Plantillas de email</h1>
+        <BotonNuevaPlantilla empresaId={empresa.id} />
+      </div>
       <div className="card">
         <h2>{plantillas.length} plantillas</h2>
         {plantillas.length === 0 ? (
@@ -33,10 +37,13 @@ export default async function PlantillasPage() {
             <tbody>
               {plantillas.map((p) => (
                 <tr key={p.id}>
-                  <td>{p.nombre}</td>
+                  <td><Link href={`/marketing/plantillas/${p.id}`} className="enlace">{p.nombre}</Link></td>
                   <td>{p.asunto || '—'}</td>
                   <td>{p.created_at.slice(0, 10)}</td>
-                  <td><BotonUsarPlantilla plantillaId={p.id} empresaId={empresa.id} /></td>
+                  <td>
+                    <Link href={`/marketing/plantillas/${p.id}`} className="boton" style={{ marginRight: 6 }}>Editar</Link>
+                    <BotonUsarPlantilla plantillaId={p.id} empresaId={empresa.id} />
+                  </td>
                 </tr>
               ))}
             </tbody>

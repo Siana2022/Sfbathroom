@@ -27,12 +27,14 @@ export default function EditorEmail({
   nombreInicial,
   asuntoInicial,
   bloquesIniciales,
+  destino = 'campana',
 }: {
   campanaId: string;
   empresaId: string;
   nombreInicial: string;
   asuntoInicial: string;
   bloquesIniciales: BloqueEmail[];
+  destino?: 'campana' | 'plantilla';
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -105,11 +107,12 @@ export default function EditorEmail({
 
   function guardar() {
     startTransition(async () => {
+      const tabla = destino === 'plantilla' ? 'plantillas_email' : 'campanas_email';
       const { error } = await supabase
-        .from('campanas_email')
+        .from(tabla)
         .update({ nombre, asunto, bloques })
         .eq('id', campanaId);
-      setEstado(error ? error.message : 'Campaña guardada.');
+      setEstado(error ? error.message : destino === 'plantilla' ? 'Plantilla guardada.' : 'Campaña guardada.');
       if (!error) router.refresh();
     });
   }
@@ -278,9 +281,11 @@ export default function EditorEmail({
               <button type="button" className="boton boton-primario" onClick={guardar} disabled={pending}>
                 {pending ? 'Guardando…' : 'Guardar campaña'}
               </button>
-              <button type="button" className="boton" onClick={guardarPlantilla} disabled={pending}>
-                Guardar como plantilla
-              </button>
+              {destino === 'campana' ? (
+                <button type="button" className="boton" onClick={guardarPlantilla} disabled={pending}>
+                  Guardar como plantilla
+                </button>
+              ) : null}
             </div>
           </div>
         </div>
