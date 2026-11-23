@@ -1,6 +1,8 @@
 {
   "framework": "nextjs",
-  "regions": ["fra1"],
+  "regions": [
+    "fra1"
+  ],
   "crons": [
     {
       "path": "/api/jobs/resumen-diario",
@@ -9,6 +11,10 @@
     {
       "path": "/api/jobs/informe-semanal",
       "schedule": "0 6 * * 1"
+    },
+    {
+      "path": "/api/jobs/alertas-comercial",
+      "schedule": "30 7 * * *"
     }
   ]
 }

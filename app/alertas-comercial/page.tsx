@@ -28,7 +28,7 @@ export default async function AlertasComercialPage() {
         </li>
       </ul>
 
-      <AlertasLista alertas={d.alertas} />
+      <AlertasLista alertas={d.alertas} empresaId={d.empresaId} comercialId={d.comercialId} />
     </div>
   );
 }
