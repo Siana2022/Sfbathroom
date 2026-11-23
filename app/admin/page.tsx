@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import AdminUsuarios from '@/components/AdminUsuarios';
@@ -50,6 +51,12 @@ export default async function AdminPage() {
     <div>
       <p className="breadcrumb">Administración</p>
       <h1>Administración de usuarios</h1>
+      <p style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+        <Link href="/marketing/campanas" className="boton">Email marketing</Link>
+        <Link href="/marketing/plantillas" className="boton">Plantillas de email</Link>
+        <Link href="/marketing/bajas" className="boton">Bajas de correo</Link>
+        <Link href="/configuracion/plantillas-reunion" className="boton">Plantillas de reunión</Link>
+      </p>
       {!esAdmin ? (
         <div className="card">
           <h2>Acceso restringido</h2>
