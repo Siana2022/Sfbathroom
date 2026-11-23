@@ -9,8 +9,9 @@ const ROLES_PERMITIDOS_MARGEN = new Set(['admin', 'direccion', 'financiero']);
  */
 export const getUsuario = cache(async (): Promise<{ id: string; rol: string | null; comercialId: string | null; comercialIds: string[] } | null> => {
   const supabase = createClient();
-  const { data } = await supabase.auth.getUser();
-  const user = data.user;
+  // getSession lee la cookie sin llamar a Auth; la autorización real es RLS.
+  const { data } = await supabase.auth.getSession();
+  const user = data.session?.user ?? null;
   if (!user) return null;
   const { data: perfil } = await supabase
     .from('profiles')
@@ -18,11 +19,14 @@ export const getUsuario = cache(async (): Promise<{ id: string; rol: string | nu
     .eq('id', user.id)
     .maybeSingle();
   const p = perfil as { role: string | null; comercial_id: string | null } | null;
-  const { data: pcs } = await supabase
-    .from('profiles_comerciales')
-    .select('comercial_id')
-    .eq('profile_id', user.id);
-  const extra = ((pcs ?? []) as { comercial_id: string }[]).map((x) => x.comercial_id);
+  let extra: string[] = [];
+  if (p?.role === 'comercial') {
+    const { data: pcs } = await supabase
+      .from('profiles_comerciales')
+      .select('comercial_id')
+      .eq('profile_id', user.id);
+    extra = ((pcs ?? []) as { comercial_id: string }[]).map((x) => x.comercial_id);
+  }
   const comercialIds = [...new Set([...(p?.comercial_id ? [p.comercial_id] : []), ...extra])];
   return { id: user.id, rol: p?.role ?? null, comercialId: p?.comercial_id ?? null, comercialIds };
 });
