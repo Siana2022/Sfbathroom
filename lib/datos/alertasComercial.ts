@@ -43,8 +43,9 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
   const anio = hoy.getFullYear();
   const anioPrev = anio - 1;
 
+  const comercialIds = usuario.comercialIds;
   let comercialId: string | null = usuario.comercialId;
-  if (esComercial && !comercialId) {
+  if (esComercial && comercialIds.length === 0) {
     return { esComercial, empresaId: empresa.id, comercialId, alertas: [], criticas: 0, avisos: 0 };
   }
 
@@ -52,7 +53,7 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
     .from('clientes')
     .select('id, nombre, limite_credito')
     .eq('empresa_id', empresa.id)
-    .eq('comercial_id', comercialId as string);
+    .in('comercial_id', comercialIds);
   const clientes = (clientesRaw ?? []) as { id: string; nombre: string; limite_credito: number | null }[];
   const ids = clientes.map((c) => c.id);
   if (ids.length === 0) {
@@ -197,7 +198,7 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
     .from('pedidos')
     .select('id, numero_erp, cliente_id, fecha_prometida, importe')
     .eq('empresa_id', empresa.id)
-    .eq('comercial_id', comercialId as string)
+    .in('comercial_id', comercialIds)
     .eq('estado', 'pendiente');
   for (const p of (pedidosRaw ?? []) as { id: string; numero_erp: string | null; cliente_id: string | null; fecha_prometida: string | null; importe: number }[]) {
     if (p.fecha_prometida && p.fecha_prometida < hoyISO) {
@@ -232,14 +233,16 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
     });
   }
 
-  const { data: objetivoFila } = await supabase
+  const { data: objetivoFilas } = await supabase
     .from('objetivos_comercial')
     .select('importe')
     .eq('empresa_id', empresa.id)
     .eq('anio', anio)
-    .eq('comercial_id', comercialId as string)
-    .maybeSingle();
-  const objetivo = Number((objetivoFila as { importe: number } | null)?.importe ?? 0);
+    .in('comercial_id', comercialIds);
+  const objetivo = ((objetivoFilas ?? []) as { importe: number }[]).reduce(
+    (s, o) => s + Number(o.importe ?? 0),
+    0,
+  );
   if (objetivo > 0) {
     const netaTotal = [...netaAnio.values()].reduce((s, v) => s + v, 0);
     const diaDelAnio = Math.floor((hoy.getTime() - Date.parse(`${anio}-01-01`)) / DIA) + 1;

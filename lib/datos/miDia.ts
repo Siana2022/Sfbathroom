@@ -29,7 +29,15 @@ export async function getMiDia(codigoEmpresa: string, anio: number): Promise<MiD
   const { data: perfil } = await supabase.from('profiles').select('role, comercial_id').eq('id', user.id).maybeSingle();
   if (perfil?.role !== 'comercial') return null;
   const comercialId = perfil.comercial_id as string | null;
-  if (!comercialId) return null;
+  const { data: pcs } = await supabase
+    .from('profiles_comerciales')
+    .select('comercial_id')
+    .eq('profile_id', user.id);
+  const comercialIds = [...new Set([
+    ...(comercialId ? [comercialId] : []),
+    ...((pcs ?? []) as { comercial_id: string }[]).map((x) => x.comercial_id),
+  ])];
+  if (comercialIds.length === 0) return null;
 
   const { data: comercial } = await supabase.from('comerciales').select('nombre').eq('id', comercialId).maybeSingle();
 
@@ -37,7 +45,7 @@ export async function getMiDia(codigoEmpresa: string, anio: number): Promise<MiD
     .from('clientes')
     .select('id, nombre')
     .eq('empresa_id', empresa.id)
-    .eq('comercial_id', comercialId);
+    .in('comercial_id', comercialIds);
   const clientesCargo = (clientes ?? []) as { id: string; nombre: string }[];
   const ids = clientesCargo.map((c) => c.id);
 
@@ -98,7 +106,7 @@ export async function getMiDia(codigoEmpresa: string, anio: number): Promise<MiD
     .from('pedidos')
     .select('id, numero_erp, fecha_entrada, importe, cliente_id')
     .eq('empresa_id', empresa.id)
-    .eq('comercial_id', comercialId)
+    .in('comercial_id', comercialIds)
     .gte('fecha_entrada', `${anio}-01-01`)
     .eq('estado', 'pendiente')
     .order('fecha_entrada', { ascending: true })
@@ -111,14 +119,16 @@ export async function getMiDia(codigoEmpresa: string, anio: number): Promise<MiD
     cliente: nombreCliente.get(p.cliente_id ?? '') ?? '—',
   }));
 
-  const { data: objetivoFila } = await supabase
+  const { data: objetivoFilas } = await supabase
     .from('objetivos_comercial')
     .select('importe')
     .eq('empresa_id', empresa.id)
     .eq('anio', anio)
-    .eq('comercial_id', comercialId)
-    .maybeSingle();
-  const objetivo = Number((objetivoFila as { importe: number } | null)?.importe ?? 0);
+    .in('comercial_id', comercialIds);
+  const objetivo = ((objetivoFilas ?? []) as { importe: number }[]).reduce(
+    (s, o) => s + Number(o.importe ?? 0),
+    0,
+  );
 
   const { data: rankingRaw } = await supabase.rpc('mi_ranking_comercial', {
     p_codigo_empresa: codigoEmpresa,

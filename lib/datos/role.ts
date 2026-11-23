@@ -7,7 +7,7 @@ const ROLES_PERMITIDOS_MARGEN = new Set(['admin', 'direccion', 'financiero']);
  * Usuario + rol, deduplicado dentro de la misma petición (React cache).
  * Evita repetir `auth.getUser()` y la consulta a profiles en cada función de datos.
  */
-export const getUsuario = cache(async (): Promise<{ id: string; rol: string | null; comercialId: string | null } | null> => {
+export const getUsuario = cache(async (): Promise<{ id: string; rol: string | null; comercialId: string | null; comercialIds: string[] } | null> => {
   const supabase = createClient();
   const { data } = await supabase.auth.getUser();
   const user = data.user;
@@ -18,7 +18,13 @@ export const getUsuario = cache(async (): Promise<{ id: string; rol: string | nu
     .eq('id', user.id)
     .maybeSingle();
   const p = perfil as { role: string | null; comercial_id: string | null } | null;
-  return { id: user.id, rol: p?.role ?? null, comercialId: p?.comercial_id ?? null };
+  const { data: pcs } = await supabase
+    .from('profiles_comerciales')
+    .select('comercial_id')
+    .eq('profile_id', user.id);
+  const extra = ((pcs ?? []) as { comercial_id: string }[]).map((x) => x.comercial_id);
+  const comercialIds = [...new Set([...(p?.comercial_id ? [p.comercial_id] : []), ...extra])];
+  return { id: user.id, rol: p?.role ?? null, comercialId: p?.comercial_id ?? null, comercialIds };
 });
 
 export async function getRol(): Promise<string | null> {
