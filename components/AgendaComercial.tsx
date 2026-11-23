@@ -61,8 +61,11 @@ export default function AgendaComercial({ datos, clienteInicial }: { datos: Agen
 
   const puedeCrear = datos.esComercial && datos.comercialId;
   const clienteSel = datos.clientes.find((c) => c.id === clienteId);
-  const [contactos, setContactos] = useState<{ id: string; nombre: string; telefono: string | null; email: string | null; esPrincipal: boolean }[]>([]);
+  const [contactos, setContactos] = useState<{ id: string; nombre: string; cargo: string | null; telefono: string | null; email: string | null; esPrincipal: boolean }[]>([]);
   const [contactoId, setContactoId] = useState('');
+  const [refetch, setRefetch] = useState(0);
+  const [formContacto, setFormContacto] = useState<{ modo: 'editar' | 'nuevo'; nombre: string; cargo: string; telefono: string; email: string } | null>(null);
+  const [guardando, setGuardando] = useState(false);
 
   useEffect(() => {
     let cancelado = false;
@@ -73,15 +76,23 @@ export default function AgendaComercial({ datos, clienteInicial }: { datos: Agen
     }
     supabase
       .from('clientes_contactos')
-      .select('id, nombre, telefono, email, es_principal')
+      .select('id, nombre, cargo, telefono, email, es_principal')
       .eq('cliente_id', clienteId)
       .order('es_principal', { ascending: false })
       .order('nombre')
       .then(({ data }) => {
         if (cancelado) return;
-        const lista = ((data ?? []) as { id: string; nombre: string; telefono: string | null; email: string | null; es_principal: boolean }[]).map((c) => ({
+        const lista = ((data ?? []) as {
+          id: string;
+          nombre: string;
+          cargo: string | null;
+          telefono: string | null;
+          email: string | null;
+          es_principal: boolean;
+        }[]).map((c) => ({
           id: c.id,
           nombre: c.nombre,
+          cargo: c.cargo,
           telefono: c.telefono,
           email: c.email,
           esPrincipal: c.es_principal,
@@ -92,7 +103,55 @@ export default function AgendaComercial({ datos, clienteInicial }: { datos: Agen
     return () => {
       cancelado = true;
     };
-  }, [clienteId]);
+  }, [clienteId, refetch]);
+
+  function abrirEdicion() {
+    const c = contactos.find((x) => x.id === contactoId) ?? contactos[0];
+    if (!c) return;
+    setFormContacto({ modo: 'editar', nombre: c.nombre, cargo: c.cargo ?? '', telefono: c.telefono ?? '', email: c.email ?? '' });
+  }
+
+  function abrirNuevo() {
+    setFormContacto({ modo: 'nuevo', nombre: '', cargo: '', telefono: '', email: '' });
+  }
+
+  async function guardarFormContacto() {
+    if (!formContacto || !formContacto.nombre.trim() || !clienteId) return;
+    setGuardando(true);
+    const cuerpo = {
+      nombre: formContacto.nombre.trim(),
+      cargo: formContacto.cargo.trim() || null,
+      telefono: formContacto.telefono.trim() || null,
+      email: formContacto.email.trim() || null,
+    };
+    let error = null as { message: string } | null;
+    if (formContacto.modo === 'editar') {
+      const { error: e } = await supabase
+        .from('clientes_contactos')
+        .update(cuerpo)
+        .eq('id', contactoId);
+      error = e;
+    } else {
+      const { data, error: e } = await supabase
+        .from('clientes_contactos')
+        .insert({
+          empresa_id: datos.empresaId,
+          cliente_id: clienteId,
+          ...cuerpo,
+          es_principal: contactos.length === 0,
+        })
+        .select('id')
+        .single();
+      error = e;
+      if (data) setContactoId((data as { id: string }).id);
+    }
+    setGuardando(false);
+    if (error) setError(error.message);
+    else {
+      setFormContacto(null);
+      setRefetch((n) => n + 1);
+    }
+  }
 
   const proximas = datos.eventos
     .filter((e) => !e.completada && e.fecha >= hoy)
@@ -227,23 +286,61 @@ export default function AgendaComercial({ datos, clienteInicial }: { datos: Agen
                           {c.email ? <> · <a href={`mailto:${c.email}`} className="enlace">{c.email}</a></> : null}
                         </div>
                       </div>
-                      {contactos.length > 1 ? (
-                        <select
-                          value={contactoId}
-                          onChange={(e) => setContactoId(e.target.value)}
-                          style={{ padding: '6px 8px', border: '1px solid var(--border-2)', borderRadius: 8, background: '#fff', maxWidth: 220 }}
-                        >
-                          {contactos.map((x) => (
-                            <option key={x.id} value={x.id}>
-                              {x.nombre}
-                            </option>
-                          ))}
-                        </select>
-                      ) : null}
+                      <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
+                        {contactos.length > 1 ? (
+                          <select
+                            value={contactoId}
+                            onChange={(e) => setContactoId(e.target.value)}
+                            style={{ padding: '6px 8px', border: '1px solid var(--border-2)', borderRadius: 8, background: '#fff', maxWidth: 180 }}
+                          >
+                            {contactos.map((x) => (
+                              <option key={x.id} value={x.id}>
+                                {x.nombre}
+                              </option>
+                            ))}
+                          </select>
+                        ) : null}
+                        <button type="button" className="boton" onClick={abrirEdicion}>Editar</button>
+                        <button type="button" className="boton" onClick={abrirNuevo}>Nuevo</button>
+                      </div>
                     </div>
                   );
                 })()
               )}
+
+              {formContacto ? (
+                <div style={{ marginTop: 10, padding: 12, border: '1px dashed var(--border-2)', borderRadius: 10 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
+                    {formContacto.modo === 'editar' ? 'Editar contacto' : 'Nuevo contacto'}
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <label className="campo-filtro" style={{ minWidth: 180 }}>
+                      Nombre *
+                      <input type="text" value={formContacto.nombre} onChange={(e) => setFormContacto({ ...formContacto, nombre: e.target.value })} />
+                    </label>
+                    <label className="campo-filtro">
+                      Cargo
+                      <input type="text" value={formContacto.cargo} onChange={(e) => setFormContacto({ ...formContacto, cargo: e.target.value })} />
+                    </label>
+                    <label className="campo-filtro">
+                      Teléfono
+                      <input type="tel" value={formContacto.telefono} onChange={(e) => setFormContacto({ ...formContacto, telefono: e.target.value })} />
+                    </label>
+                    <label className="campo-filtro" style={{ minWidth: 200 }}>
+                      Email
+                      <input type="email" value={formContacto.email} onChange={(e) => setFormContacto({ ...formContacto, email: e.target.value })} />
+                    </label>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                    <button type="button" className="boton" onClick={guardarFormContacto} disabled={guardando || !formContacto.nombre.trim()}>
+                      {guardando ? 'Guardando…' : 'Guardar'}
+                    </button>
+                    <button type="button" className="boton" onClick={() => setFormContacto(null)} disabled={guardando}>
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : null}
           <textarea
