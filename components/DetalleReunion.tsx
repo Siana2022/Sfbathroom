@@ -26,6 +26,9 @@ export default function DetalleReunion({
   const [pending, startTransition] = useTransition();
   const [nota, setNota] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [fechaNueva, setFechaNueva] = useState(evento.fecha);
+  const [horaNueva, setHoraNueva] = useState(evento.hora ? evento.hora.slice(0, 5) : '');
+  const [reagendando, setReagendando] = useState(false);
 
   async function añadirNota() {
     if (!nota.trim()) return;
@@ -48,9 +51,42 @@ export default function DetalleReunion({
   async function alternar() {
     startTransition(async () => {
       const { error: e } = await supabase.from('agenda').update({ completada: !evento.completada }).eq('id', evento.id);
-      if (e) setError(e.message);
-      else router.refresh();
+      if (e) {
+        setError(e.message);
+        return;
+      }
+      await supabase.from('agenda_notas').insert({
+        agenda_id: evento.id,
+        empresa_id: empresaId,
+        comercial_id: comercialId,
+        texto: evento.completada ? 'Reunión reabierta.' : 'Reunión marcada como hecha.',
+      });
+      router.refresh();
     });
+  }
+
+  async function reagendar() {
+    if (!fechaNueva) return;
+    setReagendando(true);
+    const antes = `${evento.fecha}${evento.hora ? ` ${evento.hora.slice(0, 5)}` : ''}`;
+    const despues = `${fechaNueva}${horaNueva ? ` ${horaNueva}` : ''}`;
+    const { error: e } = await supabase
+      .from('agenda')
+      .update({ fecha: fechaNueva, hora: horaNueva || null })
+      .eq('id', evento.id);
+    if (e) {
+      setError(e.message);
+      setReagendando(false);
+      return;
+    }
+    await supabase.from('agenda_notas').insert({
+      agenda_id: evento.id,
+      empresa_id: empresaId,
+      comercial_id: comercialId,
+      texto: `Reagendada: ${antes} → ${despues}`,
+    });
+    setReagendando(false);
+    router.refresh();
   }
 
   async function borrar() {
@@ -92,10 +128,27 @@ export default function DetalleReunion({
             <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{evento.notas}</p>
           </div>
         ) : null}
+
+        <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border-2)' }}>
+          <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 6 }}>Reagendar</div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <label className="campo-filtro">
+              Nueva fecha
+              <input type="date" value={fechaNueva} onChange={(e) => setFechaNueva(e.target.value)} />
+            </label>
+            <label className="campo-filtro">
+              Nueva hora
+              <input type="time" value={horaNueva} onChange={(e) => setHoraNueva(e.target.value)} />
+            </label>
+            <button type="button" className="boton" onClick={reagendar} disabled={pending || reagendando || !fechaNueva}>
+              {reagendando ? 'Guardando…' : 'Reagendar'}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="card">
-        <h2>Notas de seguimiento</h2>
+        <h2>Seguimiento completo</h2>
         {evento.seguimiento.length === 0 ? (
           <p style={{ color: 'var(--muted)' }}>Sin notas todavía.</p>
         ) : (
