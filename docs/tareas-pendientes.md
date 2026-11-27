@@ -242,3 +242,29 @@ bloque están; quedan los análisis avanzados, filtros y vistas. Marcar aquí el
 - Estado: lote vacío en A3ERP a día de hoy. No implementar hasta que el cliente empiece a
   rellenarlo. Antes hay que validar con `diag-lotes.mjs` que compras (`LINEFACC`),
   ventas (`LINEFACT`) y stock (`STOCKALM`) guardan el mismo lote.
+
+## 9. Semáforo de fuga de clientes — revisar configuración (anotado 27 nov 2026)
+
+Pregunta abierta del cliente: **«el semáforo de fuga, ¿cómo está configurado?»**, con la idea
+de ajustarlo. Hoy vive en `lib/datos/clientes.ts` (`calcularClientes`) y funciona así:
+
+- Mide **días desde la última factura** (no desde el último pedido), sobre las facturas de los
+  últimos 2 años.
+- `frecuencia` = media de días entre facturas: `(última − primera) / (nº facturas − 1)`.
+- Niveles: `diasSin ≤ frecuencia` → verde; hasta `2,5 × frecuencia` → ámbar; por encima → rojo.
+  Con **una sola factura** no hay frecuencia: ámbar si lleva más de **90 días**.
+- Solo clientes `estado = 'activo'`, solo los que no están en verde, ordenados por días sin
+  facturar y **máximo 15**.
+
+Puntos flojos detectados:
+
+1. **Facturas, no pedidos**: un cliente que pide pero se factura a mes vencido puede salir en
+   rojo sin estar en riesgo (y al revés, pedidos sin facturar no cuentan).
+2. **Frecuencia = media simple**: no contempla estacionalidad (ferias, campaña de baño).
+3. **Umbrales fijos en código** (90 días y 2,5×): no pasan por la tabla de umbrales
+   configurables que sí usan las alertas.
+4. **Ventana de 2 años**: con poco histórico la frecuencia no es fiable.
+5. En la vista consolidada de clientes (pestaña «Todas») no se muestra; el semáforo es por empresa.
+
+Opciones para cuando se retome: llevar los umbrales a configuración (como `alertas_config`),
+medir por pedidos en lugar de facturas, o introducir estacionalidad en la frecuencia.
