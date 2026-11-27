@@ -42,6 +42,7 @@ type Fila = {
   importe: number | null;
   estado: string | null;
   situacion: string | null;
+  situacion_detalle: string | null;
   cliente_nombre: string | null;
   clientes: { nombre: string }[] | null;
   pedido_lineas: { descripcion: string | null; codigo_articulo: string | null; cantidad: number | null }[] | null;
@@ -64,16 +65,21 @@ async function cargarPanel(codigoEmpresa: string, anio: number): Promise<Pedidos
   const { data } = await supabase
     .from('pedidos')
     .select(
-      'id, numero_erp, serie, fecha, fecha_entrada, fecha_prometida, importe, estado, situacion, cliente_nombre, clientes(nombre), pedido_lineas(descripcion, codigo_articulo, cantidad)',
+      'id, numero_erp, serie, fecha, fecha_entrada, fecha_prometida, importe, estado, situacion, situacion_detalle, cliente_nombre, clientes(nombre), pedido_lineas(descripcion, codigo_articulo, cantidad)',
     )
     .eq('empresa_id', empresa.id)
     .order('fecha_entrada', { ascending: true });
 
-  // La ingesta marca los pedidos abiertos como `captado`, no como `pendiente`:
-  // se consideran pendientes todos los que no estén servidos ni anulados.
-  const filas = ((data ?? []) as Fila[]).filter(
-    (f) => f.estado !== 'servido' && f.estado !== 'anulado' && f.situacion !== 'S' && f.situacion !== 'A',
-  );
+  // Abierto = SITUACIONDETALLE empieza por PENDIENTE (o estado ya normalizado).
+  // Se admite también el estado antiguo `captado` de las filas sin recargar.
+  const filas = ((data ?? []) as Fila[]).filter((f) => {
+    const detalle = (f.situacion_detalle ?? '').toUpperCase();
+    if (detalle) {
+      if (detalle.startsWith('PENDIENTE')) return true;
+      if (detalle.startsWith('SERVIDO') || detalle.startsWith('ANULADO')) return false;
+    }
+    return f.estado === 'pendiente' || f.estado === 'captado';
+  });
 
   // Última observación por pedido (la tabla es pequeña: se trae entera y se filtra).
   const { data: obs } = await supabase

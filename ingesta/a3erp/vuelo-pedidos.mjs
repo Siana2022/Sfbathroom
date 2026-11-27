@@ -54,11 +54,20 @@ const lote = 500;
 
 const norm = (v) => String(v ?? '').trim();
 
-function estadoDe(situacion) {
+/**
+ * Estado del pedido a partir de SITUACIONDETALLE, que es el campo que manda.
+ * `SITUACION` solo trae S (servido) y A (abierto), y A NO es anulado.
+ */
+function estadoDe(detalle, situacion) {
+  const d = norm(detalle).toUpperCase();
+  if (d.startsWith('ANULADO')) return 'anulado';
+  if (d.startsWith('PENDIENTE')) return 'pendiente';
+  if (d.startsWith('SERVIDO')) return 'servido';
+
   const s = norm(situacion).toUpperCase();
-  if (s === 'A') return 'anulado';
   if (s === 'S') return 'servido';
-  return 'captado';
+  if (s === 'A') return 'pendiente';
+  return 'pendiente';
 }
 
 async function getSupabase(ruta) {
@@ -117,6 +126,7 @@ async function main() {
                           LTRIM(RTRIM(CODCLI)) AS CODCLI,
                           NOMCLI,
                           SITUACION,
+                          SITUACIONDETALLE,
                           BASEMONEDA,
                           TOTMONEDA
                    FROM [${e.base}].dbo.CABEPEDV
@@ -134,8 +144,9 @@ async function main() {
         cliente_codigo: norm(f.CODCLI) || null,
         cliente_nombre: norm(f.NOMCLI) || null,
         cliente_id: clientePorCodigo.get(norm(f.CODCLI)) ?? null,
-        estado: estadoDe(f.SITUACION),
+        estado: estadoDe(f.SITUACIONDETALLE, f.SITUACION),
         situacion: norm(f.SITUACION) || null,
+        situacion_detalle: norm(f.SITUACIONDETALLE) || null,
         base_imponible: f.BASEMONEDA === null ? null : Number(f.BASEMONEDA),
         total: f.TOTMONEDA === null ? null : Number(f.TOTMONEDA),
         empresa_id: empresaId,
