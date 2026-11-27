@@ -13,7 +13,7 @@
  * Uso: node --env-file=.env ingesta/zoho/simular-importacion.mjs
  */
 import { writeFileSync } from 'node:fs';
-import { crearCruce, idDe } from './lib/cruce.mjs';
+import { crearCruce, idDe, apiNameDeModulo } from './lib/cruce.mjs';
 
 const ZOHO_CLIENT_ID = process.env.ZOHO_CLIENT_ID ?? '';
 const ZOHO_CLIENT_SECRET = process.env.ZOHO_CLIENT_SECRET ?? '';
@@ -91,6 +91,7 @@ async function main() {
   const cruce = crearCruce({ clientes, contactos });
   const cuentaPorId = new Map(cuentas.map((c) => [c.id, c.Account_Name]));
   const zContactoPorId = new Map(zContacts.map((c) => [c.id, c]));
+  const llamadaPorId = new Map(llamadas.map((l) => [l.id, l]));
 
   const informe = {
     generado: new Date().toISOString(),
@@ -103,7 +104,7 @@ async function main() {
       notas: notas.length,
     },
     llamadas: { casan: 0, sueltas: 0, porVia: {}, ejemplosSueltos: [] },
-    notas: { casan: 0, sueltas: 0, porVia: {}, porModuloPadre: { Accounts: 0, Contacts: 0, sinModulo: 0, sinPadre: 0 }, ejemplosSueltos: [] },
+    notas: { casan: 0, sueltas: 0, porVia: {}, porModuloPadre: { Accounts: 0, Contacts: 0, Calls: 0, Events: 0, otros: 0, sinPadre: 0 }, ejemplosSueltos: [] },
   };
 
   for (const l of llamadas) {
@@ -126,13 +127,15 @@ async function main() {
 
   for (const n of notas) {
     const parentId = idDe(n.Parent_Id);
-    const modulo = n.$se_module ?? (n.Parent_Id && typeof n.Parent_Id === 'object' ? n.Parent_Id.module : null);
+    const modulo = apiNameDeModulo(n.$se_module) ?? apiNameDeModulo(n.Parent_Id?.module);
     if (!parentId) informe.notas.porModuloPadre.sinPadre += 1;
     else if (modulo === 'Accounts') informe.notas.porModuloPadre.Accounts += 1;
     else if (modulo === 'Contacts') informe.notas.porModuloPadre.Contacts += 1;
-    else informe.notas.porModuloPadre.sinModulo += 1;
+    else if (modulo === 'Calls') informe.notas.porModuloPadre.Calls += 1;
+    else if (modulo === 'Events') informe.notas.porModuloPadre.Events += 1;
+    else informe.notas.porModuloPadre.otros += 1;
 
-    const { cliente, via } = cruce.resolverNota(n, cuentaPorId, zContactoPorId);
+    const { cliente, via } = cruce.resolverNota(n, cuentaPorId, zContactoPorId, llamadaPorId);
     if (cliente) {
       informe.notas.casan += 1;
       informe.notas.porVia[via] = (informe.notas.porVia[via] ?? 0) + 1;
