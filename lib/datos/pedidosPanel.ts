@@ -40,6 +40,8 @@ type Fila = {
   fecha_entrada: string | null;
   fecha_prometida: string | null;
   importe: number | null;
+  estado: string | null;
+  situacion: string | null;
   cliente_nombre: string | null;
   clientes: { nombre: string }[] | null;
   pedido_lineas: { descripcion: string | null; codigo_articulo: string | null; cantidad: number | null }[] | null;
@@ -62,13 +64,16 @@ async function cargarPanel(codigoEmpresa: string, anio: number): Promise<Pedidos
   const { data } = await supabase
     .from('pedidos')
     .select(
-      'id, numero_erp, serie, fecha, fecha_entrada, fecha_prometida, importe, cliente_nombre, clientes(nombre), pedido_lineas(descripcion, codigo_articulo, cantidad)',
+      'id, numero_erp, serie, fecha, fecha_entrada, fecha_prometida, importe, estado, situacion, cliente_nombre, clientes(nombre), pedido_lineas(descripcion, codigo_articulo, cantidad)',
     )
     .eq('empresa_id', empresa.id)
-    .eq('estado', 'pendiente')
     .order('fecha_entrada', { ascending: true });
 
-  const filas = (data ?? []) as Fila[];
+  // La ingesta marca los pedidos abiertos como `captado`, no como `pendiente`:
+  // se consideran pendientes todos los que no estén servidos ni anulados.
+  const filas = ((data ?? []) as Fila[]).filter(
+    (f) => f.estado !== 'servido' && f.estado !== 'anulado' && f.situacion !== 'S' && f.situacion !== 'A',
+  );
 
   // Última observación por pedido (la tabla es pequeña: se trae entera y se filtra).
   const { data: obs } = await supabase
