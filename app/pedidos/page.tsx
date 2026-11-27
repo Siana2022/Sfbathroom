@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import { getPedidos } from '@/lib/datos/pedidos';
+import { getPedidos, getPedidosFusionados } from '@/lib/datos/pedidos';
 import { parseFiltros, getOpcionesFiltros, type SearchParams } from '@/lib/datos/filtros';
 import { decimal, eur, fecha, numero } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
@@ -7,15 +7,25 @@ import DescargarExcel from '@/components/DescargarExcel';
 import Filtros from '@/components/Filtros';
 import Aviso from '@/components/Aviso';
 import { ANIO_ACTUAL } from '@/lib/ejercicio';
+import { getUsuario } from '@/lib/datos/role';
+import { EMPRESAS } from '@/lib/empresas';
+import ChipsEmpresa from '@/components/ChipsEmpresa';
 
 
 const ANIO = ANIO_ACTUAL;
 
 export default async function PedidosPage({ searchParams }: { searchParams: SearchParams }) {
-  const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
+  const empresaCookie = cookies().get('sfb_empresa')?.value ?? 'SF';
   const filtros = parseFiltros(searchParams);
-  const opciones = await getOpcionesFiltros(empresa, { fuente: 'pedidos', anio: ANIO });
-  const d = await getPedidos(empresa, ANIO, filtros);
+  const usuario = await getUsuario();
+  const esComercial = usuario?.rol === 'comercial';
+  const empresaParam = EMPRESAS.find((e) => e.codigo === searchParams?.empresa)?.codigo ?? null;
+  // El comercial ve por defecto la cartera de las tres empresas; las pestañas acotan.
+  const fusionado = esComercial && !empresaParam;
+  const empresa = empresaParam ?? empresaCookie;
+
+  const opciones = fusionado ? null : await getOpcionesFiltros(empresa, { fuente: 'pedidos', anio: ANIO });
+  const d = fusionado ? await getPedidosFusionados(ANIO, filtros) : await getPedidos(empresa, ANIO, filtros);
 
   return (
     <div>
@@ -25,7 +35,9 @@ export default async function PedidosPage({ searchParams }: { searchParams: Sear
         Pedidos de {d.empresa.nombre}, cartera pendiente de servir y entregas fuera de plazo.
       </p>
 
-      <Filtros opciones={opciones} campos={['cliente', 'comercial', 'desde', 'hasta']} />
+      {esComercial ? <ChipsEmpresa actual={empresaParam} searchParams={searchParams} ruta="/pedidos" /> : null}
+
+      {opciones ? <Filtros opciones={opciones} campos={['cliente', 'comercial', 'desde', 'hasta']} /> : null}
 
       {d.sinEnlaceFacturas && (
         <Aviso tipo="info">
@@ -67,8 +79,12 @@ export default async function PedidosPage({ searchParams }: { searchParams: Sear
           <h2>Pedidos fuera de plazo de entrega</h2>
           <DescargarExcel
             nombre={`pedidos-fuera-plazo-${d.anio}`}
-            columnas={['Cliente', 'Pedido', 'Entrega prevista', 'Días de retraso', 'Importe']}
-            registros={d.fueraPlazo.map((f) => [f.cliente, f.numero, f.fechaPrevista, f.diasRetraso, f.importe])}
+            columnas={fusionado ? ['Empresa', 'Cliente', 'Pedido', 'Entrega prevista', 'Días de retraso', 'Importe'] : ['Cliente', 'Pedido', 'Entrega prevista', 'Días de retraso', 'Importe']}
+            registros={d.fueraPlazo.map((f) =>
+              fusionado
+                ? [f.empresa ?? '', f.cliente, f.numero, f.fechaPrevista, f.diasRetraso, f.importe]
+                : [f.cliente, f.numero, f.fechaPrevista, f.diasRetraso, f.importe],
+            )}
           />
         </div>
         <p className="nota" style={{ color: 'var(--muted)', marginTop: 0 }}>
@@ -82,6 +98,7 @@ export default async function PedidosPage({ searchParams }: { searchParams: Sear
           <table className="tabla">
             <thead>
               <tr>
+                {fusionado ? <th>Empresa</th> : null}
                 <th>Cliente</th>
                 <th>Pedido</th>
                 <th>Entrega prevista</th>
@@ -92,6 +109,7 @@ export default async function PedidosPage({ searchParams }: { searchParams: Sear
             <tbody>
               {d.fueraPlazo.map((f) => (
                 <tr key={f.id}>
+                  {fusionado ? <td><span className="badge">{f.empresa}</span></td> : null}
                   <td>{f.cliente}</td>
                   <td>{f.numero}</td>
                   <td>{fecha(f.fechaPrevista)}</td>
@@ -116,8 +134,9 @@ export default async function PedidosPage({ searchParams }: { searchParams: Sear
           <h2>Cartera pendiente por cliente</h2>
           <DescargarExcel
             nombre={`pedidos-cartera-por-cliente-${d.anio}`}
-            columnas={['Cliente', 'Pedidos', 'Pendiente', 'Próxima entrega', 'Días']}
+            columnas={fusionado ? ['Empresa', 'Cliente', 'Pedidos', 'Pendiente', 'Próxima entrega', 'Días'] : ['Cliente', 'Pedidos', 'Pendiente', 'Próxima entrega', 'Días']}
             registros={d.carteraCliente.map((c) => [
+              ...(fusionado ? [c.empresa ?? ''] : []),
               c.nombre,
               c.pedidos,
               c.pendiente,
@@ -132,6 +151,7 @@ export default async function PedidosPage({ searchParams }: { searchParams: Sear
           <table className="tabla">
             <thead>
               <tr>
+                {fusionado ? <th>Empresa</th> : null}
                 <th>Cliente</th>
                 <th className="td-num">Pedidos</th>
                 <th className="td-num">Pendiente</th>
@@ -141,7 +161,8 @@ export default async function PedidosPage({ searchParams }: { searchParams: Sear
             </thead>
             <tbody>
               {d.carteraCliente.map((c) => (
-                <tr key={c.nombre}>
+                <tr key={`${c.empresa ?? ''}-${c.nombre}`}>
+                  {fusionado ? <td><span className="badge">{c.empresa}</span></td> : null}
                   <td>{c.nombre}</td>
                   <td className="td-num">{numero(c.pedidos)}</td>
                   <td className="td-num">{eur(c.pendiente)}</td>

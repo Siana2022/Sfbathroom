@@ -66,6 +66,8 @@ export type PedidoDetalle = {
 };
 
 export type PedidoFueraPlazo = {
+  /** Solo en la vista fusionada. */
+  empresa?: string;
   id: string;
   numero: string;
   cliente: string;
@@ -75,6 +77,8 @@ export type PedidoFueraPlazo = {
 };
 
 export type CarteraCliente = {
+  /** Solo en la vista fusionada. */
+  empresa?: string;
   nombre: string;
   pedidos: number;
   pendiente: number;
@@ -375,4 +379,79 @@ export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: 
   const usuario = await getUsuario();
   const clave = `getPedidos:${usuario?.id ?? 'anon'}:${codigoEmpresa}:${anio}:${JSON.stringify(filtros ?? {})}`;
   return memo(clave, () => calcular_getPedidos(codigoEmpresa, anio, filtros), 5 * 60 * 1000);
+}
+
+/** Fila de pedido con la empresa de la que viene (vista fusionada). */
+
+/**
+ * Pedidos de las tres empresas en un solo resumen, para el comercial que no cambia
+ * de sociedad. Los importes y conteos se suman; las medias se ponderan por su base.
+ */
+export async function getPedidosFusionados(anio: number, filtros?: Filtros): Promise<PedidosResumen> {
+  const { EMPRESAS } = await import('@/lib/empresas');
+  const partes = await Promise.all(
+    EMPRESAS.map(async (e) => ({ codigo: e.codigo, datos: await getPedidos(e.codigo, anio, filtros) })),
+  );
+  const suma = (f: (d: PedidosResumen) => number) => partes.reduce((s, p) => s + f(p.datos), 0);
+
+  const captados = suma((d) => d.captados);
+  const importeCaptado = suma((d) => d.importeCaptado);
+  const pendientes = suma((d) => d.pendientes);
+  const programados = suma((d) => d.programados);
+
+  // Medias ponderadas por el peso real de cada empresa.
+  const ponderar = (
+    valorDe: (d: PedidosResumen) => number | null,
+    pesoDe: (d: PedidosResumen) => number,
+  ): number | null => {
+    let peso = 0;
+    let acumulado = 0;
+    for (const p of partes) {
+      const v = valorDe(p.datos);
+      const w = pesoDe(p.datos);
+      if (v === null || w <= 0) continue;
+      acumulado += v * w;
+      peso += w;
+    }
+    return peso > 0 ? acumulado / peso : null;
+  };
+
+  const estados = ['pendiente', 'servido', 'anulado'] as const;
+  const porEstado: EstadoPedidos[] = estados.map((estado) => {
+    const filas = partes
+      .map((p) => p.datos.porEstado.find((x) => x.estado === estado))
+      .filter((x): x is EstadoPedidos => Boolean(x));
+    return {
+      estado,
+      label: filas[0]?.label ?? estado,
+      pedidos: filas.reduce((s, f) => s + f.pedidos, 0),
+      importe: filas.reduce((s, f) => s + f.importe, 0),
+      total: filas.reduce((s, f) => s + f.total, 0),
+      detalle: filas.flatMap((f) => f.detalle),
+    } as EstadoPedidos;
+  });
+
+  return {
+    empresa: { codigo: 'TODAS', nombre: 'las tres empresas' },
+    anio,
+    captados,
+    importeCaptado,
+    ticketMedio: captados > 0 ? importeCaptado / captados : 0,
+    pendientes,
+    importePendiente: suma((d) => d.importePendiente),
+    servidos: suma((d) => d.servidos),
+    importeServido: suma((d) => d.importeServido),
+    anulados: suma((d) => d.anulados),
+    importeAnulado: suma((d) => d.importeAnulado),
+    antiguedadMediaCartera: ponderar((d) => d.antiguedadMediaCartera, (d) => d.pendientes) ?? 0,
+    plazoMedioEntrega: ponderar((d) => d.plazoMedioEntrega, (d) => Math.max(0, d.captados - d.programados)),
+    programados,
+    importeProgramado: suma((d) => d.importeProgramado),
+    cumplimientoFecha: ponderar((d) => d.cumplimientoFecha, (d) => d.programados),
+    fueraPlazo: partes.flatMap((p) => p.datos.fueraPlazo.map((f) => ({ ...f, empresa: p.codigo }))),
+    fueraPlazoTotal: suma((d) => d.fueraPlazoTotal),
+    carteraCliente: partes.flatMap((p) => p.datos.carteraCliente.map((c) => ({ ...c, empresa: p.codigo }))),
+    porEstado,
+    sinEnlaceFacturas: partes.some((p) => p.datos.sinEnlaceFacturas),
+  };
 }
