@@ -13,7 +13,7 @@ export type EventoSeguimiento =
       titulo: string | null;
       detalle: string | null;
       resultado: string | null;
-      duracionSeg: number | null;
+      duracionMin: number | null;
       origen: string | null;
     };
 
@@ -54,7 +54,7 @@ export async function getSeguimientoCliente(clienteId: string): Promise<{
     // Llamadas, notas y correos importados (Zoho y futuras fuentes).
     supabase
       .from('interacciones')
-      .select('id, tipo, fecha, titulo, detalle, resultado, duracion_seg, origen')
+      .select('id, tipo, fecha, asunto, contenido, resultado, duracion_min, origen')
       .eq('cliente_id', clienteId)
       .order('fecha', { ascending: false })
       .limit(60),
@@ -83,10 +83,10 @@ export async function getSeguimientoCliente(clienteId: string): Promise<{
     id: string;
     tipo: string;
     fecha: string;
-    titulo: string | null;
-    detalle: string | null;
+    asunto: string | null;
+    contenido: string | null;
     resultado: string | null;
-    duracion_seg: number | null;
+    duracion_min: number | null;
     origen: string | null;
   }[];
 
@@ -97,10 +97,10 @@ export async function getSeguimientoCliente(clienteId: string): Promise<{
       id: i.id,
       fecha: i.fecha,
       subtipo: i.tipo,
-      titulo: i.titulo,
-      detalle: i.detalle,
+      titulo: i.asunto,
+      detalle: i.contenido,
       resultado: i.resultado,
-      duracionSeg: i.duracion_seg,
+      duracionMin: i.duracion_min,
       origen: i.origen,
     })),
     ...reuniones.map((r) => ({

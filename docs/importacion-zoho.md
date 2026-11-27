@@ -50,22 +50,13 @@ create table mapeo_externo (
   primary key (origen, entidad, id_externo)
 );
 
--- Actividades no reunión: llamadas, notas, correos
-create table interacciones (
-  id uuid primary key default gen_random_uuid(),
-  empresa_id uuid not null references empresas(id),
-  cliente_id uuid references clientes(id),
-  comercial_id uuid references comerciales(id),
-  tipo text not null check (tipo in ('llamada','nota','correo','tarea')),
-  fecha timestamptz not null,
-  titulo text,
-  detalle text,
-  resultado text,
-  duracion_seg integer,
-  origen text,
-  id_externo text,
-  unique (origen, id_externo)
-);
+-- Actividades no reunión: llamadas, notas, correos.
+-- OJO: la tabla ya existía en producción desde la migración 0037 (rama
+-- `feat/acceso-comercial`) con otro esquema. La 0095 la adapta en vez de crearla:
+--   asunto        ← título
+--   contenido     ← detalle (Zoho Description)
+--   duracion_min  ← duración (Zoho ya la da en minutos)
+-- y añade pendiente/origen/id_externo. Ver `supabase/migrations/0095_interacciones_zoho.sql`.
 
 -- Oportunidades (Deals)
 create table oportunidades (
