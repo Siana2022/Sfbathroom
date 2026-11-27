@@ -24,6 +24,35 @@ function ymd(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+const COLOR_EMPRESA: Record<string, string> = {
+  SF: 'var(--accent)',
+  FUX: 'var(--verde)',
+  DOT: 'var(--ambar)',
+};
+
+/** Etiqueta pequeña con la empresa de la reunión (agenda fusionada). */
+function EtiquetaEmpresa({ codigo }: { codigo: string }) {
+  const color = COLOR_EMPRESA[codigo] ?? 'var(--muted)';
+  return (
+    <span
+      title={`Empresa ${codigo}`}
+      style={{
+        fontSize: 10,
+        fontWeight: 700,
+        lineHeight: 1.4,
+        color,
+        border: `1px solid ${color}`,
+        borderRadius: 4,
+        padding: '0 4px',
+        marginRight: 6,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {codigo}
+    </span>
+  );
+}
+
 export default function AgendaComercial({ datos, clienteInicial }: { datos: AgendaData; clienteInicial?: string | null }) {
   const supabase = createClient();
   const router = useRouter();
@@ -39,17 +68,24 @@ export default function AgendaComercial({ datos, clienteInicial }: { datos: Agen
   const [notas, setNotas] = useState('');
 
   const [mes, setMes] = useState(() => hoy.slice(0, 7));
+  const [filtroEmpresa, setFiltroEmpresa] = useState('TODAS');
   const [arrastrandoId, setArrastrandoId] = useState<string | null>(null);
+
+  // Agenda fusionada: se puede acotar a una empresa con los chips.
+  const eventos = useMemo(
+    () => (filtroEmpresa === 'TODAS' ? datos.eventos : datos.eventos.filter((e) => e.empresaCodigo === filtroEmpresa)),
+    [datos.eventos, filtroEmpresa],
+  );
 
   const porFecha = useMemo(() => {
     const m = new Map<string, EventoAgenda[]>();
-    for (const e of datos.eventos) {
+    for (const e of eventos) {
       const arr = m.get(e.fecha) ?? [];
       arr.push(e);
       m.set(e.fecha, arr);
     }
     return m;
-  }, [datos.eventos]);
+  }, [eventos]);
 
   const celdas = useMemo(() => {
     const [anio, mesN] = mes.split('-').map(Number);
@@ -108,7 +144,7 @@ export default function AgendaComercial({ datos, clienteInicial }: { datos: Agen
   }, [clienteId, refetch]);
 
   function moverA(id: string, nuevaFecha: string) {
-    const ev = datos.eventos.find((e) => e.id === id);
+    const ev = eventos.find((e) => e.id === id);
     if (!ev || ev.fecha === nuevaFecha) return;
     startTransition(async () => {
       const { error } = await supabase.from('agenda').update({ fecha: nuevaFecha }).eq('id', id);
@@ -126,7 +162,7 @@ export default function AgendaComercial({ datos, clienteInicial }: { datos: Agen
       });
       await supabase.from('agenda_notas').insert({
         agenda_id: id,
-        empresa_id: datos.empresaId,
+        empresa_id: ev.empresaId,
         comercial_id: datos.comercialId,
         texto: `Reagendada: ${ev.fecha} → ${nuevaFecha}`,
         tipo: 'sistema',
@@ -165,7 +201,7 @@ export default function AgendaComercial({ datos, clienteInicial }: { datos: Agen
       const { data, error: e } = await supabase
         .from('clientes_contactos')
         .insert({
-          empresa_id: datos.empresaId,
+          empresa_id: clienteSel?.empresaId ?? datos.empresaId,
           cliente_id: clienteId,
           ...cuerpo,
           es_principal: contactos.length === 0,
@@ -183,7 +219,7 @@ export default function AgendaComercial({ datos, clienteInicial }: { datos: Agen
     }
   }
 
-  const proximas = datos.eventos
+  const proximas = eventos
     .filter((e) => !e.completada && e.fecha >= hoy)
     .sort((a, b) => (a.fecha + (a.hora ?? '')).localeCompare(b.fecha + (b.hora ?? '')))
     .slice(0, 8);
@@ -194,7 +230,7 @@ export default function AgendaComercial({ datos, clienteInicial }: { datos: Agen
     startTransition(async () => {
       const contacto = contactos.find((c) => c.id === contactoId) ?? null;
       const { error: e } = await supabase.from('agenda').insert({
-        empresa_id: datos.empresaId,
+        empresa_id: clienteSel?.empresaId ?? datos.empresaId,
         comercial_id: datos.comercialId,
         cliente_id: clienteId,
         contacto_id: contacto?.id ?? null,
@@ -225,6 +261,22 @@ export default function AgendaComercial({ datos, clienteInicial }: { datos: Agen
 
   return (
     <div>
+      {datos.empresas.length > 1 ? (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+          <span style={{ fontSize: 12, color: 'var(--muted)' }}>Empresa:</span>
+          {['TODAS', ...datos.empresas.map((e) => e.codigo)].map((codigo) => (
+            <button
+              key={codigo}
+              type="button"
+              className={`boton${filtroEmpresa === codigo ? ' boton-primario' : ''}`}
+              onClick={() => setFiltroEmpresa(codigo)}
+            >
+              {codigo === 'TODAS' ? 'Todas' : codigo}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {puedeCrear ? (
         <div className="card" id="nueva">
           <h2>Nueva reunión</h2>
@@ -459,6 +511,7 @@ export default function AgendaComercial({ datos, clienteInicial }: { datos: Agen
                       }}
                       title={`${e.asunto} · ${e.clienteNombre ?? ''}`}
                     >
+                      <EtiquetaEmpresa codigo={e.empresaCodigo} />
                       {e.hora ? `${e.hora.slice(0, 5)} ` : ''}{e.asunto}
                     </Link>
                   ))}
@@ -476,7 +529,7 @@ export default function AgendaComercial({ datos, clienteInicial }: { datos: Agen
         const domingo = new Date(lunes.getTime() + 6 * 86400000);
         const l = ymd(lunes);
         const r = ymd(domingo);
-        const semana = datos.eventos
+        const semana = eventos
           .filter((e) => e.fecha >= l && e.fecha <= r)
           .sort((a, b) => (a.fecha + (a.hora ?? '')).localeCompare(b.fecha + (b.hora ?? '')));
         return (
@@ -503,7 +556,7 @@ export default function AgendaComercial({ datos, clienteInicial }: { datos: Agen
 
       <div className="card">
         <h2>Atrasadas</h2>
-        {datos.eventos.filter((e) => e.estado === 'programada' && e.fecha < hoy).length === 0 ? (
+        {eventos.filter((e) => e.estado === 'programada' && e.fecha < hoy).length === 0 ? (
           <p style={{ color: 'var(--muted)' }}>Nada atrasado.</p>
         ) : (
           <table className="tabla">
@@ -518,7 +571,7 @@ export default function AgendaComercial({ datos, clienteInicial }: { datos: Agen
               </tr>
             </thead>
             <tbody>
-              {datos.eventos
+              {eventos
                 .filter((e) => e.estado === 'programada' && e.fecha < hoy)
                 .sort((a, b) => a.fecha.localeCompare(b.fecha))
                 .map((e) => (
@@ -526,7 +579,7 @@ export default function AgendaComercial({ datos, clienteInicial }: { datos: Agen
                     <td style={{ color: 'var(--rojo)' }}>{e.fecha}</td>
                     <td>{e.hora ? e.hora.slice(0, 5) : '—'}</td>
                     <td>{e.clienteNombre ?? '—'}</td>
-                    <td>{e.asunto}</td>
+                    <td><EtiquetaEmpresa codigo={e.empresaCodigo} />{e.asunto}</td>
                     <td>{TIPOS.find((t) => t.valor === e.tipo)?.etiqueta ?? e.tipo}</td>
                     <td><Link href={`/agenda/${e.id}`} className="boton">Abrir</Link></td>
                   </tr>
@@ -559,7 +612,7 @@ export default function AgendaComercial({ datos, clienteInicial }: { datos: Agen
                   <td>{e.fecha}</td>
                   <td>{e.hora ? e.hora.slice(0, 5) : '—'}</td>
                   <td>{e.clienteNombre ?? '—'}</td>
-                  <td>{e.asunto}</td>
+                  <td><EtiquetaEmpresa codigo={e.empresaCodigo} />{e.asunto}</td>
                   <td>{TIPOS.find((t) => t.valor === e.tipo)?.etiqueta ?? e.tipo}</td>
                   <td>{e.seguimiento.length}</td>
                   <td>

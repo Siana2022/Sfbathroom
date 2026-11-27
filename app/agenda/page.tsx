@@ -1,11 +1,14 @@
 import Link from 'next/link';
 import { cookies } from 'next/headers';
-import { getAgenda } from '@/lib/datos/agenda';
+import { getAgenda, getAgendaTodas } from '@/lib/datos/agenda';
+import { getUsuario } from '@/lib/datos/role';
 import AgendaComercial from '@/components/AgendaComercial';
 
 export default async function AgendaPage({ searchParams }: { searchParams: { cliente?: string } }) {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
-  const datos = await getAgenda(empresa);
+  // El comercial ve su agenda de las tres empresas a la vez, sin selector.
+  const usuario = await getUsuario();
+  const datos = usuario?.rol === 'comercial' ? await getAgendaTodas() : await getAgenda(empresa);
 
   return (
     <div>

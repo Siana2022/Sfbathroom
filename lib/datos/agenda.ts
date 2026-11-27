@@ -7,6 +7,10 @@ export type NotaAgenda = { id: string; texto: string; fecha: string; tipo: strin
 
 export type EventoAgenda = {
   id: string;
+  /** Empresa a la que pertenece la reunión (para la agenda fusionada). */
+  empresaId: string;
+  empresaCodigo: string;
+  empresaNombre: string;
   fecha: string;
   hora: string | null;
   asunto: string;
@@ -29,10 +33,20 @@ export type EventoAgenda = {
 
 export type AgendaData = {
   empresaId: string;
+  /** Empresas incluidas en la agenda (una, o las tres si va fusionada). */
+  empresas: { id: string; codigo: string; nombre: string }[];
   comercialId: string | null;
   esComercial: boolean;
   eventos: EventoAgenda[];
-  clientes: { id: string; nombre: string; telefono: string | null; email: string | null; personaContacto: string | null }[];
+  clientes: {
+    id: string;
+    nombre: string;
+    telefono: string | null;
+    email: string | null;
+    personaContacto: string | null;
+    empresaId: string;
+    empresaCodigo: string;
+  }[];
 };
 
 export async function getAgendaContexto(
@@ -55,9 +69,12 @@ export async function getAgendaContexto(
   return { empresaId: empresa.id, comercialId, esComercial };
 }
 
-export async function getAgenda(codigoEmpresa: string): Promise<AgendaData> {
+/**
+ * Carga la agenda de una o varias empresas. Con `codigos` vacío trae todas: es la
+ * agenda fusionada del comercial, que no debería cambiar de empresa para ver su día.
+ */
+async function cargarAgenda(codigos?: string[]): Promise<AgendaData> {
   const supabase = createClient();
-  const empresa = await getEmpresaPorCodigo(codigoEmpresa);
   const usuario = await getUsuario();
 
   let comercialId: string | null = null;
@@ -72,10 +89,20 @@ export async function getAgenda(codigoEmpresa: string): Promise<AgendaData> {
     comercialId = (perfil?.comercial_id as string | null) ?? null;
   }
 
+  let consulta = supabase.from('empresas').select('id, codigo, nombre').order('codigo');
+  if (codigos && codigos.length > 0) consulta = consulta.in('codigo', codigos);
+  const { data: empresasRaw } = await consulta;
+  const empresas = (empresasRaw ?? []) as { id: string; codigo: string; nombre: string }[];
+  if (empresas.length === 0) {
+    return { empresaId: '', empresas: [], comercialId: null, esComercial, eventos: [], clientes: [] };
+  }
+  const ids = empresas.map((e) => e.id);
+  const empresaPorId = new Map(empresas.map((e) => [e.id, e]));
+
   const { data: notasRaw } = await supabase
     .from('agenda_notas')
     .select('id, agenda_id, texto, created_at, tipo, motivo')
-    .eq('empresa_id', empresa.id)
+    .in('empresa_id', ids)
     .order('created_at', { ascending: true });
 
   const seguimientoPorEvento = new Map<string, NotaAgenda[]>();
@@ -94,8 +121,8 @@ export async function getAgenda(codigoEmpresa: string): Promise<AgendaData> {
 
   const { data: eventosRaw } = await supabase
     .from('agenda')
-    .select('id, comercial_id, cliente_id, fecha, hora, asunto, tipo, notas, completada, estado, importe_estimado, pedido_ref, motivo_cierre, proxima_reunion_id')
-    .eq('empresa_id', empresa.id)
+    .select('id, empresa_id, comercial_id, cliente_id, fecha, hora, asunto, tipo, notas, completada, estado, importe_estimado, pedido_ref, motivo_cierre, proxima_reunion_id')
+    .in('empresa_id', ids)
     .order('fecha', { ascending: true });
 
   const clientes = await todasLasFilas<{
@@ -104,11 +131,12 @@ export async function getAgenda(codigoEmpresa: string): Promise<AgendaData> {
     telefono: string | null;
     email: string | null;
     persona_contacto: string | null;
+    empresa_id: string;
   }>((desde) =>
     supabase
       .from('clientes')
-      .select('id, nombre, telefono, email, persona_contacto')
-      .eq('empresa_id', empresa.id)
+      .select('id, nombre, telefono, email, persona_contacto, empresa_id')
+      .in('empresa_id', ids)
       .order('nombre')
       .range(desde, desde + TAMANO_PAGINA - 1),
   );
@@ -116,6 +144,7 @@ export async function getAgenda(codigoEmpresa: string): Promise<AgendaData> {
 
   const eventos: EventoAgenda[] = ((eventosRaw ?? []) as {
     id: string;
+    empresa_id: string;
     cliente_id: string | null;
     fecha: string;
     hora: string | null;
@@ -128,30 +157,40 @@ export async function getAgenda(codigoEmpresa: string): Promise<AgendaData> {
     pedido_ref: string | null;
     motivo_cierre: string | null;
     proxima_reunion_id: string | null;
-  }[]).map((e) => ({
-    id: e.id,
-    fecha: e.fecha,
-    hora: e.hora,
-    asunto: e.asunto,
-    tipo: e.tipo,
-    notas: e.notas,
-    completada: e.completada,
-    estado: e.estado ?? 'programada',
-    importeEstimado: e.importe_estimado === null ? null : Number(e.importe_estimado),
-    pedidoRef: e.pedido_ref,
-    motivoCierre: e.motivo_cierre,
-    proximaReunionId: e.proxima_reunion_id,
-    pedido: null,
-    adjuntos: [],
-    clienteContacto: null,
-    contacto: null,
-    clienteId: e.cliente_id,
-    clienteNombre: e.cliente_id ? (nombreCliente.get(e.cliente_id) ?? '—') : null,
-    seguimiento: seguimientoPorEvento.get(e.id) ?? [],
-  }));
+  }[]).map((e) => {
+    const empresa = empresaPorId.get(e.empresa_id);
+    return {
+      id: e.id,
+      empresaId: e.empresa_id,
+      empresaCodigo: empresa?.codigo ?? '—',
+      empresaNombre: empresa?.nombre ?? '—',
+      fecha: e.fecha,
+      hora: e.hora,
+      asunto: e.asunto,
+      tipo: e.tipo,
+      notas: e.notas,
+      completada: e.completada,
+      estado: e.estado ?? 'programada',
+      importeEstimado: e.importe_estimado === null ? null : Number(e.importe_estimado),
+      pedidoRef: e.pedido_ref,
+      motivoCierre: e.motivo_cierre,
+      proximaReunionId: e.proxima_reunion_id,
+      pedido: null,
+      adjuntos: [],
+      clienteContacto: null,
+      contacto: null,
+      clienteId: e.cliente_id,
+      clienteNombre: e.cliente_id ? (nombreCliente.get(e.cliente_id) ?? '—') : null,
+      seguimiento: seguimientoPorEvento.get(e.id) ?? [],
+    };
+  });
+
+  // Orden global: fecha y, dentro del día, hora.
+  eventos.sort((a, b) => (a.fecha + (a.hora ?? '')).localeCompare(b.fecha + (b.hora ?? '')));
 
   return {
-    empresaId: empresa.id,
+    empresaId: empresas[0]?.id ?? '',
+    empresas,
     comercialId: esComercial ? comercialId : null,
     esComercial,
     eventos,
@@ -161,8 +200,20 @@ export async function getAgenda(codigoEmpresa: string): Promise<AgendaData> {
       telefono: c.telefono,
       email: c.email,
       personaContacto: c.persona_contacto,
+      empresaId: c.empresa_id,
+      empresaCodigo: empresaPorId.get(c.empresa_id)?.codigo ?? '—',
     })),
   };
+}
+
+/** Agenda de una empresa (dirección y resto de perfiles). */
+export async function getAgenda(codigoEmpresa: string): Promise<AgendaData> {
+  return cargarAgenda([codigoEmpresa]);
+}
+
+/** Agenda fusionada: las reuniones de todas las empresas en una sola lista. */
+export async function getAgendaTodas(): Promise<AgendaData> {
+  return cargarAgenda();
 }
 
 
@@ -170,13 +221,15 @@ export async function getEventoAgenda(id: string): Promise<EventoAgenda | null> 
   const supabase = createClient();
   const { data: e } = await supabase
     .from('agenda')
-    .select('id, cliente_id, fecha, hora, asunto, tipo, notas, completada, estado, importe_estimado, pedido_ref, pedido_id, motivo_cierre, proxima_reunion_id, contacto_id, contacto_nombre, contacto_telefono, contacto_email')
+    .select('id, empresa_id, empresas(codigo, nombre), cliente_id, fecha, hora, asunto, tipo, notas, completada, estado, importe_estimado, pedido_ref, pedido_id, motivo_cierre, proxima_reunion_id, contacto_id, contacto_nombre, contacto_telefono, contacto_email')
     .eq('id', id)
     .maybeSingle();
   if (!e) return null;
 
   const fila = e as {
     id: string;
+    empresa_id: string;
+    empresas: { codigo: string; nombre: string }[] | null;
     cliente_id: string | null;
     fecha: string;
     hora: string | null;
@@ -238,6 +291,9 @@ export async function getEventoAgenda(id: string): Promise<EventoAgenda | null> 
 
   return {
     id: fila.id,
+    empresaId: fila.empresa_id,
+    empresaCodigo: fila.empresas?.[0]?.codigo ?? '—',
+    empresaNombre: fila.empresas?.[0]?.nombre ?? '—',
     fecha: fila.fecha,
     hora: fila.hora,
     asunto: fila.asunto,

@@ -47,23 +47,25 @@ export default function Header({ rol }: { rol?: string }) {
         <strong>sfbathroom · BI</strong>
       </span>
       <div className="topbar-derecha">
-        <FrescuraDatos empresa={empresa} />
+        <FrescuraDatos empresa={rol === 'comercial' ? empresas.map((e) => e.codigo) : empresa} />
         <BuscadorGlobal />
         <span className="topbar-fecha">{hoy}</span>
-        <select
-          aria-label="Empresa"
-          value={empresa}
-          onChange={(e) => cambiarEmpresa(e.target.value)}
-          className="selector-empresa"
-        >
-          {empresas.map((e) => (
-            <option key={e.codigo} value={e.codigo}>
-              {e.nombre}
-            </option>
-          ))}
-</select>
-          <CampanaNotificaciones />
-          {rol && <span className="badge rol">{rol}</span>}
+        {rol !== 'comercial' && (
+          <select
+            aria-label="Empresa"
+            value={empresa}
+            onChange={(e) => cambiarEmpresa(e.target.value)}
+            className="selector-empresa"
+          >
+            {empresas.map((e) => (
+              <option key={e.codigo} value={e.codigo}>
+                {e.nombre}
+              </option>
+            ))}
+          </select>
+        )}
+        <CampanaNotificaciones />
+        {rol && <span className="badge rol">{rol}</span>}
       </div>
     </header>
   );
