@@ -11,6 +11,7 @@ import { getPedidosCliente, getPreciosCliente, getReunionesCliente } from '@/lib
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getSeguimientoCliente } from '@/lib/datos/seguimiento';
 import PanelSeguimiento from '@/components/PanelSeguimiento';
+import BotonExportar from '@/components/BotonExportar';
 import GraficoBarras from '@/components/GraficoBarras';
 import { ANIO_ACTUAL } from '@/lib/ejercicio';
 
@@ -85,7 +86,16 @@ export default async function FichaClientePage({ params }: { params: { id: strin
 
 
       <div className="card" id="pedidos">
-        <h2>Últimos pedidos</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <h2 style={{ margin: 0 }}>Últimos pedidos</h2>
+          {pedidos.length > 0 ? (
+            <BotonExportar
+              nombre={`pedidos-${d.cliente.nombre.replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase()}`}
+              cabeceras={['Pedido', 'Fecha', 'Estado', 'Total', 'Líneas']}
+              filas={pedidos.map((p) => [p.numero, p.fecha, p.estado, p.total, p.lineas.length])}
+            />
+          ) : null}
+        </div>
         {pedidos.length === 0 ? (
           <p style={{ color: 'var(--muted)' }}>Sin pedidos registrados.</p>
         ) : (
