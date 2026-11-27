@@ -18,6 +18,33 @@ import { ANIO_ACTUAL } from '@/lib/ejercicio';
 
 const ANIO = ANIO_ACTUAL;
 
+type Anotacion = { fecha: string | null; lineas: string[] };
+
+/**
+ * A3ERP guarda las observaciones como un histórico en texto libre. Se separa por
+ * líneas en blanco; si la anotación empieza por una fecha (varios formatos), se
+ * saca aparte para poder mostrarla como etiqueta.
+ */
+function partirObservaciones(texto: string): Anotacion[] {
+  return texto
+    .split(/\n\s*\n/)
+    .map((bloque) => bloque.trim())
+    .filter(Boolean)
+    .map((bloque) => {
+      const m = bloque.match(
+        /^(\d{2}[-/]\d{2}[-/]\d{2,4}|\d{4}[-/]\d{2}[-/]\d{2}|\d{8,9}|[a-záéíóúñ]+-\d{2})\s*:?\s*([\s\S]*)$/i,
+      );
+      const cuerpo = m ? m[2] : bloque;
+      return {
+        fecha: m ? m[1] : null,
+        lineas: cuerpo.split('\n').map((l) => l.trim()).filter(Boolean),
+      };
+    });
+}
+
+/** Líneas que son cabecera de un correo pegado en A3ERP. */
+const CABECERA_CORREO = /^(assumpte|asunto|subject|data|fecha|date|de|from|para|to|a|empresa|cc)\s*:/i;
+
 export default async function FichaClientePage({ params }: { params: { id: string } }) {
   // La empresa sale del propio cliente, no del selector: así se abre bien una ficha
   // de FUX o DOT aunque el selector esté en SF.
@@ -88,23 +115,63 @@ export default async function FichaClientePage({ params }: { params: { id: strin
       )}
 
 
-      {d.cliente.observaciones ? (
-        <div className="card">
-          <h2>Observaciones (A3ERP)</h2>
-          <div
-            style={{
-              whiteSpace: 'pre-wrap',
-              fontSize: 13,
-              lineHeight: 1.55,
-              maxHeight: 340,
-              overflowY: 'auto',
-              paddingRight: 6,
-            }}
-          >
-            {d.cliente.observaciones}
+      {d.cliente.observaciones ? (() => {
+        const anotaciones = partirObservaciones(d.cliente.observaciones);
+        return (
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+              <h2 style={{ margin: 0 }}>Observaciones (A3ERP)</h2>
+              <span style={{ color: 'var(--muted)', fontSize: 12 }}>
+                {anotaciones.length} anotaci{anotaciones.length === 1 ? 'ón' : 'ones'}
+              </span>
+            </div>
+            <p style={{ color: 'var(--muted)', fontSize: 13, margin: '4px 0 12px' }}>
+              Histórico que el equipo ha ido dejando en A3ERP. Se muestra tal cual.
+            </p>
+            <ol style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: 420, overflowY: 'auto' }}>
+              {anotaciones.map((a, i) => (
+                <li
+                  key={i}
+                  style={{
+                    borderLeft: '3px solid var(--border-2)',
+                    padding: '6px 0 10px 12px',
+                    marginBottom: 10,
+                  }}
+                >
+                  {a.fecha ? (
+                    <div
+                      style={{
+                        display: 'inline-block',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: 'var(--muted)',
+                        border: '1px solid var(--border-2)',
+                        borderRadius: 999,
+                        padding: '1px 8px',
+                        marginBottom: 6,
+                      }}
+                    >
+                      {a.fecha}
+                    </div>
+                  ) : null}
+                  {a.lineas.map((linea, j) => (
+                    <div
+                      key={j}
+                      style={
+                        CABECERA_CORREO.test(linea)
+                          ? { color: 'var(--tenue)', fontSize: 12, lineHeight: 1.5 }
+                          : { fontSize: 13, lineHeight: 1.55 }
+                      }
+                    >
+                      {linea}
+                    </div>
+                  ))}
+                </li>
+              ))}
+            </ol>
           </div>
-        </div>
-      ) : null}
+        );
+      })() : null}
 
       <div className="card" id="pedidos">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
