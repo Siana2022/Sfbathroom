@@ -79,7 +79,7 @@ try {
       await pool.request().query(`
         SELECT CODCLI, SERIE, NUMDOC, FECHA, IMPORTE, IDCARTERA, OBSERVACIONES
         FROM ${base}.dbo.EfectosClientes
-        WHERE OBSERVACIONES IS NOT NULL AND LTRIM(RTRIM(OBSERVACIONES)) <> ''
+        WHERE OBSERVACIONES IS NOT NULL AND LTRIM(RTRIM(CAST(OBSERVACIONES AS nvarchar(max)))) <> ''
       `)
     ).recordset;
 
