@@ -46,7 +46,17 @@ export type ClientesData = {
   tabla: { id: string; nombre: string; neta: number; netaPrev: number; coste: number; margen: number; margenPct: number | null; facturas: number; ticket: number; comercial: string | null }[];
   familias: string[];
   matriz: { id: string; nombre: string; neta: number; compradas: boolean[] }[];
-  semaforo: { id: string; nombre: string; estado: string; diasSin: number; frecuencia: number | null; nivel: 'ok' | 'aviso' | 'critico' }[];
+  semaforo: {
+    id: string;
+    nombre: string;
+    estado: string;
+    diasSin: number;
+    frecuencia: number | null;
+    nivel: 'ok' | 'aviso' | 'critico';
+    /** Última anotación del comercial sobre por qué no compra. */
+    motivo: string | null;
+    motivoNota: string | null;
+  }[];
   noActivos: { id: string; nombre: string; diasSin: number; ultimaFactura: string; comercial: string | null }[];
   movimiento: { id: string; nombre: string; netaActual: number; netaPrevia: number; delta: number; deltaPct: number | null }[];
   listas: ListasClientes;
@@ -437,6 +447,25 @@ async function calcularClientes(codigoEmpresa: string, anio: number, filtros?: F
     .sort((a, b) => b.diasSin - a.diasSin)
     .slice(0, 15);
 
+  // Última anotación de motivo por cliente (para el semáforo).
+  const motivoPorCliente = new Map<string, { motivo: string; nota: string | null }>();
+  if (semaforo.length > 0) {
+    const { data: motivos } = await supabase
+      .from('clientes_motivos')
+      .select('cliente_id, motivo, nota, created_at')
+      .eq('empresa_id', empresa.id)
+      .in('cliente_id', semaforo.map((c) => c.id))
+      .order('created_at', { ascending: false });
+    for (const m of (motivos ?? []) as { cliente_id: string; motivo: string; nota: string | null }[]) {
+      if (!motivoPorCliente.has(m.cliente_id)) motivoPorCliente.set(m.cliente_id, { motivo: m.motivo, nota: m.nota });
+    }
+  }
+  const semaforoConMotivo = semaforo.map((c) => ({
+    ...c,
+    motivo: motivoPorCliente.get(c.id)?.motivo ?? null,
+    motivoNota: motivoPorCliente.get(c.id)?.nota ?? null,
+  }));
+
   return {
     empresa,
     anio,
@@ -452,7 +481,7 @@ async function calcularClientes(codigoEmpresa: string, anio: number, filtros?: F
     tabla,
     familias: familiasOrden,
     matriz,
-    semaforo,
+    semaforo: semaforoConMotivo,
     noActivos,
     movimiento,
     listas,

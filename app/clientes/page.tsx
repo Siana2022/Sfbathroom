@@ -9,6 +9,7 @@ import Filtros from '@/components/Filtros';
 import { ANIO_ACTUAL } from '@/lib/ejercicio';
 import { getUsuario } from '@/lib/datos/role';
 import { EMPRESAS } from '@/lib/empresas';
+import MotivoCliente from '@/components/MotivoCliente';
 import { proyeccionAnual } from '@/lib/proyeccion';
 
 
@@ -184,66 +185,32 @@ export default async function ClientesPage({ searchParams }: { searchParams: Sea
       />
 
       <div className="card">
-        <h2>Semáforo de fuga</h2>
-        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
-          Clientes activos con días sin pedir por encima de su frecuencia histórica. Rojo:
-          más de 2,5 veces su frecuencia habitual. Ámbar: entre su frecuencia y 2,5 veces.
-        </p>
-        {d.semaforo.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>Ningún cliente activo está por encima de su frecuencia habitual.</p>
-        ) : (
-          <table className="tabla">
-            <thead>
-              <tr>
-                <th>Cliente</th>
-                <th className="td-num">Días sin pedir</th>
-                <th className="td-num">Frecuencia habitual</th>
-                <th>Semáforo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.semaforo.map((c) => (
-                <tr key={c.id}>
-                  <td>{c.nombre}</td>
-                  <td className="td-num">{numero(c.diasSin)}</td>
-                  <td className="td-num">{c.frecuencia === null ? '—' : `${decimal(c.frecuencia)} días`}</td>
-                  <td>
-                    <span className={c.nivel === 'aviso' ? 'badge pendiente' : 'badge construccion'}>
-                      {c.nivel === 'aviso' ? 'ámbar' : 'rojo'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      <div className="card">
-        <h2>Clientes sin actividad en más de 12 meses</h2>
-        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
-          Clientes sin facturar desde hace más de 12 meses, con su comercial asignado.
-          Candidatos a reactivación (o a su clasificación como perdidos).
-        </p>
-        {d.noActivos.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>Todos los clientes activos han facturado en los últimos 12 meses.</p>
+        <h2>Clientes por facturación {d.anio}</h2>
+        {d.tabla.length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>Sin facturación en el ejercicio.</p>
         ) : (
           <table className="tabla">
             <thead>
               <tr>
                 <th>Cliente</th>
                 <th>Comercial</th>
-                <th className="td-num">Días sin facturar</th>
-                <th>Última factura</th>
+                <th className="td-num">Facturación neta</th>
+                <th className="td-num" title="Facturación neta menos coste de venta (mismo criterio que /margen).">Margen</th>
+                <th className="td-num" title={`Crecimiento frente a ${d.anio - 1}`}>% vs {d.anio - 1}</th>
+                <th className="td-num">Ticket medio</th>
               </tr>
             </thead>
             <tbody>
-              {d.noActivos.map((c) => (
-                <tr key={c.nombre}>
+              {d.tabla.map((c) => (
+                <tr key={c.id}>
                   <td><Link href={`/clientes/${c.id}`} className="enlace">{c.nombre}</Link></td>
                   <td>{c.comercial ?? '—'}</td>
-                  <td className={`td-num ${c.diasSin > 365 ? 'td-pos' : ''}`}>{numero(c.diasSin)}</td>
-                  <td>{c.ultimaFactura}</td>
+                  <td className="td-num">{eur(c.neta)}</td>
+                  <td className="td-num">{eur(c.margen)}</td>
+                  <td className="td-num" style={colorCrecimiento(c.neta, c.netaPrev)}>
+                    {textoCrecimiento(c.neta, c.netaPrev)}
+                  </td>
+                  <td className="td-num">{eur(c.ticket)}</td>
                 </tr>
               ))}
             </tbody>
@@ -288,32 +255,70 @@ export default async function ClientesPage({ searchParams }: { searchParams: Sea
       </div>
 
       <div className="card">
-        <h2>Clientes por facturación {d.anio}</h2>
-        {d.tabla.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>Sin facturación en el ejercicio.</p>
+        <h2>Semáforo de fuga</h2>
+        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
+          Clientes activos con días sin pedir por encima de su frecuencia histórica. Rojo:
+          más de 2,5 veces su frecuencia habitual. Ámbar: entre su frecuencia y 2,5 veces.
+        </p>
+        {d.semaforo.length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>Ningún cliente activo está por encima de su frecuencia habitual.</p>
+        ) : (
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th className="td-num">Días sin pedir</th>
+                <th className="td-num">Frecuencia habitual</th>
+                <th>Semáforo</th>
+                <th>Motivo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {d.semaforo.map((c) => (
+                <tr key={c.id}>
+                  <td>{c.nombre}</td>
+                  <td className="td-num">{numero(c.diasSin)}</td>
+                  <td className="td-num">{c.frecuencia === null ? '—' : `${decimal(c.frecuencia)} días`}</td>
+                  <td>
+                    <span className={c.nivel === 'aviso' ? 'badge pendiente' : 'badge construccion'}>
+                      {c.nivel === 'aviso' ? 'ámbar' : 'rojo'}
+                    </span>
+                  </td>
+                  <td>
+                    <MotivoCliente clienteId={c.id} empresaId={d.empresa.id} motivo={c.motivo} nota={c.motivoNota} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="card">
+        <h2>Clientes sin actividad en más de 12 meses</h2>
+        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
+          Clientes sin facturar desde hace más de 12 meses, con su comercial asignado.
+          Candidatos a reactivación (o a su clasificación como perdidos).
+        </p>
+        {d.noActivos.length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>Todos los clientes activos han facturado en los últimos 12 meses.</p>
         ) : (
           <table className="tabla">
             <thead>
               <tr>
                 <th>Cliente</th>
                 <th>Comercial</th>
-                <th className="td-num">Facturación neta</th>
-                <th className="td-num" title="Facturación neta menos coste de venta (mismo criterio que /margen).">Margen</th>
-                <th className="td-num" title={`Crecimiento frente a ${d.anio - 1}`}>% vs {d.anio - 1}</th>
-                <th className="td-num">Ticket medio</th>
+                <th className="td-num">Días sin facturar</th>
+                <th>Última factura</th>
               </tr>
             </thead>
             <tbody>
-              {d.tabla.map((c) => (
-                <tr key={c.id}>
+              {d.noActivos.map((c) => (
+                <tr key={c.nombre}>
                   <td><Link href={`/clientes/${c.id}`} className="enlace">{c.nombre}</Link></td>
                   <td>{c.comercial ?? '—'}</td>
-                  <td className="td-num">{eur(c.neta)}</td>
-                  <td className="td-num">{eur(c.margen)}</td>
-                  <td className="td-num" style={colorCrecimiento(c.neta, c.netaPrev)}>
-                    {textoCrecimiento(c.neta, c.netaPrev)}
-                  </td>
-                  <td className="td-num">{eur(c.ticket)}</td>
+                  <td className={`td-num ${c.diasSin > 365 ? 'td-pos' : ''}`}>{numero(c.diasSin)}</td>
+                  <td>{c.ultimaFactura}</td>
                 </tr>
               ))}
             </tbody>
