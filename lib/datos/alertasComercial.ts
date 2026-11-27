@@ -14,6 +14,9 @@ export type AlertaComercial = {
   enlace: string;
   /** Comercial al que pertenece la alerta (para el envío individual por job). */
   comercialId?: string | null;
+  /** Empresa de la alerta (la vista fusionada mezcla las tres). */
+  empresaId?: string | null;
+  empresaCodigo?: string | null;
 };
 
 export type AlertasComercialData = {
@@ -330,6 +333,10 @@ export async function calcularAlertasComercial(
   const visibles = alertas.filter((a) => !ocultas.has(a.clave));
 
   const orden = { critico: 0, aviso: 1 } as const;
+  for (const a of visibles) {
+    a.empresaId = empresaId;
+    a.empresaCodigo = codigoEmpresa;
+  }
   visibles.sort((a, b) => orden[a.severidad] - orden[b.severidad]);
   return visibles;
 }
@@ -372,6 +379,47 @@ export async function getAlertasComercial(codigoEmpresa: string): Promise<Alerta
     esComercial,
     empresaId: empresa.id,
     comercialId,
+    alertas,
+    criticas: alertas.filter((a) => a.severidad === 'critico').length,
+    avisos: alertas.filter((a) => a.severidad === 'aviso').length,
+  };
+}
+
+
+/**
+ * Alertas del comercial con la cartera de las tres empresas en una sola lista.
+ * Mismo cálculo, una pasada por empresa; cada alerta lleva su empresa para poder
+ * silenciarla en la correcta.
+ */
+export async function getAlertasComercialTodas(): Promise<{
+  alertas: AlertaComercial[];
+  criticas: number;
+  avisos: number;
+}> {
+  const supabase = createClient();
+  const usuario = await getUsuario();
+  if (!usuario || usuario.comercialIds.length === 0) {
+    return { alertas: [], criticas: 0, avisos: 0 };
+  }
+
+  const { EMPRESAS } = await import('@/lib/empresas');
+  const hoy = new Date();
+  const contexto = {
+    comercialIds: usuario.comercialIds,
+    anio: hoy.getFullYear(),
+    hoy: hoy.toISOString().slice(0, 10),
+  };
+
+  const listas = await Promise.all(
+    EMPRESAS.map(async (e) => {
+      const empresa = await getEmpresaPorCodigo(e.codigo);
+      return calcularAlertasComercial(supabase, { ...contexto, empresaId: empresa.id, codigoEmpresa: e.codigo });
+    }),
+  );
+
+  const orden = { critico: 0, aviso: 1 } as const;
+  const alertas = listas.flat().sort((a, b) => orden[a.severidad] - orden[b.severidad]);
+  return {
     alertas,
     criticas: alertas.filter((a) => a.severidad === 'critico').length,
     avisos: alertas.filter((a) => a.severidad === 'aviso').length,

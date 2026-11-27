@@ -74,14 +74,14 @@ export default function AlertasPanel({
         : 'Avisos'
       : TITULO[vista.valor];
 
-  async function silenciar(clave: string) {
+  async function silenciar(a: { clave: string; empresaId?: string | null }) {
     if (!comercialId) return;
     if (!window.confirm('¿Ocultar esta alerta? No volverá a aparecer para ti.')) return;
     startTransition(async () => {
       await supabase.from('alertas_silenciadas').insert({
-        empresa_id: empresaId,
+        empresa_id: a.empresaId ?? empresaId,
         comercial_id: comercialId,
-        clave,
+        clave: a.clave,
       });
       setVista(null);
       router.refresh();
@@ -158,12 +158,29 @@ export default function AlertasPanel({
                         {a.severidad === 'critico' ? 'Crítica' : 'Aviso'}
                       </span>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600 }}>{a.titulo}</div>
+                        <div style={{ fontWeight: 600 }}>
+                          {a.empresaCodigo ? (
+                            <span
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 700,
+                                color: 'var(--muted)',
+                                border: '1px solid var(--border-2)',
+                                borderRadius: 4,
+                                padding: '0 4px',
+                                marginRight: 6,
+                              }}
+                            >
+                              {a.empresaCodigo}
+                            </span>
+                          ) : null}
+                          {a.titulo}
+                        </div>
                         <div style={{ color: 'var(--muted)', fontSize: 13 }}>{a.detalle}</div>
                       </div>
                       <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
                         <Link href={a.enlace} className="enlace">Abrir</Link>
-                        <button type="button" className="boton" onClick={() => silenciar(a.clave)} disabled={pending}>
+                        <button type="button" className="boton" onClick={() => silenciar(a)} disabled={pending}>
                           Silenciar
                         </button>
                       </div>

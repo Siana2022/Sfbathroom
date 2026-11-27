@@ -1,10 +1,16 @@
 import { cookies } from 'next/headers';
-import { getAlertasComercial } from '@/lib/datos/alertasComercial';
+import { getAlertasComercial, getAlertasComercialTodas } from '@/lib/datos/alertasComercial';
+import { getUsuario } from '@/lib/datos/role';
 import AlertasPanel from '@/components/AlertasPanel';
 
 export default async function AlertasComercialPage() {
   const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
-  const d = await getAlertasComercial(empresa);
+  // El comercial ve las alertas de su cartera en las tres empresas a la vez.
+  const usuario = await getUsuario();
+  const esComercial = usuario?.rol === 'comercial';
+  const d = esComercial
+    ? { ...(await getAlertasComercialTodas()), empresaId: '', comercialId: usuario?.comercialId ?? null }
+    : await getAlertasComercial(empresa);
 
   return (
     <div>
