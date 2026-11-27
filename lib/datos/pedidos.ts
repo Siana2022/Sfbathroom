@@ -131,7 +131,7 @@ function etiquetaPedido(p: FilaPedido): string {
   return p.serie ? `${p.serie}/${p.numero_erp}` : p.numero_erp;
 }
 
-export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<PedidosResumen> {
+async function calcular_getPedidos(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<PedidosResumen> {
   const usuario = await getUsuario();
   const clave = `pedidos:${usuario?.id ?? 'anon'}:${codigoEmpresa}:${anio}:${JSON.stringify(filtros ?? {})}`;
   return memo(clave, () => pedidosInterno(codigoEmpresa, anio, filtros));
@@ -368,4 +368,11 @@ async function pedidosInterno(codigoEmpresa: string, anio: number, filtros?: Fil
     porEstado,
     sinEnlaceFacturas,
   };
+}
+
+/** Caché de 5 minutos por usuario, empresa, año y filtros (la ingesta es diaria). */
+export async function getPedidos(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<PedidosResumen> {
+  const usuario = await getUsuario();
+  const clave = `getPedidos:${usuario?.id ?? 'anon'}:${codigoEmpresa}:${anio}:${JSON.stringify(filtros ?? {})}`;
+  return memo(clave, () => calcular_getPedidos(codigoEmpresa, anio, filtros), 5 * 60 * 1000);
 }

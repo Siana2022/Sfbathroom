@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
+import { memo } from '@/lib/perf/memo';
+import { getUsuario } from '@/lib/datos/role';
 import { filtrarPorIds, getFacturaIdsFiltradas, hayFiltros, type Filtros } from '@/lib/datos/filtros';
 import { lineasPorFacturas } from '@/lib/datos/lineas';
 import { todasLasFilas, TAMANO_PAGINA } from '@/lib/datos/query';
@@ -298,7 +300,7 @@ async function getFacturacionRpc(
   };
 }
 
-export async function getFacturacion(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<FacturacionData> {
+async function calcular_getFacturacion(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<FacturacionData> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
   const anioPrevio = anio - 1;
@@ -649,4 +651,11 @@ function agruparComerciales(filas: Omit<RankingComercial, 'secciones'>[]): Ranki
   const salida = [...mapa.values()].sort((a, b) => b.importe - a.importe);
   for (const g of salida) g.secciones.sort((a, b) => b.importe - a.importe);
   return salida;
+}
+
+/** Caché de 5 minutos por usuario, empresa, año y filtros (la ingesta es diaria). */
+export async function getFacturacion(codigoEmpresa: string, anio: number, filtros?: Filtros): Promise<FacturacionData> {
+  const usuario = await getUsuario();
+  const clave = `getFacturacion:${usuario?.id ?? 'anon'}:${codigoEmpresa}:${anio}:${JSON.stringify(filtros ?? {})}`;
+  return memo(clave, () => calcular_getFacturacion(codigoEmpresa, anio, filtros), 5 * 60 * 1000);
 }
