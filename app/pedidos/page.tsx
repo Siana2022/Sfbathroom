@@ -41,7 +41,7 @@ export default async function PedidosPage() {
 
   const tablas = [
     {
-      titulo: 'Pendientes de servir',
+      titulo: 'Pendientes de servir (sin fecha programada)',
       filas: d.pendientes,
       columnas: ['Cliente', 'Pedido', 'Fecha del pedido', 'Qué han pedido'],
       render: (p: PedidoOperativo) => (
@@ -74,8 +74,8 @@ export default async function PedidosPage() {
       <p className="breadcrumb">Cuadro mando comercial · Bloque 2</p>
       <h1>Pedidos pendientes</h1>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
-        Todo lo que está pendiente de servir de {d.empresa.nombre}: sin fecha, con fecha programada y
-        lo que ya va fuera de plazo.
+        Todo lo que está pendiente de servir de {d.empresa.nombre}: lo que aún no tiene fecha, lo que
+        está programado y lo que ya va fuera de plazo.
       </p>
 
       <ul className="grid-kpis">

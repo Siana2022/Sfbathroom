@@ -116,6 +116,8 @@ async function cargarPanel(codigoEmpresa: string, anio: number): Promise<Pedidos
     };
   });
 
+  // Listas disjuntas: sin fecha (por planificar) y con fecha (planificados).
+  const pendientesSinFecha = pedidos.filter((p) => !p.fechaPrometida);
   const programados = pedidos
     .filter((p) => p.fechaPrometida)
     .sort((a, b) => (a.fechaPrometida ?? '').localeCompare(b.fechaPrometida ?? ''));
@@ -128,7 +130,7 @@ async function cargarPanel(codigoEmpresa: string, anio: number): Promise<Pedidos
   return {
     empresa: { codigo: empresa.codigo, nombre: empresa.nombre },
     anio,
-    pendientes: pedidos,
+    pendientes: pendientesSinFecha,
     programados,
     fueraPlazo,
     importePendiente: suma(pedidos),
