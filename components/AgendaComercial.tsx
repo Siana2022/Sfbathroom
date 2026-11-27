@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import SelectorBuscable from '@/components/SelectorBuscable';
 import type { AgendaData, EventoAgenda } from '@/lib/datos/agenda';
 
 const TIPOS: { valor: string; etiqueta: string }[] = [
@@ -236,15 +237,17 @@ export default function AgendaComercial({ datos, clienteInicial }: { datos: Agen
               Hora
               <input type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
             </label>
-            <label className="campo-filtro" style={{ minWidth: 240 }}>
-              Cliente *
-              <select value={clienteId} onChange={(e) => setClienteId(e.target.value)}>
-                <option value="">—</option>
-                {datos.clientes.map((c) => (
-                  <option key={c.id} value={c.id}>{c.nombre}</option>
-                ))}
-              </select>
-            </label>
+            {/* Buscable: se escribe parte del nombre en vez de recorrer un desplegable. */}
+            <div style={{ minWidth: 260 }}>
+              <SelectorBuscable
+                etiqueta="Cliente *"
+                opciones={datos.clientes.map((c) => ({ id: c.id, nombre: c.nombre }))}
+                valor={clienteId}
+                onChange={(id) => setClienteId(id ?? '')}
+                textoTodos="—"
+                placeholder="Escribe el nombre…"
+              />
+            </div>
             <label className="campo-filtro">
               Tipo
               <select value={tipo} onChange={(e) => setTipo(e.target.value)}>
