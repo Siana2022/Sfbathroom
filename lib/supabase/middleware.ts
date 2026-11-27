@@ -63,6 +63,7 @@ export async function updateSession(request: NextRequest) {
     '/canal-y-marca', '/concentracion', '/credito-cobro', '/actividad-comercial',
     '/calidad', '/alertas', '/cuadros', '/configuracion', '/documentos', '/admin',
     '/datos', '/mi-panel', '/marketing', '/financiero', '/kpis', '/rentabilidad-clientes',
+    '/ranking',
   ];
   const esRutaCuadro =
     RUTAS_CUADRO.some((r) => path === r || path.startsWith(`${r}/`)) &&

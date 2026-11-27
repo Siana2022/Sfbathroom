@@ -14,6 +14,10 @@ export type ComercialRow = {
   id: string;
   nombre: string;
   neta: number;
+  /** Neta del mismo periodo del año anterior (para la variación del ranking). */
+  netaPrev: number;
+  /** Unidades facturadas (con signo de abono). */
+  unidades: number;
   facturas: number;
   clientes: number;
   descuentoMedio: number;
@@ -51,6 +55,13 @@ export type ActividadData = {
 type Fila = { id: string; comercial_id: string | null; cliente_id: string | null; base_imponible: number; tipo_documento: string; descuento_pie: number; fecha: string };
 type FilaComercial = { id: string; nombre: string };
 type FilaPedido = { comercial_id: string | null };
+type FilaPrevia = {
+  id: string;
+  comercial_id: string | null;
+  cliente_id: string | null;
+  base_imponible: number;
+  tipo_documento: string;
+};
 type FilaLinea = { factura_id: string; articulo_id: string | null; cantidad: number; importe: number; coste_unitario: number | null };
 type FilaArticulo = { id: string; coste_unitario: number | null };
 type FilaPresupuesto = { comercial_id: string | null; importe: number };
@@ -82,12 +93,14 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
         .lte('fecha', `${anio}-12-31`)
         .range(desde, desde + TAMANO_PAGINA - 1)
     ),
-    todasLasFilas<{ id: string; comercial_id: string | null; cliente_id: string | null }>((desde) =>
+    // Año anterior: además de para clientes nuevos/perdidos, ahora da la neta previa
+    // (misma semántica que el año en curso: factura, abono y nota_cargo).
+    todasLasFilas<FilaPrevia>((desde) =>
       supabase
         .from('facturas')
-        .select('id, comercial_id, cliente_id')
+        .select('id, comercial_id, cliente_id, base_imponible, tipo_documento')
         .eq('empresa_id', empresa.id)
-        .eq('tipo_documento', 'factura')
+        .in('tipo_documento', ['factura', 'abono', 'nota_cargo'])
         .gte('fecha', `${anioPrevio}-01-01`)
         .lte('fecha', `${anioPrevio}-12-31`)
         .range(desde, desde + TAMANO_PAGINA - 1)
@@ -144,9 +157,10 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
 
   const porComercial = new Map<
     string,
-    { neta: number; trimNeta: number; facturas: number; clientes: Set<string>; descuento: number; margenImporte: number; margenCoste: number }
+    { neta: number; trimNeta: number; facturas: number; clientes: Set<string>; descuento: number; unidades: number; margenImporte: number; margenCoste: number }
   >();
   const clientesPrevio = new Map<string, Set<string>>();
+  const netaPreviaPorComercial = new Map<string, number>();
 
   const mesActual = new Date().getMonth() + 1;
   const trimActual = Math.floor((mesActual - 1) / 3) + 1;
@@ -158,7 +172,7 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
 
   for (const f of filas) {
     const key = f.comercial_id ?? '';
-    const c = porComercial.get(key) ?? { neta: 0, trimNeta: 0, facturas: 0, clientes: new Set<string>(), descuento: 0, margenImporte: 0, margenCoste: 0 };
+    const c = porComercial.get(key) ?? { neta: 0, trimNeta: 0, facturas: 0, clientes: new Set<string>(), descuento: 0, unidades: 0, margenImporte: 0, margenCoste: 0 };
     c.neta += netaDeDocumento(f.tipo_documento, f.base_imponible);
     c.facturas += 1;
     if (f.cliente_id) c.clientes.add(f.cliente_id);
@@ -174,6 +188,7 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
     const c = porComercial.get(key);
     if (!c) continue;
     const sign = tipoPorFactura.get(l.factura_id) === 'abono' ? -1 : 1;
+    c.unidades += sign * Number(l.cantidad ?? 0);
     c.margenImporte += sign * Number(l.importe ?? 0);
     const coste = Number(l.coste_unitario ?? articuloCoste.get(l.articulo_id ?? '') ?? 0);
     c.margenCoste += sign * Number(l.cantidad ?? 0) * coste;
@@ -181,9 +196,17 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
 
   for (const f of filasPrevias) {
     const key = f.comercial_id ?? '';
-    const set = clientesPrevio.get(key) ?? new Set<string>();
-    if (f.cliente_id) set.add(f.cliente_id);
-    clientesPrevio.set(key, set);
+    // La lista de clientes del año anterior se mantiene sobre facturas (como antes);
+    // la neta previa sí suma abonos y notas de cargo, igual que el año en curso.
+    if (f.tipo_documento === 'factura') {
+      const set = clientesPrevio.get(key) ?? new Set<string>();
+      if (f.cliente_id) set.add(f.cliente_id);
+      clientesPrevio.set(key, set);
+    }
+    netaPreviaPorComercial.set(
+      key,
+      (netaPreviaPorComercial.get(key) ?? 0) + netaDeDocumento(f.tipo_documento, f.base_imponible),
+    );
   }
 
   const presupuestoPorComercial = new Map<string, number>();
@@ -289,6 +312,8 @@ export async function getActividad(codigoEmpresa: string, anio: number, filtros?
       id: c.id,
       nombre: c.nombre,
       neta: v?.neta ?? 0,
+      netaPrev: netaPreviaPorComercial.get(c.id) ?? 0,
+      unidades: v?.unidades ?? 0,
       facturas: v?.facturas ?? 0,
       clientes: activosAnio.size,
       descuentoMedio: v && v.facturas > 0 ? v.descuento / v.facturas : 0,
@@ -336,6 +361,8 @@ function agrupar(filas: ComercialRow[]): ComercialRow[] {
     };
 
     g.base.neta += f.neta;
+    g.base.netaPrev += f.netaPrev;
+    g.base.unidades += f.unidades;
     g.base.facturas += f.facturas;
     g.base.clientes += f.clientes;
     g.base.pedidos += f.pedidos;
