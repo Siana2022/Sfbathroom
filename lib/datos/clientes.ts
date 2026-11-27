@@ -43,7 +43,7 @@ export type ClientesData = {
   perdidos: number;
   inactivos: number;
   retencion: number | null;
-  tabla: { id: string; nombre: string; neta: number; coste: number; margen: number; margenPct: number | null; facturas: number; ticket: number; comercial: string | null }[];
+  tabla: { id: string; nombre: string; neta: number; netaPrev: number; coste: number; margen: number; margenPct: number | null; facturas: number; ticket: number; comercial: string | null }[];
   familias: string[];
   matriz: { id: string; nombre: string; neta: number; compradas: boolean[] }[];
   semaforo: { id: string; nombre: string; estado: string; diasSin: number; frecuencia: number | null; nivel: 'ok' | 'aviso' | 'critico' }[];
@@ -151,6 +151,7 @@ async function calcularClientes(codigoEmpresa: string, anio: number, filtros?: F
   const activos = new Set<string>();
   const activosPrevio = new Set<string>();
   const porCliente = new Map<string, { neta: number; facturas: number }>();
+  const netaPreviaPorCliente = new Map<string, number>();
   const fechasCliente = new Map<string, Set<string>>();
   const idsFacturasAnio: string[] = [];
   const clienteDeFactura = new Map<string, string | null>();
@@ -168,6 +169,12 @@ async function calcularClientes(codigoEmpresa: string, anio: number, filtros?: F
       clienteDeFactura.set(f.id, f.cliente_id);
     } else {
       activosPrevio.add(f.cliente_id);
+      if (f.fecha.slice(0, 4) === String(anio - 1)) {
+        netaPreviaPorCliente.set(
+          f.cliente_id,
+          (netaPreviaPorCliente.get(f.cliente_id) ?? 0) + Number(f.base_imponible ?? 0),
+        );
+      }
     }
     const s = fechasCliente.get(f.cliente_id) ?? new Set<string>();
     s.add(f.fecha);
@@ -337,6 +344,7 @@ async function calcularClientes(codigoEmpresa: string, anio: number, filtros?: F
       id,
       nombre: nombreCliente.get(id) ?? '—',
       neta: v.neta,
+      netaPrev: netaPreviaPorCliente.get(id) ?? 0,
       coste: costePorCliente.get(id) ?? 0,
       margen: v.neta - (costePorCliente.get(id) ?? 0),
       margenPct: v.neta !== 0 ? ((v.neta - (costePorCliente.get(id) ?? 0)) / v.neta) * 100 : null,
@@ -399,6 +407,7 @@ async function calcularClientes(codigoEmpresa: string, anio: number, filtros?: F
       id,
       nombre: nombreCliente.get(id) ?? '—',
       neta: v.neta,
+      netaPrev: netaPreviaPorCliente.get(id) ?? 0,
       compradas: familiasOrden.map((fam) => familiasCliente.get(id)?.has(fam) ?? false),
     }))
     .sort((a, b) => b.neta - a.neta)
