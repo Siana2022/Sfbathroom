@@ -11,6 +11,7 @@ import { getPedidosCliente, getPreciosCliente, getReunionesCliente } from '@/lib
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getSeguimientoCliente } from '@/lib/datos/seguimiento';
 import { getNotasCobroCliente } from '@/lib/datos/cobrosNotas';
+import { getUsuario } from '@/lib/datos/role';
 import PanelSeguimiento from '@/components/PanelSeguimiento';
 import BotonExportar from '@/components/BotonExportar';
 import GraficoBarras from '@/components/GraficoBarras';
@@ -49,6 +50,9 @@ const CABECERA_CORREO = /^(assumpte|asunto|subject|data|fecha|date|de|from|para|
 export default async function FichaClientePage({ params }: { params: { id: string } }) {
   // La empresa sale del propio cliente, no del selector: así se abre bien una ficha
   // de FUX o DOT aunque el selector esté en SF.
+  // Los comerciales no llevan cobros: no ven saldo ni DSO.
+  const usuario = await getUsuario();
+  const puedeVerCobros = usuario?.rol !== 'comercial';
   const empresaCookie = cookies().get('sfb_empresa')?.value ?? 'SF';
   const empresa = (await getCodigoEmpresaDeCliente(params.id)) ?? empresaCookie;
   const d = await getFichaCliente(empresa, params.id, ANIO);
@@ -93,8 +97,12 @@ export default async function FichaClientePage({ params }: { params: { id: strin
         <Kpi etiqueta={`Facturación neta ${d.anio}`} valor={eur(d.neta)} nota={d.deltaPct === null ? 'sin dato previo' : `vs ${d.anio - 1}: ${pct(d.deltaPct)}`} />
         <Kpi etiqueta="Facturas" valor={numero(d.facturas)} nota={`${numero(d.unidades)} unidades`} />
         <Kpi etiqueta="Ticket medio" valor={eur(d.ticketMedio)} nota="por factura" />
-        <Kpi etiqueta="Saldo pendiente" valor={eur(d.saldo)} nota={`${eur(d.vencido)} vencido`} />
-        <Kpi etiqueta="DSO del cliente" valor={d.dsoDias === null ? '—' : `${decimal(d.dsoDias)} días`} nota="últimos 12 meses" />
+        {puedeVerCobros ? (
+          <>
+            <Kpi etiqueta="Saldo pendiente" valor={eur(d.saldo)} nota={`${eur(d.vencido)} vencido`} />
+            <Kpi etiqueta="DSO del cliente" valor={d.dsoDias === null ? '—' : `${decimal(d.dsoDias)} días`} nota="últimos 12 meses" />
+          </>
+        ) : null}
       </ul>
 
       <div className="card">
