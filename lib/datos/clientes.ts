@@ -34,6 +34,8 @@ export type ClientesData = {
   empresa: { id: string; codigo: string; nombre: string };
   anio: number;
   activos: number;
+  /** Facturación neta del año sumada sobre la tabla de clientes. */
+  netaTotal: number;
   activosPrevio: number;
   activos12m: number;
   nuevos: number;
@@ -429,6 +431,7 @@ async function calcularClientes(codigoEmpresa: string, anio: number, filtros?: F
   return {
     empresa,
     anio,
+    netaTotal: tabla.reduce((s, c) => s + c.neta, 0),
     activos: activos.size,
     activosPrevio: activosPrevio.size,
     activos12m: activos12m.size,
@@ -449,6 +452,7 @@ async function calcularClientes(codigoEmpresa: string, anio: number, filtros?: F
 
 export type ClientesFusionados = {
   anio: number;
+  netaTotal: number;
   activos12m: number;
   retencion: number | null;
   nuevos: number;
@@ -476,6 +480,7 @@ export async function getClientesFusionados(anio: number, filtros?: Filtros): Pr
 
   return {
     anio,
+    netaTotal: suma((d) => d.netaTotal),
     activos12m: suma((d) => d.activos12m),
     retencion: activosPrevio > 0 ? (retenidos / activosPrevio) * 100 : null,
     nuevos: suma((d) => d.nuevos),
