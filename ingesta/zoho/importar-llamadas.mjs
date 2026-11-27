@@ -113,11 +113,11 @@ async function upsert(tabla, onConflict, filas) {
   return escritas;
 }
 
-/** Zoho devuelve la duración en minutos; en la tabla se guarda en segundos. */
-function duracionSegundos(valor) {
+/** Zoho ya devuelve la duración en minutos. */
+function duracionMinutos(valor) {
   const minutos = Number(valor);
   if (!Number.isFinite(minutos) || minutos <= 0) return null;
-  return Math.round(minutos * 60);
+  return Math.round(minutos);
 }
 
 function iso(fecha) {
@@ -165,7 +165,7 @@ async function main() {
       continue;
     }
 
-    const { cliente, via, contacto } = cruce.resolverLlamada(llamada, cuentaPorId, zContactoPorId);
+    const { cliente, via } = cruce.resolverLlamada(llamada, cuentaPorId, zContactoPorId);
 
     // No pisar lo que se haya vinculado a mano en la pantalla de pendientes.
     const previa = yaImportadas.get(idExterno);
@@ -188,17 +188,17 @@ async function main() {
       });
     }
 
+    // Columnas de la tabla existente (0037): asunto/contenido/duracion_min.
     filas.push({
       empresa_id: cliente?.empresa_id ?? null,
       cliente_id: cliente?.id ?? null,
-      contacto_id: contacto?.id ?? null,
       comercial_id: comercial,
       tipo: 'llamada',
       fecha,
-      titulo: llamada.Subject ?? null,
-      detalle: llamada.Description ?? null,
+      asunto: llamada.Subject ?? null,
+      contenido: llamada.Description ?? llamada.Subject ?? '',
       resultado: llamada.Call_Result ?? null,
-      duracion_seg: duracionSegundos(llamada.Call_Duration),
+      duracion_min: duracionMinutos(llamada.Call_Duration),
       pendiente: !cliente,
       origen: 'zoho',
       id_externo: idExterno,

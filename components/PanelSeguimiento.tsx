@@ -204,8 +204,8 @@ export default function PanelSeguimiento({
                     {e.resultado ? (
                       <span className="badge listo" style={{ marginLeft: 8 }}>{e.resultado}</span>
                     ) : null}
-                    {e.duracionSeg ? (
-                      <span style={{ color: 'var(--muted)', fontSize: 12 }}> · {Math.round(e.duracionSeg / 60)} min</span>
+                    {e.duracionMin ? (
+                      <span style={{ color: 'var(--muted)', fontSize: 12 }}> · {e.duracionMin} min</span>
                     ) : null}
                     {e.origen && e.origen !== 'manual' ? (
                       <span style={{ color: 'var(--muted)', fontSize: 12 }}> · {e.origen}</span>

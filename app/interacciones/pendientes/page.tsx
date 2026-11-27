@@ -58,8 +58,8 @@ export default async function InteraccionesPendientesPage() {
                 <tr key={p.id}>
                   <td style={{ whiteSpace: 'nowrap' }}>{fechaCorta(p.fecha)}</td>
                   <td style={{ textTransform: 'capitalize' }}>{p.tipo}</td>
-                  <td>{p.titulo ?? '—'}</td>
-                  <td style={{ color: 'var(--muted)', fontSize: 13 }}>{recortar(p.detalle)}</td>
+                  <td>{p.asunto ?? '—'}</td>
+                  <td style={{ color: 'var(--muted)', fontSize: 13 }}>{recortar(p.contenido)}</td>
                   <td>{p.resultado ?? '—'}</td>
                   <td style={{ color: 'var(--muted)', fontSize: 12 }}>
                     {p.origen ?? '—'}
