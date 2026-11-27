@@ -54,14 +54,36 @@ try {
     console.log('Pedidos por año:');
     console.table(porAnio);
 
-    const recientes = (
-      await pool
-        .request()
-        .query(`SELECT TOP 10 NUMDOC, SERIE, FECHA, SITUACION, FECHAPROM
-                FROM ${base}.dbo.CABEPEDV ORDER BY FECHA DESC`)
-    ).recordset;
-    console.log('Últimos 10 pedidos:');
-    console.table(recientes);
+    // Cada consulta va protegida: si una columna no existe en alguna base, se avisa
+    // y se sigue, en vez de abortar el diagnóstico entero.
+    const consulta = async (titulo, sql) => {
+      try {
+        const filas = (await pool.request().query(sql)).recordset;
+        console.log(titulo);
+        console.table(filas);
+      } catch (err) {
+        console.log(`${titulo} (no disponible: ${err.message})`);
+      }
+    };
+
+    await consulta(
+      'CERRADO:',
+      `SELECT CERRADO, COUNT(*) AS n FROM ${base}.dbo.CABEPEDV GROUP BY CERRADO ORDER BY n DESC`,
+    );
+    await consulta(
+      'COMPLETO:',
+      `SELECT COMPLETO, COUNT(*) AS n FROM ${base}.dbo.CABEPEDV GROUP BY COMPLETO ORDER BY n DESC`,
+    );
+    await consulta(
+      'SITUACIONDETALLE:',
+      `SELECT SITUACIONDETALLE, COUNT(*) AS n FROM ${base}.dbo.CABEPEDV GROUP BY SITUACIONDETALLE ORDER BY n DESC`,
+    );
+    await consulta(
+      'Últimos 10 pedidos:',
+      `SELECT TOP 10 NUMDOC, SERIE, FECHA, FECENTREGA, SITUACION, CERRADO, COMPLETO,
+              SITUACIONDETALLE, IMPNET_PDTE, TOTALEST
+       FROM ${base}.dbo.CABEPEDV ORDER BY FECHA DESC`,
+    );
   }
 } finally {
   await pool.close();
