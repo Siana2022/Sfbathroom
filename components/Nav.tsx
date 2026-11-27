@@ -30,6 +30,12 @@ export default function Nav({ userEmail, rol }: { userEmail?: string; rol?: stri
           <span>Cuadro mando comercial</span>
         </span>
       </div>
+      {/* El comercial trabaja desde la agenda: va la primera del menú. */}
+      {esComercial && (
+        <Link key="/agenda" href="/agenda" className={activo('/agenda')}>
+          Mi agenda
+        </Link>
+      )}
       <Link key="/" href="/" className={activo('/')}>
         Resumen
       </Link>
@@ -41,9 +47,6 @@ export default function Nav({ userEmail, rol }: { userEmail?: string; rol?: stri
           </Link>
           <Link key="/pedidos" href="/pedidos" className={activo('/pedidos')}>
             Pedidos
-          </Link>
-          <Link key="/agenda" href="/agenda" className={activo('/agenda')}>
-            Mi agenda
           </Link>
           <Link key="/alertas-comercial" href="/alertas-comercial" className={activo('/alertas-comercial')}>
             Mis alertas
