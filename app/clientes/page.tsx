@@ -14,6 +14,23 @@ import { EMPRESAS } from '@/lib/empresas';
 const ANIO = ANIO_ACTUAL;
 
 
+/** Crecimiento de la facturación frente al año anterior (null si no había base). */
+function crecimiento(neta: number, previa: number): number | null {
+  return previa > 0 ? ((neta - previa) / previa) * 100 : null;
+}
+
+function colorCrecimiento(neta: number, previa: number): { color: string } | undefined {
+  const v = crecimiento(neta, previa);
+  if (v === null || v === 0) return undefined;
+  return { color: v > 0 ? 'var(--verde)' : 'var(--rojo)' };
+}
+
+function textoCrecimiento(neta: number, previa: number): string {
+  const v = crecimiento(neta, previa);
+  if (v === null) return '—';
+  return `${v > 0 ? '+' : ''}${decimal(v)} %`;
+}
+
 /** Chips para acotar por empresa sin tocar el selector de la cabecera. */
 function ChipsEmpresa({ actual, searchParams }: { actual: string | null; searchParams: SearchParams }) {
   const base = new URLSearchParams();
@@ -82,15 +99,14 @@ export default async function ClientesPage({ searchParams }: { searchParams: Sea
             <h2 style={{ margin: 0 }}>Clientes por facturación {f.anio}</h2>
             <DescargarExcel
               nombre={`clientes-${ANIO}`}
-              columnas={['Empresa', 'Cliente', 'Comercial', 'Facturación', 'Margen', 'Margen %', 'Facturas', 'Ticket medio']}
+              columnas={['Empresa', 'Cliente', 'Comercial', 'Facturación', `Crecimiento vs ${f.anio - 1} %`, 'Margen', 'Ticket medio']}
               registros={f.tabla.map((c) => [
                 c.empresa,
                 c.nombre,
                 c.comercial ?? '',
                 c.neta.toFixed(2),
+                crecimiento(c.neta, c.netaPrev)?.toFixed(2) ?? '',
                 c.margen.toFixed(2),
-                c.margenPct === null ? '' : c.margenPct.toFixed(2),
-                c.facturas,
                 c.ticket.toFixed(2),
               ])}
             />
@@ -106,8 +122,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: Sea
                   <th>Comercial</th>
                   <th className="td-num">Facturación neta</th>
                   <th className="td-num">Margen</th>
-                  <th className="td-num">Margen %</th>
-                  <th className="td-num">Facturas</th>
+                  <th className="td-num" title={`Crecimiento frente a ${f.anio - 1}`}>% vs {f.anio - 1}</th>
                   <th className="td-num">Ticket medio</th>
                 </tr>
               </thead>
@@ -119,10 +134,9 @@ export default async function ClientesPage({ searchParams }: { searchParams: Sea
                     <td>{c.comercial ?? '—'}</td>
                     <td className="td-num">{eur(c.neta)}</td>
                     <td className="td-num">{eur(c.margen)}</td>
-                    <td className={`td-num ${c.margenPct !== null && c.margenPct >= 0 ? 'td-pos' : ''}`}>
-                      {c.margenPct === null ? '—' : `${decimal(c.margenPct)} %`}
+                    <td className="td-num" style={colorCrecimiento(c.neta, c.netaPrev)}>
+                      {textoCrecimiento(c.neta, c.netaPrev)}
                     </td>
-                    <td className="td-num">{numero(c.facturas)}</td>
                     <td className="td-num">{eur(c.ticket)}</td>
                   </tr>
                 ))}
@@ -280,8 +294,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: Sea
                 <th>Comercial</th>
                 <th className="td-num">Facturación neta</th>
                 <th className="td-num" title="Facturación neta menos coste de venta (mismo criterio que /margen).">Margen</th>
-                <th className="td-num" title="Margen sobre la facturación neta del cliente.">Margen %</th>
-                <th className="td-num">Facturas</th>
+                <th className="td-num" title={`Crecimiento frente a ${d.anio - 1}`}>% vs {d.anio - 1}</th>
                 <th className="td-num">Ticket medio</th>
               </tr>
             </thead>
@@ -292,10 +305,9 @@ export default async function ClientesPage({ searchParams }: { searchParams: Sea
                   <td>{c.comercial ?? '—'}</td>
                   <td className="td-num">{eur(c.neta)}</td>
                   <td className="td-num">{eur(c.margen)}</td>
-                  <td className={`td-num ${c.margenPct !== null && c.margenPct >= 0 ? 'td-pos' : ''}`}>
-                    {c.margenPct === null ? '—' : `${decimal(c.margenPct)} %`}
+                  <td className="td-num" style={colorCrecimiento(c.neta, c.netaPrev)}>
+                    {textoCrecimiento(c.neta, c.netaPrev)}
                   </td>
-                  <td className="td-num">{numero(c.facturas)}</td>
                   <td className="td-num">{eur(c.ticket)}</td>
                 </tr>
               ))}
