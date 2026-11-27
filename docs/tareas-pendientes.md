@@ -268,3 +268,23 @@ Puntos flojos detectados:
 
 Opciones para cuando se retome: llevar los umbrales a configuración (como `alertas_config`),
 medir por pedidos en lugar de facturas, o introducir estacionalidad en la frecuencia.
+
+## 10. Notas de Zoho sin cliente: BAÑOS CIEN (27 nov 2026)
+
+Tras importar Zoho quedan **19 interacciones pendientes**: 17 llamadas y 2 notas. Las dos
+notas cuelgan de «BAÑOS CIEN» (una de una visita y otra de una llamada), y **en A3ERP no
+existe ningún cliente con ese nombre**: hay `BAÑOS 10`, `BAÑOS DEL DUERO`, `BAÑOS BARCOS`,
+`ANOVA BAÑOS`… pero ninguno es ese.
+
+Decisión: **no hacer matching difuso**. Con veinte clientes que empiezan por «BAÑOS», la
+probabilidad de asignarla al cliente equivocado es alta, y un historial mal colgado es peor
+que uno pendiente. Se quedan en *Interacciones pendientes* hasta que el cliente confirme si
+BAÑOS CIEN es un prospecto de Zoho o una ficha que falta en A3ERP. Si se crea la ficha, basta
+volver a lanzar el importador: el cruce las casa solo.
+
+**Relacionado (A3ERP no aporta notas):** la ingesta de clientes lee `__CLIENTES` +
+`__ORGANIZACION` y trae nombre, NIF, dirección, teléfono, email y comercial, pero **no
+ningún campo de notas u observaciones**. Hoy las únicas notas que llegan son las de Zoho;
+las internas (`clientes_notas`) se escriben en la app. Si A3ERP tiene observaciones de
+cliente, hay que añadirlas al mapeo y decidir si van como campo del cliente o como
+`interacciones` tipo nota.
