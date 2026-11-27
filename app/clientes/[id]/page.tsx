@@ -88,6 +88,24 @@ export default async function FichaClientePage({ params }: { params: { id: strin
       )}
 
 
+      {d.cliente.observaciones ? (
+        <div className="card">
+          <h2>Observaciones (A3ERP)</h2>
+          <div
+            style={{
+              whiteSpace: 'pre-wrap',
+              fontSize: 13,
+              lineHeight: 1.55,
+              maxHeight: 340,
+              overflowY: 'auto',
+              paddingRight: 6,
+            }}
+          >
+            {d.cliente.observaciones}
+          </div>
+        </div>
+      ) : null}
+
       <div className="card" id="pedidos">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <h2 style={{ margin: 0 }}>Últimos pedidos</h2>
