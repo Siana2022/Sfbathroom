@@ -1,5 +1,6 @@
 /**
- * Carga condiciones de pago, tarifa y riesgo del cliente desde A3ERP (__CLIENTES).
+ * Carga condiciones de pago, tarifa, riesgo y observaciones del cliente desde A3ERP
+ * (__CLIENTES + __ORGANIZACION.OBSERVACIONES).
  *
  * Uso (en el PC de la ingesta, con su .env):
  *   node --env-file=.env vuelo-clientes-credito.mjs
@@ -106,8 +107,10 @@ async function main() {
 
       const filas = (
         await pool.request().query(`
-          SELECT CODCLI, FORPAG, DOCPAG, TARIFA, DIASPAGO1, RIESGOCON, SUPRIESGO
-          FROM ${base}.dbo.[__CLIENTES]
+          SELECT c.CODCLI, c.FORPAG, c.DOCPAG, c.TARIFA, c.DIASPAGO1, c.RIESGOCON, c.SUPRIESGO,
+                 o.OBSERVACIONES
+          FROM ${base}.dbo.[__CLIENTES] c
+          LEFT JOIN ${base}.dbo.[__ORGANIZACION] o ON o.IDORG = c.IDORG
         `)
       ).recordset;
 
@@ -127,6 +130,7 @@ async function main() {
           dias_pago: num(c.DIASPAGO1) === null ? null : Math.round(Number(c.DIASPAGO1)),
           riesgo_concedido: num(c.RIESGOCON),
           riesgo_actual: num(c.SUPRIESGO),
+          observaciones: limpio(c.OBSERVACIONES),
         });
       }
 

@@ -24,6 +24,7 @@ export type FichaCliente = {
     diasPago: number | null;
     riesgoConcedido: number | null;
     riesgoActual: number | null;
+    observaciones: string | null;
     estado: string;
     fechaPrimerPedido: string | null;
     comercial: string | null;
@@ -71,7 +72,7 @@ export async function getFichaCliente(codigoEmpresa: string, clienteId: string, 
 
   const { data: clienteRaw } = await supabase
     .from('clientes')
-    .select('id, nombre, codigo_erp, cif, nombre_fiscal, direccion, poblacion, provincia, pais_facturacion, telefono, email, persona_contacto, forma_pago, tarifa_codigo, dias_pago, riesgo_concedido, riesgo_actual, estado, fecha_primer_pedido, comercial_id, grupo_id')
+    .select('id, nombre, codigo_erp, cif, nombre_fiscal, direccion, poblacion, provincia, pais_facturacion, telefono, email, persona_contacto, forma_pago, tarifa_codigo, dias_pago, riesgo_concedido, riesgo_actual, estado, fecha_primer_pedido, comercial_id, grupo_id, observaciones')
     .eq('id', clienteId)
     .eq('empresa_id', empresa.id)
     .maybeSingle();
@@ -82,7 +83,8 @@ export async function getFichaCliente(codigoEmpresa: string, clienteId: string, 
     provincia: string | null; pais_facturacion: string | null;
     telefono: string | null; email: string | null; persona_contacto: string | null;
     forma_pago: string | null; tarifa_codigo: string | null; dias_pago: number | null;
-    riesgo_concedido: number | null; riesgo_actual: number | null; estado: string;
+    riesgo_concedido: number | null; riesgo_actual: number | null; observaciones: string | null;
+    estado: string;
     fecha_primer_pedido: string | null; comercial_id: string | null; grupo_id: string | null;
   };
 
@@ -197,6 +199,7 @@ export async function getFichaCliente(codigoEmpresa: string, clienteId: string, 
       diasPago: c.dias_pago,
       riesgoConcedido: c.riesgo_concedido,
       riesgoActual: c.riesgo_actual,
+      observaciones: c.observaciones,
       estado: c.estado,
       fechaPrimerPedido: c.fecha_primer_pedido,
       comercial: (comercialRes.data as { nombre?: string } | null)?.nombre ?? null,
