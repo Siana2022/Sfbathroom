@@ -69,6 +69,11 @@ export default function Nav({ userEmail, rol }: { userEmail?: string; rol?: stri
           <span className="nav-numero">{b.numero}</span> {b.titulo}
         </Link>
       ))}
+      {['admin', 'direccion'].includes(rol ?? '') && (
+        <Link key="/ranking" href="/ranking" className={activo('/ranking')}>
+          Ranking de comerciales
+        </Link>
+      )}
       {!esComercial && (
         <>
           <Link key="/cuadros" href="/cuadros" className={activo('/cuadros')}>
