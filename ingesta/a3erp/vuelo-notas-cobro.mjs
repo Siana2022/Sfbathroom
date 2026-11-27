@@ -75,13 +75,15 @@ try {
 
   for (const e of objetivo) {
     const base = `[${e.base}]`;
+    // Sin funciones de cadena en SQL: OBSERVACIONES es `text` y SQL Server no admite
+    // LTRIM/RTRIM sobre ese tipo. Se filtra en JavaScript.
     const filas = (
       await pool.request().query(`
         SELECT CODCLI, SERIE, NUMDOC, FECHA, IMPORTE, IDCARTERA, OBSERVACIONES
         FROM ${base}.dbo.EfectosClientes
-        WHERE OBSERVACIONES IS NOT NULL AND LTRIM(RTRIM(CAST(OBSERVACIONES AS nvarchar(max)))) <> ''
+        WHERE OBSERVACIONES IS NOT NULL
       `)
-    ).recordset;
+    ).recordset.filter((f) => String(f.OBSERVACIONES ?? '').trim() !== '');
 
     if (filas.length === 0) {
       console.log(`${e.codigo}: sin notas de cobro`);
