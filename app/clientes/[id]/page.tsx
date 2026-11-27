@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { cookies } from 'next/headers';
-import { getFichaCliente } from '@/lib/datos/fichaCliente';
+import { getFichaCliente, getCodigoEmpresaDeCliente } from '@/lib/datos/fichaCliente';
 import { getCrossSell } from '@/lib/datos/crosssell';
 import { decimal, eur, numero, pct } from '@/lib/formato';
 import Kpi from '@/components/Kpi';
@@ -19,7 +19,10 @@ import { ANIO_ACTUAL } from '@/lib/ejercicio';
 const ANIO = ANIO_ACTUAL;
 
 export default async function FichaClientePage({ params }: { params: { id: string } }) {
-  const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
+  // La empresa sale del propio cliente, no del selector: así se abre bien una ficha
+  // de FUX o DOT aunque el selector esté en SF.
+  const empresaCookie = cookies().get('sfb_empresa')?.value ?? 'SF';
+  const empresa = (await getCodigoEmpresaDeCliente(params.id)) ?? empresaCookie;
   const d = await getFichaCliente(empresa, params.id, ANIO);
   if (!d) notFound();
   const [crossSell, contactos, empresaData, pedidos, precios, reuniones, seguimiento] = await Promise.all([

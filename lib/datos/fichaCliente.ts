@@ -49,6 +49,22 @@ const MESES: Record<string, string> = {
   '07': 'Jul', '08': 'Ago', '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dic',
 };
 
+/**
+ * Código de empresa del cliente. La ficha no puede depender del selector de empresa:
+ * desde el buscador global o desde un pedido se abre cualquier cliente, y con la
+ * cookie puesta en otra sociedad `getFichaCliente` devolvía 404.
+ */
+export async function getCodigoEmpresaDeCliente(clienteId: string): Promise<string | null> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from('clientes')
+    .select('empresa_id, empresas(codigo)')
+    .eq('id', clienteId)
+    .maybeSingle();
+  const fila = data as { empresa_id: string; empresas: { codigo: string } | null } | null;
+  return fila?.empresas?.codigo ?? null;
+}
+
 export async function getFichaCliente(codigoEmpresa: string, clienteId: string, anio: number): Promise<FichaCliente | null> {
   const supabase = createClient();
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
