@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { createClient } from '@/lib/supabase/server';
 import { getUsuario } from '@/lib/datos/role';
+import { EMPRESAS } from '@/lib/empresas';
 import NuevaCampana from '@/components/NuevaCampana';
 
 export default async function CampanasPage() {
@@ -11,11 +12,20 @@ export default async function CampanasPage() {
   const usuario = await getUsuario();
   const supabase = createClient();
 
-  const { data } = await supabase
+  const esComercial = usuario?.rol === 'comercial';
+  const { data: empresasRaw } = await supabase.from('empresas').select('id, codigo').order('codigo');
+  // Mismo orden que en la cabecera (SF, DOT, FUX), no el alfabético.
+  const orden = new Map(EMPRESAS.map((e, i) => [e.codigo as string, i]));
+  const empresasTodas = ((empresasRaw ?? []) as { id: string; codigo: string }[]).sort(
+    (a, b) => (orden.get(a.codigo) ?? 99) - (orden.get(b.codigo) ?? 99),
+  );
+  // El comercial ve todas sus campañas (las tres empresas); el resto, las de la empresa.
+  let consulta = supabase
     .from('campanas_email')
-    .select('id, nombre, asunto, estado, total, enviados, fallidos, created_at, enviada_at')
-    .eq('empresa_id', empresa.id)
+    .select('id, nombre, asunto, estado, total, enviados, fallidos, created_at, enviada_at, empresa_id, empresas(codigo)')
     .order('created_at', { ascending: false });
+  if (!esComercial) consulta = consulta.eq('empresa_id', empresa.id);
+  const { data } = await consulta;
 
   const campanas = (data ?? []) as {
     id: string;
@@ -27,6 +37,7 @@ export default async function CampanasPage() {
     fallidos: number;
     created_at: string;
     enviada_at: string | null;
+    empresas: { codigo: string }[] | null;
   }[];
 
   const puede = usuario?.rol === 'admin' || usuario?.rol === 'direccion' || usuario?.rol === 'comercial';
@@ -47,7 +58,10 @@ export default async function CampanasPage() {
         <div className="card"><p>Solo administración, dirección y comerciales pueden gestionar campañas.</p></div>
       ) : (
         <>
-          <NuevaCampana empresaId={empresa.id} />
+          <NuevaCampana
+            empresaId={esComercial ? undefined : empresa.id}
+            empresas={esComercial ? empresasTodas : [{ id: empresa.id, codigo: empresa.codigo }]}
+          />
           <div className="card">
             <h2>Campañas ({campanas.length})</h2>
             {campanas.length === 0 ? (
@@ -56,6 +70,7 @@ export default async function CampanasPage() {
               <table className="tabla">
                 <thead>
                   <tr>
+                    {esComercial ? <th>Empresa</th> : null}
                     <th>Nombre</th>
                     <th>Asunto</th>
                     <th>Estado</th>
@@ -68,6 +83,7 @@ export default async function CampanasPage() {
                 <tbody>
                   {campanas.map((c) => (
                     <tr key={c.id}>
+                      {esComercial ? <td><span className="badge">{c.empresas?.[0]?.codigo ?? '—'}</span></td> : null}
                       <td>{c.nombre}</td>
                       <td>{c.asunto || '—'}</td>
                       <td><span className={c.estado === 'enviada' ? 'badge listo' : 'badge construccion'}>{c.estado}</span></td>
