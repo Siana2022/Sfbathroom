@@ -32,9 +32,6 @@ const DIA = 86400000;
 const UMBRAL_SIN_COMPRAR = 90;
 const UMBRAL_SIN_COMPRAR_AVISO = 60;
 const UMBRAL_CAIDA = 60;
-const UMBRAL_MORA = 2000;
-const UMBRAL_MORA_CRITICO = 10000;
-const UMBRAL_LIMITE = 90;
 const UMBRAL_NUEVO_DIAS = 45;
 const UMBRAL_OBJETIVO = 0.8;
 
@@ -114,15 +111,6 @@ export async function calcularAlertasComercial(
     if (!prev || f.fecha > prev) ultima.set(f.cliente_id, f.fecha);
   }
 
-  const { data: resumen } = await supabase.rpc('cobros_resumen', {
-    p_codigo_empresa: codigoEmpresa,
-    p_cliente: null,
-  });
-  const porClienteCobros = new Map<string, { saldo: number; vencido: number }>();
-  for (const c of ((resumen as { por_cliente?: { cliente_id: string; saldo: number; vencido: number }[] } | null)?.por_cliente ?? [])) {
-    porClienteCobros.set(c.cliente_id, { saldo: Number(c.saldo ?? 0), vencido: Number(c.vencido ?? 0) });
-  }
-
   const alertas: AlertaComercial[] = [];
 
   for (const c of clientes) {
@@ -167,49 +155,6 @@ export async function calcularAlertasComercial(
         enlace: `/clientes/${c.id}`,
         comercialId,
       });
-    }
-
-    const cobros = porClienteCobros.get(c.id);
-    if (cobros && cobros.vencido > 0) {
-      if (cobros.vencido >= UMBRAL_MORA_CRITICO) {
-        alertas.push({
-          tipo: 'mora',
-          categoria: 'cobros',
-          clave: '',
-          severidad: 'critico',
-          titulo: `${c.nombre} debe ${Math.round(cobros.vencido)} € vencidos`,
-          detalle: 'Mora elevada: revisar cobro antes de seguir sirviendo',
-          enlace: '/credito-cobro',
-          comercialId,
-        });
-      } else if (cobros.vencido >= UMBRAL_MORA) {
-        alertas.push({
-          tipo: 'mora',
-          categoria: 'cobros',
-          clave: '',
-          severidad: 'aviso',
-          titulo: `${c.nombre} tiene ${Math.round(cobros.vencido)} € vencidos`,
-          detalle: 'Mora pendiente de cobro',
-          enlace: '/credito-cobro',
-          comercialId,
-        });
-      }
-    }
-
-    if (c.limite_credito && c.limite_credito > 0 && cobros) {
-      const uso = (cobros.saldo / c.limite_credito) * 100;
-      if (uso >= UMBRAL_LIMITE) {
-        alertas.push({
-          tipo: 'limite',
-          categoria: 'cobros',
-          clave: '',
-          severidad: uso >= 100 ? 'critico' : 'aviso',
-          titulo: `${c.nombre} usa el ${Math.round(uso)} % de su límite`,
-          detalle: `Saldo ${Math.round(cobros.saldo)} € de ${Math.round(c.limite_credito)} €`,
-          enlace: `/clientes/${c.id}`,
-          comercialId,
-        });
-      }
     }
 
     if ((facturasAnio.get(c.id) ?? 0) === 1 && dias > UMBRAL_NUEVO_DIAS) {
