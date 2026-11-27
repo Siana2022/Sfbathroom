@@ -23,6 +23,13 @@ export function normalizar(valor) {
     .trim();
 }
 
+/** `$se_module` / `Parent_Id.module` pueden venir como texto o como objeto {api_name}. */
+export function apiNameDeModulo(modulo) {
+  if (!modulo) return null;
+  if (typeof modulo === 'string') return modulo;
+  return modulo.api_name ?? null;
+}
+
 /** `What_Id`/`Parent_Id` pueden venir como objeto {id,name} o como id suelto. */
 export function idDe(valor) {
   if (!valor) return null;
@@ -121,16 +128,24 @@ export function crearCruce({ clientes, contactos }) {
   }
 
   /**
-   * Nota de Zoho: el vínculo real está en `Parent_Id`, que apunta a una cuenta o a un
-   * contacto según `$se_module`. Si el registro no trae `$se_module` (pasa a menudo),
-   * se deduce por el id: si está en el listado de cuentas es cuenta; si está en el de
-   * contactos, contacto.
+   * Nota de Zoho: el vínculo real está en `Parent_Id`. En sfbathroom casi todas cuelgan
+   * de una **llamada**, no de una cuenta o un contacto, así que el orden es:
+   *   1. si el padre es una llamada → el cliente de esa llamada (vínculo exacto);
+   *   2. si es una cuenta → el cliente de esa cuenta;
+   *   3. si es un contacto → su email o su cuenta;
+   *   4. y si no trae módulo, se deduce por el id.
    */
-  function resolverNota(nota, cuentaPorId, zContactoPorId) {
+  function resolverNota(nota, cuentaPorId, zContactoPorId, llamadaPorId) {
     const parentId = idDe(nota.Parent_Id);
-    const modulo = nota.$se_module ?? (nota.Parent_Id && typeof nota.Parent_Id === 'object' ? nota.Parent_Id.module : null);
+    const modulo = apiNameDeModulo(nota.$se_module) ?? apiNameDeModulo(nota.Parent_Id?.module);
 
     if (parentId) {
+      const esLlamada = modulo === 'Calls' || (!modulo && llamadaPorId?.has(parentId));
+      if (esLlamada && llamadaPorId?.has(parentId)) {
+        const r = resolverLlamada(llamadaPorId.get(parentId), cuentaPorId, zContactoPorId);
+        if (r.cliente) return { cliente: r.cliente, via: 'nota-llamada', contacto: r.contacto };
+      }
+
       const esCuenta = modulo === 'Accounts' || (!modulo && cuentaPorId.has(parentId));
       if (esCuenta && cuentaPorId.has(parentId)) {
         const c = buscarCliente(cuentaPorId.get(parentId), idx, clientes);
