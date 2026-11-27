@@ -4,7 +4,18 @@ export type EventoSeguimiento =
   | { tipo: 'nota'; id: string; fecha: string; texto: string; autor: string | null }
   | { tipo: 'reunion'; id: string; fecha: string; titulo: string; estado: string | null; contacto: string | null }
   | { tipo: 'cambio'; id: string; fecha: string; texto: string; motivo: string | null }
-  | { tipo: 'alta'; id: string; fecha: string; texto: string };
+  | { tipo: 'alta'; id: string; fecha: string; texto: string }
+  | {
+      tipo: 'interaccion';
+      id: string;
+      fecha: string;
+      subtipo: string;
+      titulo: string | null;
+      detalle: string | null;
+      resultado: string | null;
+      duracionSeg: number | null;
+      origen: string | null;
+    };
 
 export type AlertaCliente = {
   id: string;
@@ -21,7 +32,7 @@ export async function getSeguimientoCliente(clienteId: string): Promise<{
 }> {
   const supabase = createClient();
 
-  const [notasRes, agendaRes, alertasRes] = await Promise.all([
+  const [notasRes, agendaRes, alertasRes, interaccionesRes] = await Promise.all([
     supabase
       .from('clientes_notas')
       .select('id, texto, created_at, autor_id')
@@ -40,6 +51,13 @@ export async function getSeguimientoCliente(clienteId: string): Promise<{
       .eq('cliente_id', clienteId)
       .order('resuelta')
       .order('created_at', { ascending: false }),
+    // Llamadas, notas y correos importados (Zoho y futuras fuentes).
+    supabase
+      .from('interacciones')
+      .select('id, tipo, fecha, titulo, detalle, resultado, duracion_seg, origen')
+      .eq('cliente_id', clienteId)
+      .order('fecha', { ascending: false })
+      .limit(60),
   ]);
 
   const notas = (notasRes.data ?? []) as { id: string; texto: string; created_at: string; autor_id: string | null }[];
@@ -61,8 +79,30 @@ export async function getSeguimientoCliente(clienteId: string): Promise<{
         .limit(30)
     : { data: [] as { id: string; agenda_id: string; fecha_anterior: string | null; fecha_nueva: string | null; motivo: string | null; created_at: string }[] };
 
+  const interacciones = (interaccionesRes.data ?? []) as {
+    id: string;
+    tipo: string;
+    fecha: string;
+    titulo: string | null;
+    detalle: string | null;
+    resultado: string | null;
+    duracion_seg: number | null;
+    origen: string | null;
+  }[];
+
   const eventos: EventoSeguimiento[] = [
     ...notas.map((n) => ({ tipo: 'nota' as const, id: n.id, fecha: n.created_at, texto: n.texto, autor: null })),
+    ...interacciones.map((i) => ({
+      tipo: 'interaccion' as const,
+      id: i.id,
+      fecha: i.fecha,
+      subtipo: i.tipo,
+      titulo: i.titulo,
+      detalle: i.detalle,
+      resultado: i.resultado,
+      duracionSeg: i.duracion_seg,
+      origen: i.origen,
+    })),
     ...reuniones.map((r) => ({
       tipo: 'reunion' as const,
       id: r.id,

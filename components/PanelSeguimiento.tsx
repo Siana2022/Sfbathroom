@@ -9,7 +9,22 @@ const ICONO: Record<EventoSeguimiento['tipo'], string> = {
   reunion: '🤝',
   cambio: '🔁',
   alta: '•',
+  interaccion: '📞',
 };
+
+/** Icono según el subtipo de la interacción importada. */
+const ICONO_INTERACCION: Record<string, string> = {
+  llamada: '📞',
+  nota: '🗒️',
+  correo: '✉️',
+  tarea: '✅',
+};
+
+function recortar(texto: string | null, max = 400): string | null {
+  if (!texto) return null;
+  const limpio = texto.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  return limpio.length > max ? `${limpio.slice(0, max)}…` : limpio;
+}
 
 function fecha(iso: string) {
   const d = new Date(iso.length === 10 ? `${iso}T00:00:00` : iso);
@@ -163,7 +178,9 @@ export default function PanelSeguimiento({
         <ol style={{ listStyle: 'none', padding: 0, margin: 0 }}>
           {eventos.map((e) => (
             <li key={`${e.tipo}-${e.id}`} style={{ display: 'flex', gap: 12, padding: '8px 0', borderTop: '1px solid var(--border)' }}>
-              <span aria-hidden="true" style={{ width: 22 }}>{ICONO[e.tipo]}</span>
+              <span aria-hidden="true" style={{ width: 22 }}>
+                {e.tipo === 'interaccion' ? ICONO_INTERACCION[e.subtipo] ?? '📞' : ICONO[e.tipo]}
+              </span>
               <span style={{ width: 92, color: 'var(--muted)', fontSize: 13, flexShrink: 0 }}>{fecha(e.fecha)}</span>
               <span style={{ flex: 1, fontSize: 14 }}>
                 {e.tipo === 'nota' ? e.texto : null}
@@ -181,6 +198,23 @@ export default function PanelSeguimiento({
                   </>
                 ) : null}
                 {e.tipo === 'alta' ? e.texto : null}
+                {e.tipo === 'interaccion' ? (
+                  <>
+                    <strong>{e.titulo ?? (e.subtipo === 'llamada' ? 'Llamada' : 'Interacción')}</strong>
+                    {e.resultado ? (
+                      <span className="badge listo" style={{ marginLeft: 8 }}>{e.resultado}</span>
+                    ) : null}
+                    {e.duracionSeg ? (
+                      <span style={{ color: 'var(--muted)', fontSize: 12 }}> · {Math.round(e.duracionSeg / 60)} min</span>
+                    ) : null}
+                    {e.origen && e.origen !== 'manual' ? (
+                      <span style={{ color: 'var(--muted)', fontSize: 12 }}> · {e.origen}</span>
+                    ) : null}
+                    {recortar(e.detalle) ? (
+                      <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 2 }}>{recortar(e.detalle)}</div>
+                    ) : null}
+                  </>
+                ) : null}
               </span>
             </li>
           ))}

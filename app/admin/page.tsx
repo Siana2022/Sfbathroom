@@ -53,6 +53,7 @@ export default async function AdminPage() {
       <h1>Administración de usuarios</h1>
       <p style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
         <Link href="/marketing/campanas" className="boton">Email marketing</Link>
+        <Link href="/interacciones/pendientes" className="boton">Interacciones pendientes</Link>
         <Link href="/marketing/plantillas" className="boton">Plantillas de email</Link>
         <Link href="/marketing/bajas" className="boton">Bajas de correo</Link>
         <Link href="/configuracion/plantillas-reunion" className="boton">Plantillas de reunión</Link>

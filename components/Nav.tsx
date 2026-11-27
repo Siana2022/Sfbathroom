@@ -96,6 +96,11 @@ export default function Nav({ userEmail, rol }: { userEmail?: string; rol?: stri
       ))}
       {!esComercial && (
         <>
+          {['admin', 'direccion'].includes(rol ?? '') && (
+            <Link key="/interacciones/pendientes" href="/interacciones/pendientes" className={activo('/interacciones/pendientes')}>
+              Interacciones pendientes
+            </Link>
+          )}
           <Link key="/admin" href="/admin" className={activo('/admin')}>
             Administración
           </Link>
