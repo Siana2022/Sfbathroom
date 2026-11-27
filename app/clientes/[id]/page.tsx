@@ -76,14 +76,6 @@ export default async function FichaClientePage({ params }: { params: { id: strin
       <p className="breadcrumb">
         <Link href="/clientes">Clientes</Link> · Ficha 360º
       </p>
-      <nav style={{ display: 'flex', gap: 14, flexWrap: 'wrap', margin: '4px 0 14px', fontSize: 13 }}>
-        <a href="#resumen" className="enlace">Resumen</a>
-        <a href="#pedidos" className="enlace">Pedidos ({pedidos.length})</a>
-        <a href="#tarifas" className="enlace">Tarifas y precios</a>
-        <a href="#seguimiento" className="enlace">Seguimiento ({seguimiento.eventos.length})</a>
-        <a href="#reuniones" className="enlace">Reuniones ({reuniones.length})</a>
-        <a href="#contactos" className="enlace">Contactos ({contactos.length})</a>
-      </nav>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
         <h1 style={{ marginBottom: 6 }}>{d.cliente.nombre}</h1>
         <Link href={`/agenda?cliente=${d.cliente.id}#nueva`} className="boton">Agendar reunión</Link>
@@ -96,6 +88,39 @@ export default async function FichaClientePage({ params }: { params: { id: strin
         {d.cliente.grupo && <> · Grupo: {d.cliente.grupo}</>}
         {' · '}<span className={d.cliente.estado === 'activo' ? 'badge listo' : 'badge construccion'}>{d.cliente.estado}</span>
       </p>
+
+      <ul className="grid-kpis">
+        <Kpi etiqueta={`Facturación neta ${d.anio}`} valor={eur(d.neta)} nota={d.deltaPct === null ? 'sin dato previo' : `vs ${d.anio - 1}: ${pct(d.deltaPct)}`} />
+        <Kpi etiqueta="Facturas" valor={numero(d.facturas)} nota={`${numero(d.unidades)} unidades`} />
+        <Kpi etiqueta="Ticket medio" valor={eur(d.ticketMedio)} nota="por factura" />
+        <Kpi etiqueta="Saldo pendiente" valor={eur(d.saldo)} nota={`${eur(d.vencido)} vencido`} />
+        <Kpi etiqueta="DSO del cliente" valor={d.dsoDias === null ? '—' : `${decimal(d.dsoDias)} días`} nota="últimos 12 meses" />
+      </ul>
+
+      <div className="card">
+        <h2>Facturación de los últimos 12 meses</h2>
+        <p style={{ color: 'var(--muted)', fontSize: 13, margin: '0 0 10px' }}>
+          Cada barra es un mes; la segunda, el mismo mes del año anterior.
+        </p>
+        <GraficoBarras
+          series={barras}
+          formato={eur}
+          leyenda={{ a: 'Últimos 12 meses', b: 'Mismos meses del año anterior' }}
+        />
+      </div>
+
+
+      <PanelSeguimiento
+        clienteId={d.cliente.id}
+        empresaId={empresaData.id}
+        eventos={seguimiento.eventos}
+        alertas={seguimiento.alertas}
+      />
+
+      <details style={{ marginTop: 18 }}>
+        <summary style={{ cursor: 'pointer', color: 'var(--muted)', fontSize: 14, padding: '10px 0' }}>
+          Más información: contacto, pedidos, tarifas, reuniones, artículos y facturas
+        </summary>
 
       {(d.cliente.nombreFiscal || d.cliente.direccion || d.cliente.telefono || d.cliente.email) && (
         <div className="card">
@@ -322,37 +347,11 @@ export default async function FichaClientePage({ params }: { params: { id: strin
         )}
       </div>
 
-      <PanelSeguimiento
-        clienteId={d.cliente.id}
-        empresaId={empresaData.id}
-        eventos={seguimiento.eventos}
-        alertas={seguimiento.alertas}
-      />
 
       <div id="contactos">
         <EditorContactosCliente clienteId={d.cliente.id} empresaId={empresaData.id} contactos={contactos} />
       </div>
 
-      <div id="resumen"></div>
-      <ul className="grid-kpis">
-        <Kpi etiqueta={`Facturación neta ${d.anio}`} valor={eur(d.neta)} nota={d.deltaPct === null ? 'sin dato previo' : `vs ${d.anio - 1}: ${pct(d.deltaPct)}`} />
-        <Kpi etiqueta="Facturas" valor={numero(d.facturas)} nota={`${numero(d.unidades)} unidades`} />
-        <Kpi etiqueta="Ticket medio" valor={eur(d.ticketMedio)} nota="por factura" />
-        <Kpi etiqueta="Saldo pendiente" valor={eur(d.saldo)} nota={`${eur(d.vencido)} vencido`} />
-        <Kpi etiqueta="DSO del cliente" valor={d.dsoDias === null ? '—' : `${decimal(d.dsoDias)} días`} nota="últimos 12 meses" />
-      </ul>
-
-      <div className="card">
-        <h2>Facturación de los últimos 12 meses</h2>
-        <p style={{ color: 'var(--muted)', fontSize: 13, margin: '0 0 10px' }}>
-          Cada barra es un mes; la segunda, el mismo mes del año anterior.
-        </p>
-        <GraficoBarras
-          series={barras}
-          formato={eur}
-          leyenda={{ a: 'Últimos 12 meses', b: 'Mismos meses del año anterior' }}
-        />
-      </div>
 
       <div className="card">
         <h2>Top artículos comprados {d.anio}</h2>
@@ -432,6 +431,8 @@ export default async function FichaClientePage({ params }: { params: { id: strin
           </table>
         )}
       </div>
+      </details>
+
     </div>
   );
 }
