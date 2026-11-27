@@ -10,6 +10,7 @@ import { getContactosCliente } from '@/lib/datos/contactos';
 import { getPedidosCliente, getPreciosCliente, getReunionesCliente } from '@/lib/datos/ficha360';
 import { getEmpresaPorCodigo } from '@/lib/datos/facturacion';
 import { getSeguimientoCliente } from '@/lib/datos/seguimiento';
+import { getNotasCobroCliente } from '@/lib/datos/cobrosNotas';
 import PanelSeguimiento from '@/components/PanelSeguimiento';
 import BotonExportar from '@/components/BotonExportar';
 import GraficoBarras from '@/components/GraficoBarras';
@@ -25,7 +26,7 @@ export default async function FichaClientePage({ params }: { params: { id: strin
   const empresa = (await getCodigoEmpresaDeCliente(params.id)) ?? empresaCookie;
   const d = await getFichaCliente(empresa, params.id, ANIO);
   if (!d) notFound();
-  const [crossSell, contactos, empresaData, pedidos, precios, reuniones, seguimiento] = await Promise.all([
+  const [crossSell, contactos, empresaData, pedidos, precios, reuniones, seguimiento, notasCobro] = await Promise.all([
     getCrossSell(empresa, params.id, ANIO),
     getContactosCliente(params.id),
     getEmpresaPorCodigo(empresa),
@@ -33,6 +34,7 @@ export default async function FichaClientePage({ params }: { params: { id: strin
     getPreciosCliente(d.cliente.codigoErp),
     getReunionesCliente(params.id),
     getSeguimientoCliente(params.id),
+    getNotasCobroCliente(params.id),
   ]);
 
   const barras = d.historico.map((m) => ({ etiqueta: m.mes, valor: Math.max(0, m.neta), titulo: `${m.mes}: ${eur(m.neta)}` }));
@@ -103,6 +105,27 @@ export default async function FichaClientePage({ params }: { params: { id: strin
           >
             {d.cliente.observaciones}
           </div>
+        </div>
+      ) : null}
+
+      {notasCobro.length > 0 ? (
+        <div className="card">
+          <h2>Notas de cobro</h2>
+          <p style={{ color: 'var(--muted)', fontSize: 13, margin: '4px 0 12px' }}>
+            Anotaciones de efectos y cobros de A3ERP. Solo visible para administración, dirección y financiero.
+          </p>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            {notasCobro.map((n) => (
+              <li key={n.id} style={{ borderLeft: '3px solid var(--border-2)', padding: '6px 0 10px 12px', marginBottom: 10 }}>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>
+                  {n.fecha ? new Date(`${n.fecha}T00:00:00`).toLocaleDateString('es-ES') : 'sin fecha'}
+                  {n.documento ? ` · ${n.documento}` : ''}
+                  {n.importe !== null ? ` · ${eur(n.importe)}` : ''}
+                </div>
+                <div style={{ fontSize: 13, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{n.texto}</div>
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
 
