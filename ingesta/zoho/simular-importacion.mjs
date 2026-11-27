@@ -2,7 +2,8 @@
  * Simulación de importación de Zoho CRM (solo lectura, no escribe nada).
  *
  * Lee llamadas y notas de Zoho, las cruza con los clientes de las tres empresas
- * y genera un informe de coincidencias.
+ * y genera un informe de coincidencias. El cruce vive en `lib/cruce.mjs`, que es
+ * el mismo que usa el importador real.
  *
  * Variables necesarias (.env):
  *   ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, ZOHO_REFRESH_TOKEN
@@ -12,6 +13,7 @@
  * Uso: node --env-file=.env ingesta/zoho/simular-importacion.mjs
  */
 import { writeFileSync } from 'node:fs';
+import { crearCruce, idDe } from './lib/cruce.mjs';
 
 const ZOHO_CLIENT_ID = process.env.ZOHO_CLIENT_ID ?? '';
 const ZOHO_CLIENT_SECRET = process.env.ZOHO_CLIENT_SECRET ?? '';
@@ -24,17 +26,6 @@ if (!ZOHO_REFRESH_TOKEN || !SUPABASE_URL || !SERVICE_KEY) {
   console.error('Faltan variables: ZOHO_REFRESH_TOKEN, SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY.');
   process.exit(1);
 }
-
-const normalizar = (s) =>
-  (s ?? '')
-    .toString()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toUpperCase()
-    .replace(/\b(S\.?L\.?U?|S\.?A\.?U?|S\.?C\.?P|SOCIEDAD LIMITADA)\b/g, '')
-    .replace(/[^A-Z0-9 ]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
 
 async function tokenZoho() {
   const res = await fetch(`https://accounts.zoho.${ZOHO_DOMAIN}/oauth/v2/token`, {
@@ -86,86 +77,37 @@ async function supabase(tabla, campos) {
   return filas;
 }
 
-function indiceClientes(clientes) {
-  const porNombre = new Map();
-  const porCif = new Map();
-  for (const c of clientes) {
-    const n = normalizar(c.nombre);
-    if (n) porNombre.set(n, c);
-    if (c.cif) porCif.set(String(c.cif).replace(/[^A-Z0-9]/gi, '').toUpperCase(), c);
-  }
-  return { porNombre, porCif };
-}
-
-function buscarCliente(texto, idx, clientes) {
-  const n = normalizar(texto);
-  if (!n) return null;
-  if (idx.porNombre.has(n)) return idx.porNombre.get(n);
-  // coincidencia por nombre contenido en el asunto (el más largo gana)
-  let mejor = null;
-  for (const c of clientes) {
-    const cn = normalizar(c.nombre);
-    if (cn.length < 4) continue;
-    if (n.includes(cn) && (!mejor || cn.length > normalizar(mejor.nombre).length)) mejor = c;
-  }
-  return mejor;
-}
-
 async function main() {
   const token = await tokenZoho();
-  const [clientes, contactos] = await Promise.all([
-    supabase('clientes', 'id,nombre,cif,empresa_id'),
+  const [clientes, contactos, cuentas, zContacts, llamadas, notas] = await Promise.all([
+    supabase('clientes', 'id,nombre,cif,empresa_id,comercial_id'),
     supabase('clientes_contactos', 'id,nombre,email,cliente_id'),
-  ]);
-  const idx = indiceClientes(clientes);
-  const contactoPorEmail = new Map(contactos.filter((c) => c.email).map((c) => [String(c.email).toLowerCase(), c]));
-
-  const [cuentas, zContacts, llamadas, notas] = await Promise.all([
     zohoAll(token, 'Accounts', 'id,Account_Name'),
     zohoAll(token, 'Contacts', 'id,Full_Name,Email,Account_Name,Account_Name.id'),
     zohoAll(token, 'Calls', 'id,Subject,Call_Start_Time,Call_Duration,Description,Call_Result,Who_Id,What_Id,Owner'),
     zohoAll(token, 'Notes', 'id,Note_Title,Note_Content,Parent_Id,Created_Time,Owner'),
   ]);
 
+  const cruce = crearCruce({ clientes, contactos });
   const cuentaPorId = new Map(cuentas.map((c) => [c.id, c.Account_Name]));
   const zContactoPorId = new Map(zContacts.map((c) => [c.id, c]));
 
-  const resolver = (fila) => {
-    // 1) por cuenta relacionada
-    const whatId = fila.What_Id?.id ?? fila.What_Id;
-    if (whatId && cuentaPorId.has(whatId)) {
-      const c = buscarCliente(cuentaPorId.get(whatId), idx, clientes);
-      if (c) return { cliente: c, via: 'cuenta' };
-    }
-    // 2) por contacto relacionado
-    const whoId = fila.Who_Id?.id ?? fila.Who_Id;
-    if (whoId && zContactoPorId.has(whoId)) {
-      const zc = zContactoPorId.get(whoId);
-      if (zc.Email && contactoPorEmail.has(String(zc.Email).toLowerCase())) {
-        const c = clientes.find((x) => x.id === contactoPorEmail.get(String(zc.Email).toLowerCase()).cliente_id);
-        if (c) return { cliente: c, via: 'contacto-email' };
-      }
-      const porCuenta = zc.Account_Name?.id ? cuentaPorId.get(zc.Account_Name.id) : zc.Account_Name;
-      if (porCuenta) {
-        const c = buscarCliente(porCuenta, idx, clientes);
-        if (c) return { cliente: c, via: 'contacto-cuenta' };
-      }
-    }
-    // 3) por texto del asunto
-    const c = buscarCliente(fila.Subject ?? fila.Note_Title, idx, clientes);
-    if (c) return { cliente: c, via: 'texto' };
-    return { cliente: null, via: null };
-  };
-
   const informe = {
     generado: new Date().toISOString(),
-    totales: { clientes: clientes.length, cuentasZoho: cuentas.length, contactosZoho: zContacts.length, llamadas: llamadas.length, notas: notas.length },
-    llamadas: { casan: 0, sueltas: 0, porVia: {}, sinTexto: 0, ejemplosSueltos: [] },
-    notas: { casan: 0, sueltas: 0, porVia: {}, ejemplosSueltos: [] },
+    totales: {
+      clientes: clientes.length,
+      contactosLocales: contactos.length,
+      cuentasZoho: cuentas.length,
+      contactosZoho: zContacts.length,
+      llamadas: llamadas.length,
+      notas: notas.length,
+    },
+    llamadas: { casan: 0, sueltas: 0, porVia: {}, ejemplosSueltos: [] },
+    notas: { casan: 0, sueltas: 0, porVia: {}, porModuloPadre: { Accounts: 0, Contacts: 0, sinModulo: 0, sinPadre: 0 }, ejemplosSueltos: [] },
   };
 
   for (const l of llamadas) {
-    const { cliente, via } = resolver(l);
+    const { cliente, via } = cruce.resolverLlamada(l, cuentaPorId, zContactoPorId);
     if (cliente) {
       informe.llamadas.casan += 1;
       informe.llamadas.porVia[via] = (informe.llamadas.porVia[via] ?? 0) + 1;
@@ -183,14 +125,27 @@ async function main() {
   }
 
   for (const n of notas) {
-    const { cliente, via } = resolver(n);
+    const parentId = idDe(n.Parent_Id);
+    const modulo = n.$se_module ?? (n.Parent_Id && typeof n.Parent_Id === 'object' ? n.Parent_Id.module : null);
+    if (!parentId) informe.notas.porModuloPadre.sinPadre += 1;
+    else if (modulo === 'Accounts') informe.notas.porModuloPadre.Accounts += 1;
+    else if (modulo === 'Contacts') informe.notas.porModuloPadre.Contacts += 1;
+    else informe.notas.porModuloPadre.sinModulo += 1;
+
+    const { cliente, via } = cruce.resolverNota(n, cuentaPorId, zContactoPorId);
     if (cliente) {
       informe.notas.casan += 1;
       informe.notas.porVia[via] = (informe.notas.porVia[via] ?? 0) + 1;
     } else {
       informe.notas.sueltas += 1;
       if (informe.notas.ejemplosSueltos.length < 15) {
-        informe.notas.ejemplosSueltos.push({ titulo: n.Note_Title, fecha: n.Created_Time });
+        informe.notas.ejemplosSueltos.push({
+          titulo: n.Note_Title,
+          fecha: n.Created_Time,
+          padre_id: parentId,
+          padre_nombre: n.Parent_Id?.name ?? null,
+          modulo,
+        });
       }
     }
   }
@@ -199,6 +154,7 @@ async function main() {
   console.log(JSON.stringify(informe.totales, null, 2));
   console.log('Llamadas:', informe.llamadas.casan, 'casan ·', informe.llamadas.sueltas, 'sueltas');
   console.log('Notas:   ', informe.notas.casan, 'casan ·', informe.notas.sueltas, 'sueltas');
+  console.log('Padres de nota:', JSON.stringify(informe.notas.porModuloPadre));
   console.log('Detalle en informe-zoho.json');
 }
 
