@@ -2,3 +2,4 @@
 // registro en lib/jobs/registro (efecto secundario).
 import '@/lib/jobs/resumenDiario';
 import '@/lib/jobs/informeSemanal';
+import '@/lib/jobs/alertasComercial';
