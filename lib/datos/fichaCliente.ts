@@ -41,6 +41,8 @@ export type FichaCliente = {
   vencido: number;
   dsoDias: number | null;
   historico: { mes: string; neta: number }[];
+  /** Últimos 12 meses frente a los mismos meses del año anterior. */
+  comparativa: { etiqueta: string; actual: number; previo: number; titulo: string }[];
   ultimasFacturas: { id: string; fecha: string; numero: string | null; importe: number; tipo: string }[];
   topArticulos: { nombre: string; unidades: number; importe: number }[];
 };
@@ -102,7 +104,7 @@ export async function getFichaCliente(codigoEmpresa: string, clienteId: string, 
     .select('id, numero_erp, fecha, tipo_documento, total, base_imponible')
     .eq('empresa_id', empresa.id)
     .eq('cliente_id', clienteId)
-    .gte('fecha', `${anio - 1}-01-01`);
+    .gte('fecha', `${anio - 2}-01-01`);
   const filas = (facturas ?? []) as { id: string; numero_erp: string | null; fecha: string; tipo_documento: string; total: number; base_imponible: number }[];
 
   const delAnio = filas.filter((f) => f.fecha.slice(0, 4) === String(anio));
@@ -180,6 +182,30 @@ export async function getFichaCliente(codigoEmpresa: string, clienteId: string, 
     .slice(0, 8)
     .map((f) => ({ id: f.id, fecha: f.fecha, numero: f.numero_erp, importe: Number(f.total ?? 0), tipo: f.tipo_documento }));
 
+  // Ventana móvil: los 12 meses cerrados hasta este mes, y los mismos del año anterior.
+  const porMesTotal = new Map<string, number>();
+  for (const f of filas) {
+    if (!f.fecha) continue;
+    const clave = f.fecha.slice(0, 7);
+    porMesTotal.set(clave, (porMesTotal.get(clave) ?? 0) + netaDeDocumento(f.tipo_documento, f.base_imponible));
+  }
+  const comparativa: FichaCliente['comparativa'] = [];
+  const ref = new Date();
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(ref.getFullYear(), ref.getMonth() - i, 1);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const clave = `${d.getFullYear()}-${mm}`;
+    const clavePrevia = `${d.getFullYear() - 1}-${mm}`;
+    const actual = porMesTotal.get(clave) ?? 0;
+    const previo = porMesTotal.get(clavePrevia) ?? 0;
+    comparativa.push({
+      etiqueta: MESES[mm],
+      actual,
+      previo,
+      titulo: `${MESES[mm]} ${d.getFullYear()}: ${Math.round(actual)} € · ${MESES[mm]} ${d.getFullYear() - 1}: ${Math.round(previo)} €`,
+    });
+  }
+
   return {
     cliente: {
       id: c.id,
@@ -216,6 +242,7 @@ export async function getFichaCliente(codigoEmpresa: string, clienteId: string, 
     vencido,
     dsoDias,
     historico,
+    comparativa,
     topArticulos,
     ultimasFacturas: ultimas,
   };

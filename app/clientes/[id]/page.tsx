@@ -64,7 +64,12 @@ export default async function FichaClientePage({ params }: { params: { id: strin
     getNotasCobroCliente(params.id),
   ]);
 
-  const barras = d.historico.map((m) => ({ etiqueta: m.mes, valor: Math.max(0, m.neta), titulo: `${m.mes}: ${eur(m.neta)}` }));
+  const barras = d.comparativa.map((m) => ({
+    etiqueta: m.etiqueta,
+    valor: Math.max(0, m.actual),
+    valor2: Math.max(0, m.previo),
+    titulo: m.titulo,
+  }));
 
   return (
     <div>
@@ -338,8 +343,15 @@ export default async function FichaClientePage({ params }: { params: { id: strin
       </ul>
 
       <div className="card">
-        <h2>Evolución de compras (15 meses)</h2>
-        <GraficoBarras series={barras} formato={eur} leyenda={{ a: 'Compras netas' }} />
+        <h2>Facturación de los últimos 12 meses</h2>
+        <p style={{ color: 'var(--muted)', fontSize: 13, margin: '0 0 10px' }}>
+          Cada barra es un mes; la segunda, el mismo mes del año anterior.
+        </p>
+        <GraficoBarras
+          series={barras}
+          formato={eur}
+          leyenda={{ a: 'Últimos 12 meses', b: 'Mismos meses del año anterior' }}
+        />
       </div>
 
       <div className="card">
