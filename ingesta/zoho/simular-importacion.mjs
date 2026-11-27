@@ -74,7 +74,7 @@ async function supabase(tabla, campos) {
   const filas = [];
   let desde = 0;
   for (;;) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${tabla}?select=${campos}&range=${desde}-${desde + 999}`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${tabla}?select=${campos}&limit=1000&offset=${desde}`, {
       headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
     });
     if (!res.ok) throw new Error(`${tabla} ${res.status}: ${await res.text()}`);
