@@ -5,6 +5,8 @@ import '@/lib/jobs';
 import { ejecutarJob } from '@/lib/jobs/ejecutar';
 import { listarJobs, obtenerJob } from '@/lib/jobs/registro';
 
+export const maxDuration = 60;
+
 
 const JOBS_SECRET = process.env.JOBS_CRON_SECRET;
 
