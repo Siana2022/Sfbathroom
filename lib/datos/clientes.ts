@@ -446,3 +446,51 @@ async function calcularClientes(codigoEmpresa: string, anio: number, filtros?: F
     listas,
   };
 }
+
+export type ClientesFusionados = {
+  anio: number;
+  activos12m: number;
+  retencion: number | null;
+  nuevos: number;
+  recuperados: number;
+  inactivos: number;
+  perdidos: number;
+  listas: ListasClientes;
+  tabla: (ClientesData['tabla'][number] & { empresa: string })[];
+};
+
+/**
+ * Listado consolidado de clientes de las tres empresas, para el comercial que no
+ * cambia de sociedad. Solo el listado y los totales: el análisis por empresa
+ * (semáforo, matriz, evolución) se sigue viendo eligiendo la empresa.
+ */
+export async function getClientesFusionados(anio: number, filtros?: Filtros): Promise<ClientesFusionados> {
+  const { EMPRESAS } = await import('@/lib/empresas');
+  const partes = await Promise.all(
+    EMPRESAS.map(async (e) => ({ codigo: e.codigo, datos: await getClientes(e.codigo, anio, filtros) })),
+  );
+
+  const suma = (f: (d: ClientesData) => number) => partes.reduce((s, p) => s + f(p.datos), 0);
+  const activosPrevio = suma((d) => d.activosPrevio);
+  const retenidos = partes.reduce((s, p) => s + ((p.datos.retencion ?? 0) / 100) * p.datos.activosPrevio, 0);
+
+  return {
+    anio,
+    activos12m: suma((d) => d.activos12m),
+    retencion: activosPrevio > 0 ? (retenidos / activosPrevio) * 100 : null,
+    nuevos: suma((d) => d.nuevos),
+    recuperados: suma((d) => d.recuperados),
+    inactivos: suma((d) => d.inactivos),
+    perdidos: suma((d) => d.perdidos),
+    listas: {
+      activos12m: partes.flatMap((p) => p.datos.listas.activos12m),
+      nuevos: partes.flatMap((p) => p.datos.listas.nuevos),
+      recuperados: partes.flatMap((p) => p.datos.listas.recuperados),
+      inactivos: partes.flatMap((p) => p.datos.listas.inactivos),
+      perdidos: partes.flatMap((p) => p.datos.listas.perdidos),
+    },
+    tabla: partes
+      .flatMap((p) => p.datos.tabla.map((c) => ({ ...c, empresa: p.codigo })))
+      .sort((a, b) => b.neta - a.neta),
+  };
+}

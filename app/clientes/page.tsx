@@ -1,19 +1,140 @@
 import { cookies } from 'next/headers';
 import Link from 'next/link';
-import { getClientes } from '@/lib/datos/clientes';
+import { getClientes, getClientesFusionados } from '@/lib/datos/clientes';
 import { parseFiltros, getOpcionesFiltros, type SearchParams } from '@/lib/datos/filtros';
 import { decimal, eur, numero } from '@/lib/formato';
 import KpisClientes from '@/components/KpisClientes';
 import DescargarExcel from '@/components/DescargarExcel';
 import Filtros from '@/components/Filtros';
 import { ANIO_ACTUAL } from '@/lib/ejercicio';
+import { getUsuario } from '@/lib/datos/role';
+import { EMPRESAS } from '@/lib/empresas';
 
 
 const ANIO = ANIO_ACTUAL;
 
+
+/** Chips para acotar por empresa sin tocar el selector de la cabecera. */
+function ChipsEmpresa({ actual, searchParams }: { actual: string | null; searchParams: SearchParams }) {
+  const base = new URLSearchParams();
+  for (const [k, v] of Object.entries(searchParams ?? {})) {
+    if (k !== 'empresa' && typeof v === 'string') base.set(k, v);
+  }
+  const href = (codigo?: string) => {
+    const p = new URLSearchParams(base);
+    if (codigo) p.set('empresa', codigo);
+    const qs = p.toString();
+    return qs ? `/clientes?${qs}` : '/clientes';
+  };
+  const opciones = [{ codigo: null as string | null, etiqueta: 'Todas' }, ...EMPRESAS.map((e) => ({ codigo: e.codigo as string | null, etiqueta: e.codigo }))];
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+      <span style={{ fontSize: 12, color: 'var(--muted)' }}>Empresa:</span>
+      {opciones.map((o) => (
+        <Link
+          key={o.etiqueta}
+          href={href(o.codigo ?? undefined)}
+          className={`boton${(actual ?? null) === o.codigo ? ' boton-primario' : ''}`}
+        >
+          {o.etiqueta}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
 export default async function ClientesPage({ searchParams }: { searchParams: SearchParams }) {
-  const empresa = cookies().get('sfb_empresa')?.value ?? 'SF';
+  const empresaCookie = cookies().get('sfb_empresa')?.value ?? 'SF';
+  const usuario = await getUsuario();
+  const esComercial = usuario?.rol === 'comercial';
+  const empresaParam = EMPRESAS.find((e) => e.codigo === searchParams?.empresa)?.codigo ?? null;
   const filtros = parseFiltros(searchParams);
+
+  // El comercial ve por defecto las tres empresas juntas (listado consolidado) y
+  // puede acotar a una con las pestañas, sin tocar el selector de la cabecera.
+  const fusionado = esComercial && !empresaParam;
+  if (fusionado) {
+    const f = await getClientesFusionados(ANIO, filtros);
+    return (
+      <div>
+        <p className="breadcrumb">Cuadro mando comercial · Bloque 6</p>
+        <h1>Clientes · las tres empresas</h1>
+        <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
+          Facturación y margen de tus clientes de SF, FUX y DOT en {ANIO}. Elige una empresa para
+          ver el análisis completo (semáforo, evolución y matriz).
+        </p>
+
+        <ChipsEmpresa actual={null} searchParams={searchParams} />
+
+        <KpisClientes
+          anio={f.anio}
+          activos12m={f.activos12m}
+          retencion={f.retencion}
+          nuevos={f.nuevos}
+          recuperados={f.recuperados}
+          inactivos={f.inactivos}
+          perdidos={f.perdidos}
+          listas={f.listas}
+        />
+
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <h2 style={{ margin: 0 }}>Clientes por facturación {f.anio}</h2>
+            <DescargarExcel
+              nombre={`clientes-${ANIO}`}
+              columnas={['Empresa', 'Cliente', 'Comercial', 'Facturación', 'Margen', 'Margen %', 'Facturas', 'Ticket medio']}
+              registros={f.tabla.map((c) => [
+                c.empresa,
+                c.nombre,
+                c.comercial ?? '',
+                c.neta.toFixed(2),
+                c.margen.toFixed(2),
+                c.margenPct === null ? '' : c.margenPct.toFixed(2),
+                c.facturas,
+                c.ticket.toFixed(2),
+              ])}
+            />
+          </div>
+          {f.tabla.length === 0 ? (
+            <p style={{ color: 'var(--muted)' }}>Sin facturación en el ejercicio.</p>
+          ) : (
+            <table className="tabla">
+              <thead>
+                <tr>
+                  <th>Empresa</th>
+                  <th>Cliente</th>
+                  <th>Comercial</th>
+                  <th className="td-num">Facturación neta</th>
+                  <th className="td-num">Margen</th>
+                  <th className="td-num">Margen %</th>
+                  <th className="td-num">Facturas</th>
+                  <th className="td-num">Ticket medio</th>
+                </tr>
+              </thead>
+              <tbody>
+                {f.tabla.map((c) => (
+                  <tr key={`${c.empresa}-${c.id}`}>
+                    <td><span className="badge">{c.empresa}</span></td>
+                    <td><Link href={`/clientes/${c.id}`} className="enlace">{c.nombre}</Link></td>
+                    <td>{c.comercial ?? '—'}</td>
+                    <td className="td-num">{eur(c.neta)}</td>
+                    <td className="td-num">{eur(c.margen)}</td>
+                    <td className={`td-num ${c.margenPct !== null && c.margenPct >= 0 ? 'td-pos' : ''}`}>
+                      {c.margenPct === null ? '—' : `${decimal(c.margenPct)} %`}
+                    </td>
+                    <td className="td-num">{numero(c.facturas)}</td>
+                    <td className="td-num">{eur(c.ticket)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const empresa = empresaParam ?? empresaCookie;
   const [opciones, d] = await Promise.all([
     getOpcionesFiltros(empresa),
     getClientes(empresa, ANIO, filtros),
@@ -27,6 +148,8 @@ export default async function ClientesPage({ searchParams }: { searchParams: Sea
         Clientes activos, nuevos y perdidos de {d.empresa.nombre}, retención entre {ANIO - 1} y
         {d.anio}.
       </p>
+
+      {esComercial ? <ChipsEmpresa actual={empresa} searchParams={searchParams} /> : null}
 
       <Filtros opciones={opciones} />
 

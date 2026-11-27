@@ -4,12 +4,7 @@ import { useRouter } from 'next/navigation';
 import CampanaNotificaciones from '@/components/CampanaNotificaciones';
 import BuscadorGlobal from '@/components/BuscadorGlobal';
 import FrescuraDatos from '@/components/FrescuraDatos';
-
-const empresas = [
-  { codigo: 'SF', nombre: 'SF Bathroom' },
-  { codigo: 'DOT', nombre: 'DOT Surfaces' },
-  { codigo: 'FUX', nombre: 'Fuxsabany' },
-];
+import { EMPRESAS as empresas } from '@/lib/empresas';
 
 export default function Header({ rol }: { rol?: string }) {
   const [empresa, setEmpresa] = useState('SF');
