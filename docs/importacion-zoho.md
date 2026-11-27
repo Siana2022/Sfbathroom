@@ -17,8 +17,11 @@ sin perder información y sin duplicar.
 | Tareas | 1 |
 | Notas | 14 |
 
-FUX y DOT pueden tener **su propia organización** de Zoho: hay que repetir el proceso
-con credenciales de cada una.
+**Una sola organización de Zoho** para SF, FUX y DOT. Zoho **no distingue empresa**:
+cuentas, contactos, llamadas y notas están mezclados.
+
+Consecuencia: el cruce se hace contra **las tres empresas a la vez** (`clientes` de SF + FUX + DOT).
+Si un CIF existe en varias, se enlaza con la de actividad; si no hay CIF, se revisa a mano.
 
 ## 1. Destino de cada entidad
 
@@ -97,8 +100,9 @@ create table oportunidades (
 
 ## 4. Reglas de cruce
 
-- **Cuenta → cliente**: por `CIF` si existe; si no, por nombre normalizado
+- **Cuenta → cliente**: por `CIF` en **las tres empresas**; si no, por nombre normalizado
   (mayúsculas, sin acentos, sin S.L./S.A.). Nunca por aproximación difusa automática.
+- **Interacciones sin cliente**: quedan en revisión hasta vincularlas.
 - **Contacto → contacto**: por email; si no, nombre + cuenta.
 - **Comercial**: por email; si no, por nombre exacto.
 - Los que no casen se guardan en `*_revision` y se muestran en una pantalla de
@@ -126,7 +130,7 @@ create table oportunidades (
 
 ## 7. Lo que necesitamos del cliente
 
-- Confirmar si FUX y DOT usan **otra organización** de Zoho.
-- Credenciales API de cada organización (o exportaciones).
+- Confirmado: **una sola organización** para las tres empresas.
+- Confirmar qué empresa asignar cuando una cuenta no exista en A3ERP.
 - Decidir qué hacer con **Leads** y con las cuentas que no casen con A3ERP.
 - Autorización para revocar el token al terminar.
