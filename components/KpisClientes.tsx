@@ -15,6 +15,10 @@ const TITULOS: Record<Clave, string> = {
 
 type Props = {
   anio: number;
+  /** Facturación neta del año de los clientes de la vista. */
+  netaTotal: number;
+  /** Proyección de cierre (null si no es el año en curso). */
+  proyeccion: number | null;
   activos12m: number;
   retencion: number | null;
   nuevos: number;
@@ -51,7 +55,18 @@ function Tarjeta({
   );
 }
 
-export default function KpisClientes({ anio, activos12m, retencion, nuevos, recuperados, inactivos, perdidos, listas }: Props) {
+export default function KpisClientes({
+  anio,
+  netaTotal,
+  proyeccion,
+  activos12m,
+  retencion,
+  nuevos,
+  recuperados,
+  inactivos,
+  perdidos,
+  listas,
+}: Props) {
   const [sel, setSel] = useState<Clave | null>(null);
   const [comercial, setComercial] = useState('');
 
@@ -71,6 +86,16 @@ export default function KpisClientes({ anio, activos12m, retencion, nuevos, recu
   return (
     <>
       <ul className="grid-kpis">
+        <Tarjeta
+          etiqueta={`Facturación neta ${anio}`}
+          valor={eur(netaTotal)}
+          nota="clientes de esta vista"
+        />
+        <Tarjeta
+          etiqueta="Proyección de cierre"
+          valor={proyeccion === null ? '—' : eur(proyeccion)}
+          nota={proyeccion === null ? 'solo para el año en curso' : 'al ritmo actual, hasta 31 dic'}
+        />
         <Tarjeta
           etiqueta="Clientes activos 12M"
           valor={numero(activos12m)}

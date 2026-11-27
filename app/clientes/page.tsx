@@ -9,6 +9,7 @@ import Filtros from '@/components/Filtros';
 import { ANIO_ACTUAL } from '@/lib/ejercicio';
 import { getUsuario } from '@/lib/datos/role';
 import { EMPRESAS } from '@/lib/empresas';
+import { proyeccionAnual } from '@/lib/proyeccion';
 
 
 const ANIO = ANIO_ACTUAL;
@@ -68,6 +69,8 @@ export default async function ClientesPage({ searchParams }: { searchParams: Sea
 
         <KpisClientes
           anio={f.anio}
+          netaTotal={f.netaTotal}
+          proyeccion={proyeccionAnual(f.netaTotal, f.anio)}
           activos12m={f.activos12m}
           retencion={f.retencion}
           nuevos={f.nuevos}
@@ -155,6 +158,8 @@ export default async function ClientesPage({ searchParams }: { searchParams: Sea
 
       <KpisClientes
         anio={d.anio}
+        netaTotal={d.netaTotal}
+        proyeccion={proyeccionAnual(d.netaTotal, d.anio)}
         activos12m={d.activos12m}
         retencion={d.retencion}
         nuevos={d.nuevos}
