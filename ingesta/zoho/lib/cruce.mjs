@@ -107,24 +107,45 @@ export function crearCruce({ clientes, contactos }) {
   }
 
   /**
-   * Llamada de Zoho: `What_Id` (cuenta), `Who_Id` (contacto), y el asunto como último recurso.
+   * Vínculo común de una actividad: `What_Id` (cuenta), `Who_Id` (contacto) y, como
+   * último recurso, el texto del asunto/título.
    */
-  function resolverLlamada(llamada, cuentaPorId, zContactoPorId) {
-    const whatId = idDe(llamada.What_Id);
+  function resolverVinculo(registro, texto, cuentaPorId, zContactoPorId, vias) {
+    const whatId = idDe(registro.What_Id);
     if (whatId && cuentaPorId.has(whatId)) {
       const c = buscarCliente(cuentaPorId.get(whatId), idx, clientes);
-      if (c) return { cliente: c, via: 'cuenta', contacto: null };
+      if (c) return { cliente: c, via: vias.cuenta, contacto: null };
     }
 
-    const whoId = idDe(llamada.Who_Id);
+    const whoId = idDe(registro.Who_Id);
     if (whoId && zContactoPorId.has(whoId)) {
-      const r = resolverContactoZoho(zContactoPorId.get(whoId), cuentaPorId, 'contacto-email', 'contacto-cuenta');
+      const r = resolverContactoZoho(zContactoPorId.get(whoId), cuentaPorId, vias.contactoEmail, vias.contactoCuenta);
       if (r) return r;
     }
 
-    const porTexto = buscarCliente(llamada.Subject, idx, clientes);
-    if (porTexto) return { cliente: porTexto, via: 'texto', contacto: null };
+    const porTexto = buscarCliente(texto, idx, clientes);
+    if (porTexto) return { cliente: porTexto, via: vias.texto, contacto: null };
     return { cliente: null, via: null, contacto: null };
+  }
+
+  /** Llamada de Zoho. */
+  function resolverLlamada(llamada, cuentaPorId, zContactoPorId) {
+    return resolverVinculo(llamada, llamada.Subject, cuentaPorId, zContactoPorId, {
+      cuenta: 'cuenta',
+      contactoEmail: 'contacto-email',
+      contactoCuenta: 'contacto-cuenta',
+      texto: 'texto',
+    });
+  }
+
+  /** Visita/reunión de Zoho (`Events`). */
+  function resolverEvento(evento, cuentaPorId, zContactoPorId) {
+    return resolverVinculo(evento, evento.Event_Title, cuentaPorId, zContactoPorId, {
+      cuenta: 'evento-cuenta',
+      contactoEmail: 'evento-contacto-email',
+      contactoCuenta: 'evento-contacto-cuenta',
+      texto: 'evento-texto',
+    });
   }
 
   /**
@@ -135,7 +156,7 @@ export function crearCruce({ clientes, contactos }) {
    *   3. si es un contacto → su email o su cuenta;
    *   4. y si no trae módulo, se deduce por el id.
    */
-  function resolverNota(nota, cuentaPorId, zContactoPorId, llamadaPorId) {
+  function resolverNota(nota, cuentaPorId, zContactoPorId, llamadaPorId, eventoPorId) {
     const parentId = idDe(nota.Parent_Id);
     const modulo = apiNameDeModulo(nota.$se_module) ?? apiNameDeModulo(nota.Parent_Id?.module);
 
@@ -144,6 +165,12 @@ export function crearCruce({ clientes, contactos }) {
       if (esLlamada && llamadaPorId?.has(parentId)) {
         const r = resolverLlamada(llamadaPorId.get(parentId), cuentaPorId, zContactoPorId);
         if (r.cliente) return { cliente: r.cliente, via: 'nota-llamada', contacto: r.contacto };
+      }
+
+      const esEvento = modulo === 'Events' || (!modulo && eventoPorId?.has(parentId));
+      if (esEvento && eventoPorId?.has(parentId)) {
+        const r = resolverEvento(eventoPorId.get(parentId), cuentaPorId, zContactoPorId);
+        if (r.cliente) return { cliente: r.cliente, via: 'nota-evento', contacto: r.contacto };
       }
 
       const esCuenta = modulo === 'Accounts' || (!modulo && cuentaPorId.has(parentId));
@@ -169,5 +196,5 @@ export function crearCruce({ clientes, contactos }) {
     return { cliente: null, via: null, contacto: null };
   }
 
-  return { idx, clientes, clientePorId, contactoPorEmail, resolverLlamada, resolverNota };
+  return { idx, clientes, clientePorId, contactoPorEmail, resolverLlamada, resolverEvento, resolverNota };
 }

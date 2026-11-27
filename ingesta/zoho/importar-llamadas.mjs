@@ -149,22 +149,24 @@ async function main() {
     leerTabla('clientes', 'id,nombre,cif,empresa_id,comercial_id'),
     leerTabla('clientes_contactos', 'id,nombre,email,cliente_id'),
     leerTabla('comerciales', 'id,nombre,email'),
-    leerTabla('interacciones', 'id,id_externo,cliente_id', 'origen=eq.zoho'),
+    leerTabla('interacciones', 'id,id_externo,cliente_id,empresa_id,comercial_id', 'origen=eq.zoho'),
   ]);
 
-  const [cuentas, zContacts, llamadas, notas] = await Promise.all([
+  const [cuentas, zContacts, llamadas, notas, eventos] = await Promise.all([
     zohoAll(token, 'Accounts', 'id,Account_Name'),
     zohoAll(token, 'Contacts', 'id,Full_Name,Email,Account_Name,Account_Name.id'),
     zohoAll(token, 'Calls', 'id,Subject,Call_Start_Time,Call_Duration,Description,Call_Result,Who_Id,What_Id,Owner'),
     SIN_NOTAS
       ? Promise.resolve([])
       : zohoAll(token, 'Notes', 'id,Note_Title,Note_Content,Parent_Id,Created_Time,Owner'),
+    SIN_NOTAS ? Promise.resolve([]) : zohoAll(token, 'Events', 'id,Event_Title,Who_Id,What_Id'),
   ]);
 
   const cruce = crearCruce({ clientes, contactos });
   const cuentaPorId = new Map(cuentas.map((c) => [c.id, c.Account_Name]));
   const zContactoPorId = new Map(zContacts.map((c) => [c.id, c]));
   const llamadaPorId = new Map(llamadas.map((l) => [l.id, l]));
+  const eventoPorId = new Map(eventos.map((e) => [e.id, e]));
   const comercialPorEmail = new Map(
     comerciales.filter((c) => c.email).map((c) => [String(c.email).trim().toLowerCase(), c]),
   );
@@ -188,6 +190,18 @@ async function main() {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Si el padre (llamada o visita) ya está vinculado a mano en la base de datos,
+   * la nota hereda ese cliente: así se casan las notas de llamadas que se
+   * corrigieron en la pantalla de pendientes.
+   */
+  function clienteDePadreVinculado(parentId) {
+    const previa = parentId ? yaImportadas.get(parentId) : null;
+    if (!previa?.cliente_id) return null;
+    const cliente = cruce.clientePorId.get(previa.cliente_id) ?? null;
+    return cliente ? { cliente, via: 'nota-padre-vinculado', contacto: null } : null;
   }
 
   function comercialDe(registro, cliente) {
@@ -250,7 +264,9 @@ async function main() {
     else if (modulo && modulo in porModuloNotas) porModuloNotas[modulo] += 1;
     else porModuloNotas.otros += 1;
 
-    const { cliente, via } = cruce.resolverNota(nota, cuentaPorId, zContactoPorId, llamadaPorId);
+    let resuelto = cruce.resolverNota(nota, cuentaPorId, zContactoPorId, llamadaPorId, eventoPorId);
+    if (!resuelto.cliente) resuelto = clienteDePadreVinculado(parentId) ?? resuelto;
+    const { cliente, via } = resuelto;
     if (vinculoManualChoca(idExterno, cliente)) continue;
 
     if (cliente) porViaNotas[via] = (porViaNotas[via] ?? 0) + 1;

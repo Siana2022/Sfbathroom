@@ -79,19 +79,21 @@ async function supabase(tabla, campos) {
 
 async function main() {
   const token = await tokenZoho();
-  const [clientes, contactos, cuentas, zContacts, llamadas, notas] = await Promise.all([
+  const [clientes, contactos, cuentas, zContacts, llamadas, notas, eventos] = await Promise.all([
     supabase('clientes', 'id,nombre,cif,empresa_id,comercial_id'),
     supabase('clientes_contactos', 'id,nombre,email,cliente_id'),
     zohoAll(token, 'Accounts', 'id,Account_Name'),
     zohoAll(token, 'Contacts', 'id,Full_Name,Email,Account_Name,Account_Name.id'),
     zohoAll(token, 'Calls', 'id,Subject,Call_Start_Time,Call_Duration,Description,Call_Result,Who_Id,What_Id,Owner'),
     zohoAll(token, 'Notes', 'id,Note_Title,Note_Content,Parent_Id,Created_Time,Owner'),
+    zohoAll(token, 'Events', 'id,Event_Title,Who_Id,What_Id'),
   ]);
 
   const cruce = crearCruce({ clientes, contactos });
   const cuentaPorId = new Map(cuentas.map((c) => [c.id, c.Account_Name]));
   const zContactoPorId = new Map(zContacts.map((c) => [c.id, c]));
   const llamadaPorId = new Map(llamadas.map((l) => [l.id, l]));
+  const eventoPorId = new Map(eventos.map((e) => [e.id, e]));
 
   const informe = {
     generado: new Date().toISOString(),
@@ -102,6 +104,7 @@ async function main() {
       contactosZoho: zContacts.length,
       llamadas: llamadas.length,
       notas: notas.length,
+      eventos: eventos.length,
     },
     llamadas: { casan: 0, sueltas: 0, porVia: {}, ejemplosSueltos: [] },
     notas: { casan: 0, sueltas: 0, porVia: {}, porModuloPadre: { Accounts: 0, Contacts: 0, Calls: 0, Events: 0, otros: 0, sinPadre: 0 }, ejemplosSueltos: [] },
@@ -135,7 +138,7 @@ async function main() {
     else if (modulo === 'Events') informe.notas.porModuloPadre.Events += 1;
     else informe.notas.porModuloPadre.otros += 1;
 
-    const { cliente, via } = cruce.resolverNota(n, cuentaPorId, zContactoPorId, llamadaPorId);
+    const { cliente, via } = cruce.resolverNota(n, cuentaPorId, zContactoPorId, llamadaPorId, eventoPorId);
     if (cliente) {
       informe.notas.casan += 1;
       informe.notas.porVia[via] = (informe.notas.porVia[via] ?? 0) + 1;
