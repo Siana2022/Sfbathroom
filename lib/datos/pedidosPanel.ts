@@ -44,8 +44,7 @@ type Fila = {
   situacion: string | null;
   situacion_detalle: string | null;
   cliente_nombre: string | null;
-  clientes: { nombre: string }[] | null;
-  pedido_lineas: { descripcion: string | null; codigo_articulo: string | null; cantidad: number | null }[] | null;
+  cliente_id: string | null;
 };
 
 function numero(f: Fila): string {
@@ -62,13 +61,15 @@ async function cargarPanel(codigoEmpresa: string, anio: number): Promise<Pedidos
   const empresa = await getEmpresaPorCodigo(codigoEmpresa);
   const hoyISO = new Date().toISOString().slice(0, 10);
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('pedidos')
     .select(
-      'id, numero_erp, serie, fecha, fecha_entrada, fecha_prometida, importe, estado, situacion, situacion_detalle, cliente_nombre, clientes(nombre), pedido_lineas(descripcion, codigo_articulo, cantidad)',
+      'id, numero_erp, serie, fecha, fecha_entrada, fecha_prometida, importe, estado, situacion, situacion_detalle, cliente_nombre, cliente_id',
     )
     .eq('empresa_id', empresa.id)
     .order('fecha_entrada', { ascending: true });
+
+  if (error) throw new Error(`pedidos ${empresa.codigo}: ${error.message}`);
 
   // Abierto = SITUACIONDETALLE empieza por PENDIENTE (o estado ya normalizado).
   // Se admite también el estado antiguo `captado` de las filas sin recargar.
@@ -80,6 +81,27 @@ async function cargarPanel(codigoEmpresa: string, anio: number): Promise<Pedidos
     }
     return f.estado === 'pendiente' || f.estado === 'captado';
   });
+
+  // Líneas de esos pedidos, en una segunda consulta (sin datos anidados).
+  const lineasPorPedido = new Map<string, LineaPedido[]>();
+  const ids = filas.map((f) => f.id);
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data: lineas, error: eLineas } = await supabase
+      .from('pedido_lineas')
+      .select('pedido_id, descripcion, codigo_articulo, cantidad')
+      .in('pedido_id', ids.slice(i, i + 100));
+    if (eLineas) throw new Error(`lineas ${empresa.codigo}: ${eLineas.message}`);
+    for (const l of (lineas ?? []) as {
+      pedido_id: string;
+      descripcion: string | null;
+      codigo_articulo: string | null;
+      cantidad: number | null;
+    }[]) {
+      const arr = lineasPorPedido.get(l.pedido_id) ?? [];
+      arr.push({ descripcion: l.descripcion ?? '', codigo: l.codigo_articulo, cantidad: Number(l.cantidad ?? 0) });
+      lineasPorPedido.set(l.pedido_id, arr);
+    }
+  }
 
   // Última observación por pedido (la tabla es pequeña: se trae entera y se filtra).
   const { data: obs } = await supabase
@@ -102,16 +124,12 @@ async function cargarPanel(codigoEmpresa: string, anio: number): Promise<Pedidos
       id: f.id,
       empresaId: empresa.id,
       numero: numero(f),
-      cliente: f.clientes?.[0]?.nombre ?? f.cliente_nombre ?? '—',
+      cliente: f.cliente_nombre ?? '—',
       fecha,
       fechaPrometida: f.fecha_prometida,
       diasRetraso,
       importe: Number(f.importe ?? 0),
-      lineas: (f.pedido_lineas ?? []).map((l) => ({
-        descripcion: l.descripcion ?? '',
-        codigo: l.codigo_articulo,
-        cantidad: Number(l.cantidad ?? 0),
-      })),
+      lineas: lineasPorPedido.get(f.id) ?? [],
       observacion: observacion.get(f.id) ?? null,
     };
   });
