@@ -1,232 +1,157 @@
 import { cookies } from 'next/headers';
-import { getPedidos, getPedidosFusionados } from '@/lib/datos/pedidos';
-import { parseFiltros, getOpcionesFiltros, type SearchParams } from '@/lib/datos/filtros';
-import { decimal, eur, fecha, numero } from '@/lib/formato';
-import Kpi from '@/components/Kpi';
-import DescargarExcel from '@/components/DescargarExcel';
-import Filtros from '@/components/Filtros';
-import Aviso from '@/components/Aviso';
-import { ANIO_ACTUAL } from '@/lib/ejercicio';
 import { getUsuario } from '@/lib/datos/role';
-import { EMPRESAS } from '@/lib/empresas';
-import ChipsEmpresa from '@/components/ChipsEmpresa';
-
+import { getPedidosPanel, getPedidosPanelFusionado, type PedidoOperativo } from '@/lib/datos/pedidosPanel';
+import { eur, fecha, numero } from '@/lib/formato';
+import Kpi from '@/components/Kpi';
+import ObservacionPedido from '@/components/ObservacionPedido';
+import { ANIO_ACTUAL } from '@/lib/ejercicio';
 
 const ANIO = ANIO_ACTUAL;
 
-export default async function PedidosPage({ searchParams }: { searchParams: SearchParams }) {
-  const empresaCookie = cookies().get('sfb_empresa')?.value ?? 'SF';
-  const filtros = parseFiltros(searchParams);
+/** Resumen de lo pedido: hasta 4 líneas y el resto como «+N». */
+function Lineas({ lineas }: { lineas: PedidoOperativo['lineas'] }) {
+  if (lineas.length === 0) return <span style={{ color: 'var(--muted)' }}>Sin detalle de líneas</span>;
+  const visibles = lineas.slice(0, 4);
+  return (
+    <div style={{ fontSize: 12.5, lineHeight: 1.45 }}>
+      {visibles.map((l, i) => (
+        <div key={i}>
+          {numero(l.cantidad)} × {l.descripcion || l.codigo || '—'}
+        </div>
+      ))}
+      {lineas.length > visibles.length ? (
+        <div style={{ color: 'var(--muted)' }}>+{lineas.length - visibles.length} líneas más</div>
+      ) : null}
+    </div>
+  );
+}
+
+function Vacio({ children }: { children: string }) {
+  return <p style={{ color: 'var(--muted)' }}>{children}</p>;
+}
+
+export default async function PedidosPage() {
   const usuario = await getUsuario();
   const esComercial = usuario?.rol === 'comercial';
-  const empresaParam = EMPRESAS.find((e) => e.codigo === searchParams?.empresa)?.codigo ?? null;
-  // El comercial ve por defecto la cartera de las tres empresas; las pestañas acotan.
-  const fusionado = esComercial && !empresaParam;
-  const empresa = empresaParam ?? empresaCookie;
+  const d = esComercial
+    ? await getPedidosPanelFusionado(ANIO)
+    : await getPedidosPanel(cookies().get('sfb_empresa')?.value ?? 'SF', ANIO);
 
-  const opciones = fusionado ? null : await getOpcionesFiltros(empresa, { fuente: 'pedidos', anio: ANIO });
-  const d = fusionado ? await getPedidosFusionados(ANIO, filtros) : await getPedidos(empresa, ANIO, filtros);
+  const conEmpresa = esComercial && d.pendientes.some((p) => p.empresa);
+
+  const tablas = [
+    {
+      titulo: 'Pendientes de servir',
+      filas: d.pendientes,
+      columnas: ['Cliente', 'Pedido', 'Fecha del pedido', 'Qué han pedido'],
+      render: (p: PedidoOperativo) => (
+        <>
+          <td>{p.cliente}</td>
+          <td>{p.numero}</td>
+          <td>{fecha(p.fecha)}</td>
+          <td><Lineas lineas={p.lineas} /></td>
+        </>
+      ),
+    },
+    {
+      titulo: 'Con fecha de entrega programada',
+      filas: d.programados,
+      columnas: ['Cliente', 'Pedido', 'Fecha del pedido', 'Entrega prevista', 'Qué han pedido'],
+      render: (p: PedidoOperativo) => (
+        <>
+          <td>{p.cliente}</td>
+          <td>{p.numero}</td>
+          <td>{fecha(p.fecha)}</td>
+          <td>{fecha(p.fechaPrometida)}</td>
+          <td><Lineas lineas={p.lineas} /></td>
+        </>
+      ),
+    },
+  ];
 
   return (
     <div>
       <p className="breadcrumb">Cuadro mando comercial · Bloque 2</p>
-      <h1>Pedidos y cartera</h1>
+      <h1>Pedidos pendientes</h1>
       <p style={{ color: 'var(--muted)', maxWidth: 760 }}>
-        Pedidos de {d.empresa.nombre}, cartera pendiente de servir y entregas fuera de plazo.
+        Todo lo que está pendiente de servir de {d.empresa.nombre}: sin fecha, con fecha programada y
+        lo que ya va fuera de plazo.
       </p>
 
-      {esComercial ? <ChipsEmpresa actual={empresaParam} searchParams={searchParams} ruta="/pedidos" /> : null}
-
-      {opciones ? <Filtros opciones={opciones} campos={['cliente', 'comercial', 'desde', 'hasta']} /> : null}
-
-      {d.sinEnlaceFacturas && (
-        <Aviso tipo="info">
-          Todavía no hay facturas enlazadas a pedidos, así que <strong>servido</strong> y{' '}
-          <strong>pendiente</strong> se estiman con la situación del pedido en A3ERP. Cuando la
-          ingesta rellene el vínculo pedido → factura, estas cifras pasarán a calcularse por
-          fecha de factura.
-        </Aviso>
-      )}
-
-      {d.captados === 0 && (
-        <Aviso tipo="info">
-          No hay pedidos cargados para {d.anio} con los filtros actuales.
-        </Aviso>
-      )}
-
       <ul className="grid-kpis">
-        <Kpi etiqueta={`Pedidos captados ${d.anio}`} valor={numero(d.captados)} nota={`importe ${eur(d.importeCaptado)}`} />
-        <Kpi etiqueta="Cartera pendiente" valor={eur(d.importePendiente)} nota={`${numero(d.pendientes)} entregas programadas`} />
-        <Kpi etiqueta="Pedidos servidos" valor={numero(d.servidos)} nota={`importe ${eur(d.importeServido)}`} />
-        <Kpi etiqueta="Pedidos anulados" valor={numero(d.anulados)} nota={`importe ${eur(d.importeAnulado)}`} />
-        <Kpi etiqueta="Ticket medio por pedido" valor={eur(d.ticketMedio)} nota="importe captado entre pedidos no anulados" />
-        <Kpi etiqueta="Antigüedad media cartera" valor={`${Math.round(d.antiguedadMediaCartera)} días`} nota="desde la fecha de entrada" />
+        <Kpi etiqueta="Cartera pendiente" valor={eur(d.importePendiente)} nota={`${numero(d.pendientes.length)} pedidos`} />
+        <Kpi etiqueta="Con fecha programada" valor={eur(d.importeProgramado)} nota={`${numero(d.programados.length)} pedidos`} />
         <Kpi
-          etiqueta="Plazo medio entrada → entrega"
-          valor={d.plazoMedioEntrega === null ? '—' : `${Math.round(d.plazoMedioEntrega)} días`}
-          nota="solo pedidos sin fecha programada"
-        />
-        <Kpi etiqueta="Pedidos con fecha programada" valor={numero(d.programados)} nota={`importe ${eur(d.importeProgramado)}`} />
-        <Kpi
-          etiqueta="Cumplimiento fecha comprometida"
-          valor={d.cumplimientoFecha === null ? '—' : `${decimal(d.cumplimientoFecha)} %`}
-          nota="facturados en la fecha programada o antes"
+          etiqueta="Fuera de plazo"
+          valor={numero(d.fueraPlazo.length)}
+          nota={`${eur(d.importeFueraPlazo)} en riesgo`}
         />
       </ul>
 
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2>Pedidos fuera de plazo de entrega</h2>
-          <DescargarExcel
-            nombre={`pedidos-fuera-plazo-${d.anio}`}
-            columnas={fusionado ? ['Empresa', 'Cliente', 'Pedido', 'Entrega prevista', 'Días de retraso', 'Importe'] : ['Cliente', 'Pedido', 'Entrega prevista', 'Días de retraso', 'Importe']}
-            registros={d.fueraPlazo.map((f) =>
-              fusionado
-                ? [f.empresa ?? '', f.cliente, f.numero, f.fechaPrevista, f.diasRetraso, f.importe]
-                : [f.cliente, f.numero, f.fechaPrevista, f.diasRetraso, f.importe],
-            )}
-          />
+      {tablas.map((t) => (
+        <div className="card" key={t.titulo}>
+          <h2>{t.titulo} ({t.filas.length})</h2>
+          {t.filas.length === 0 ? (
+            <Vacio>No hay pedidos en esta situación.</Vacio>
+          ) : (
+            <table className="tabla">
+              <thead>
+                <tr>
+                  {conEmpresa ? <th>Empresa</th> : null}
+                  {t.columnas.map((c) => (
+                    <th key={c}>{c}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {t.filas.map((p) => (
+                  <tr key={p.id}>
+                    {conEmpresa ? <td><span className="badge">{p.empresa}</span></td> : null}
+                    {t.render(p)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
-        <p className="nota" style={{ color: 'var(--muted)', marginTop: 0 }}>
-          Entrega prevista: la fecha programada del pedido; si no la tiene,{' '}
-          {d.empresa.codigo === 'DOT' ? '21 días naturales' : '5 días hábiles'} desde la fecha de
-          entrada. Solo pedidos pendientes de servir.
-        </p>
+      ))}
+
+      <div className="card">
+        <h2>Fuera de plazo de entrega ({d.fueraPlazo.length})</h2>
         {d.fueraPlazo.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>No hay pedidos abiertos fuera de plazo.</p>
+          <Vacio>Ningún pedido pendiente ha pasado su fecha de entrega.</Vacio>
         ) : (
           <table className="tabla">
             <thead>
               <tr>
-                {fusionado ? <th>Empresa</th> : null}
+                {conEmpresa ? <th>Empresa</th> : null}
                 <th>Cliente</th>
                 <th>Pedido</th>
+                <th>Fecha del pedido</th>
                 <th>Entrega prevista</th>
-                <th className="td-num">Días de retraso</th>
-                <th className="td-num">Importe</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.fueraPlazo.map((f) => (
-                <tr key={f.id}>
-                  {fusionado ? <td><span className="badge">{f.empresa}</span></td> : null}
-                  <td>{f.cliente}</td>
-                  <td>{f.numero}</td>
-                  <td>{fecha(f.fechaPrevista)}</td>
-                  <td className="td-num" style={{ color: 'var(--rojo)', fontWeight: 600 }}>
-                    {f.diasRetraso}
-                  </td>
-                  <td className="td-num">{eur(f.importe)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        {d.fueraPlazoTotal > d.fueraPlazo.length && (
-          <p className="nota" style={{ color: 'var(--muted)' }}>
-            Mostrando los {d.fueraPlazo.length} más retrasados de {numero(d.fueraPlazoTotal)}.
-          </p>
-        )}
-      </div>
-
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2>Cartera pendiente por cliente</h2>
-          <DescargarExcel
-            nombre={`pedidos-cartera-por-cliente-${d.anio}`}
-            columnas={fusionado ? ['Empresa', 'Cliente', 'Pedidos', 'Pendiente', 'Próxima entrega', 'Días'] : ['Cliente', 'Pedidos', 'Pendiente', 'Próxima entrega', 'Días']}
-            registros={d.carteraCliente.map((c) => [
-              ...(fusionado ? [c.empresa ?? ''] : []),
-              c.nombre,
-              c.pedidos,
-              c.pendiente,
-              c.proximaEntrega ?? '',
-              c.diasHastaEntrega ?? '',
-            ])}
-          />
-        </div>
-        {d.carteraCliente.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>Sin cartera pendiente.</p>
-        ) : (
-          <table className="tabla">
-            <thead>
-              <tr>
-                {fusionado ? <th>Empresa</th> : null}
-                <th>Cliente</th>
-                <th className="td-num">Pedidos</th>
-                <th className="td-num">Pendiente</th>
-                <th>Próxima entrega</th>
                 <th className="td-num">Días</th>
+                <th>Qué han pedido</th>
+                <th>Observación</th>
               </tr>
             </thead>
             <tbody>
-              {d.carteraCliente.map((c) => (
-                <tr key={`${c.empresa ?? ''}-${c.nombre}`}>
-                  {fusionado ? <td><span className="badge">{c.empresa}</span></td> : null}
-                  <td>{c.nombre}</td>
-                  <td className="td-num">{numero(c.pedidos)}</td>
-                  <td className="td-num">{eur(c.pendiente)}</td>
-                  <td>{fecha(c.proximaEntrega)}</td>
-                  <td className="td-num">{c.diasHastaEntrega === null ? '—' : `${c.diasHastaEntrega} días`}</td>
+              {d.fueraPlazo.map((p) => (
+                <tr key={p.id}>
+                  {conEmpresa ? <td><span className="badge">{p.empresa}</span></td> : null}
+                  <td>{p.cliente}</td>
+                  <td>{p.numero}</td>
+                  <td>{fecha(p.fecha)}</td>
+                  <td>{fecha(p.fechaPrometida)}</td>
+                  <td className="td-num" style={{ color: 'var(--rojo)', fontWeight: 600 }}>{p.diasRetraso}</td>
+                  <td><Lineas lineas={p.lineas} /></td>
+                  <td>
+                    <ObservacionPedido pedidoId={p.id} empresaId={p.empresaId} observacion={p.observacion} />
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
-      </div>
-
-      <div className="card">
-        <h2>Pedidos por estado</h2>
-        {d.porEstado.map((e) => (
-          <details key={e.estado} className="estado-grupo">
-            <summary>
-              <span>{e.label}</span>
-              <span className="estado-cifras">
-                {numero(e.pedidos)} pedidos · {eur(e.importe)}
-              </span>
-            </summary>
-            {e.detalle.length === 0 ? (
-              <p style={{ color: 'var(--muted)' }}>Sin pedidos en este estado.</p>
-            ) : (
-              <table className="tabla">
-                <thead>
-                  <tr>
-                    <th>Cliente</th>
-                    <th>Pedido</th>
-                    <th>Entrada</th>
-                    <th>Entrega prevista</th>
-                    <th>Facturado</th>
-                    <th className="td-num">Importe</th>
-                    <th className="td-num">Retraso</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {e.detalle.map((p) => (
-                    <tr key={p.id}>
-                      <td>{p.cliente}</td>
-                      <td>{p.numero}</td>
-                      <td>{fecha(p.fechaEntrada)}</td>
-                      <td>{fecha(p.fechaPrevista)}</td>
-                      <td>{fecha(p.fechaFactura)}</td>
-                      <td className="td-num">{eur(p.importe)}</td>
-                      <td
-                        className="td-num"
-                        style={p.diasRetraso ? { color: 'var(--rojo)', fontWeight: 600 } : undefined}
-                      >
-                        {p.diasRetraso ? `${p.diasRetraso} días` : '—'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-            {e.total > e.detalle.length && (
-              <p className="nota" style={{ color: 'var(--muted)' }}>
-                Mostrando los {e.detalle.length} más recientes de {numero(e.total)}.
-              </p>
-            )}
-          </details>
-        ))}
       </div>
     </div>
   );
